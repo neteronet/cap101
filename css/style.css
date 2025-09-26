@@ -1,0 +1,46 @@
+html,
+body {
+  overflow-x: hidden;
+  height: 100%;
+  width: 100%;
+  font-family: "Roboto", sans-serif;
+  font-size: large;
+}
+
+headerHome {
+  background-color: #337ab7;
+  color: white;
+}
+
+.hero-section {
+  background: linear-gradient(rgba(24, 124, 46, 0.1), rgba(24, 124, 46, 0.2)),
+    url("../photos/hero-background.jpg");
+  background-size: cover;
+  background-position: center;
+  height: 640px;
+  display: flex;
+  align-items: center;
+}
+
+.outlined-text-stroke {
+  -webkit-text-stroke: 2px black; /* Adjust thickness and color */
+  color: white; /* Fill color */
+}
+
+footer {
+  font-size: small;
+}
+
+.fixed-size {
+  width: 300px; /* set width */
+  height: 200px; /* set height */
+  object-fit: cover; /* keeps proportions and crops overflow */
+}
+
+.form-login {
+  max-width: 400px;
+  padding: 2rem;
+  background: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
