@@ -8,41 +8,108 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-// Retrieve the user's name from the session.
-// In your login example, you stored 'username' (e.g., 'delacruzjuan') in the session.
-// We'll use this for the display.
-$display_name = $_SESSION['name'] ?? 'Farmer'; // Fallback to 'Farmer' if not set
-
-// If you had a 'full_name' column in your database and stored it in the session,
-// you would use that instead. For example, if you stored $_SESSION['full_name']
-// $display_name = $_SESSION['full_name'] ?? 'Farmer';
+// Initialize variables to hold fetched data
+$display_name = 'Farmer'; // Default name for the header
+$farmer_data = null;     // Will hold all farmer profile data
 
 $servername = "localhost";
 $db_username = "root"; // Your database username
 $db_password = "";     // Your database password
 $dbname = "cap101"; // Your database name
 
+// Create connection
 $conn = new mysqli($servername, $db_username, $db_password, $dbname);
 
+// Check connection
 if ($conn->connect_error) {
-    // Log error or display a generic message, but don't expose database details
     error_log("Database connection failed: " . $conn->connect_error);
-    // You might want to redirect to an error page or show a friendly message
-} else {
-    // Assuming your 'users' table has a 'username' column that serves as the display name
-    // If you have a 'first_name' and 'last_name', you'd fetch those.
-    $stmt = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
-    $stmt->bind_param("i", $_SESSION['user_id']);
-    $stmt->execute();
-    $stmt->bind_result($fetched_db_name);
-    $stmt->fetch();
-    if ($fetched_db_name) {
-        $display_name = $fetched_db_name; // Use the name fetched from DB
-    }
-    $stmt->close();
-    $conn->close();
+    // In a real application, you might redirect to a friendly error page
+    die("A database error occurred. Please try again later.");
 }
 
+// --- 1. Fetch user's display name for the header ---
+// Assuming your 'users' table has a 'name' column.
+// If not, you might want to fetch first_name and last_name from the 'Farmers' table
+// and combine them for the display_name.
+if (isset($_SESSION['user_id'])) {
+    $stmt_user = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
+    if ($stmt_user) {
+        $stmt_user->bind_param("i", $_SESSION['user_id']);
+        $stmt_user->execute();
+        $stmt_user->bind_result($fetched_db_name);
+        $stmt_user->fetch();
+        if ($fetched_db_name) {
+            $display_name = htmlspecialchars($fetched_db_name); // Use fetched name
+        }
+        $stmt_user->close();
+    } else {
+        error_log("Failed to prepare user name statement: " . $conn->error);
+    }
+}
+
+// --- 2. Fetch farmer's profile data ---
+if (isset($_SESSION['user_id'])) {
+    $stmt_farmer = $conn->prepare("SELECT
+                                    farmer_id, rsbsa_id, first_name, middle_name, last_name,
+                                    address, contact_number, land_details, status,
+                                    age, gender, civil_status, crop /* Added crop */
+                                   FROM Farmers
+                                   WHERE user_id = ?");
+    if ($stmt_farmer) {
+        $stmt_farmer->bind_param("i", $_SESSION['user_id']);
+        $stmt_farmer->execute();
+        $result = $stmt_farmer->get_result();
+        $farmer_data = $result->fetch_assoc();
+        $stmt_farmer->close();
+
+        // If land_details is a JSON string, decode it
+        if ($farmer_data && isset($farmer_data['land_details'])) {
+            $farmer_data['land_details_decoded'] = json_decode($farmer_data['land_details'], true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                error_log("JSON decoding error for farmer_id " . ($farmer_data['farmer_id'] ?? 'unknown') . ": " . json_last_error_msg());
+                $farmer_data['land_details_decoded'] = []; // Fallback to empty array on error
+            }
+        } else if ($farmer_data) {
+             $farmer_data['land_details_decoded'] = []; // Initialize if no land_details
+        }
+    } else {
+        error_log("Failed to prepare farmer data statement: " . $conn->error);
+    }
+}
+
+$conn->close();
+
+// Fallback for cases where farmer_data couldn't be fetched or doesn't exist
+if (!$farmer_data) {
+    // This could mean the user_id exists but no corresponding farmer record,
+    // or an error occurred.
+    // In a real application, you might prompt them to complete their farmer profile.
+    $farmer_data = [
+        'first_name' => 'N/A',
+        'middle_name' => '', // Keep empty for easier full name construction
+        'last_name' => 'N/A',
+        'rsbsa_id' => 'N/A',
+        'address' => 'N/A',
+        'contact_number' => 'N/A',
+        'land_details_decoded' => [], // Ensure it's an empty array
+        'status' => 'unknown', // Default status
+        'age' => 'N/A',      // Default age
+        'gender' => 'N/A',   // Default gender
+        'civil_status' => 'N/A', // Default civil status
+        'crop' => 'N/A'      // Default crop
+    ];
+}
+
+// Construct full name for display in the profile body
+$full_name_profile = htmlspecialchars($farmer_data['first_name'] . ' ' .
+                       ($farmer_data['middle_name'] ? substr($farmer_data['middle_name'], 0, 1) . '. ' : '') .
+                       $farmer_data['last_name']);
+
+// Use the fetched age, gender, civil_status, and crop directly
+$age = htmlspecialchars($farmer_data['age'] ?? 'N/A');
+$gender = htmlspecialchars($farmer_data['gender'] ?? 'N/A');
+$civil_status = htmlspecialchars($farmer_data['civil_status'] ?? 'N/A');
+$crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A'); // Fetching crop here
 ?>
 
 <!DOCTYPE html>
@@ -93,7 +160,8 @@ if ($conn->connect_error) {
             display: flex;
             align-items: center;
             text-decoration: none;
-            box-sizing: border-box; /* Ensure padding doesn't push it out */
+            box-sizing: border-box;
+            /* Ensure padding doesn't push it out */
         }
 
         .sidebar .nav-link i {
@@ -149,7 +217,8 @@ if ($conn->connect_error) {
             font-size: 1rem;
             display: flex;
             align-items: center;
-            justify-content: flex-end; /* Align to the right */
+            justify-content: flex-end;
+            /* Align to the right */
             z-index: 1060;
             border-bottom: 1px solid #ddd;
         }
@@ -180,15 +249,18 @@ if ($conn->connect_error) {
             font-size: 1.8rem;
             font-weight: 600;
             color: #19860f;
-            margin-bottom: 1rem; /* Reduced margin to match dashboard */
+            margin-bottom: 1rem;
+            /* Reduced margin to match dashboard */
         }
 
         /* General card styling for consistency */
         .card {
             border-radius: 0.5rem;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-            margin-bottom: 1rem; /* Consistent bottom margin */
-            border: 1px solid #ddd; /* Add border for consistency */
+            margin-bottom: 1rem;
+            /* Consistent bottom margin */
+            border: 1px solid #ddd;
+            /* Add border for consistency */
         }
 
         .profile-header {
@@ -209,7 +281,8 @@ if ($conn->connect_error) {
         }
 
         .profile-header h4 {
-            font-size: 1.5rem; /* Consistent with dashboard card titles */
+            font-size: 1.5rem;
+            /* Consistent with dashboard card titles */
             color: #19860f;
             margin-bottom: 0.3rem;
         }
@@ -217,23 +290,30 @@ if ($conn->connect_error) {
         .info-label {
             font-weight: 600;
             margin-right: 0.5rem;
-            color: #555; /* Slightly darker for better readability */
+            color: #555;
+            /* Slightly darker for better readability */
         }
 
         .section-title {
-            font-size: 1.25rem; /* Consistent with dashboard card titles */
+            font-size: 1.25rem;
+            /* Consistent with dashboard card titles */
             font-weight: 600;
             color: #19860f;
-            margin-top: 1.5rem; /* Adjusted for consistency */
+            margin-top: 1.5rem;
+            /* Adjusted for consistency */
             margin-bottom: 1rem;
         }
 
         /* Adjusting text within cards for consistency */
         .card-body p {
-            margin-bottom: 0.5rem; /* Consistent spacing for paragraphs */
-            font-size: 15px; /* Slightly smaller for detailed info */
+            margin-bottom: 0.5rem;
+            /* Consistent spacing for paragraphs */
+            font-size: 15px;
+            /* Slightly smaller for detailed info */
         }
-        .card-body .mb-0 { /* For the last paragraph in a section */
+
+        .card-body .mb-0 {
+            /* For the last paragraph in a section */
             margin-bottom: 0;
         }
     </style>
@@ -287,25 +367,26 @@ if ($conn->connect_error) {
                     <div class="profile-header">
                         <img src="../photos/farmer-avatar.png" alt="Farmer Photo">
                         <div>
-                            <h4>Juan Dela Cruz</h4>
-                            <p class="mb-1 text-muted small">RSBSA ID: <strong>RSBSA-123456</strong></p>
-                            <p class="mb-0 text-muted small">Barangay: Maybato Norte</p>
+                            <h4><?php echo $full_name_profile; ?></h4>
+                            <p class="mb-1 text-muted small">RSBSA ID: <strong><?php echo htmlspecialchars($farmer_data['rsbsa_id']); ?></strong></p>
+                            <p class="mb-0 text-muted small">Address: <?php echo htmlspecialchars($farmer_data['address']); ?></p>
+                            <p class="mb-0 text-muted small">Status: <span class="badge <?php echo ($farmer_data['status'] == 'verified') ? 'bg-success' : 'bg-warning text-dark'; ?>"><?php echo htmlspecialchars(ucfirst($farmer_data['status'])); ?></span></p>
                         </div>
                     </div>
 
                     <h5 class="section-title mb-3"><i class="fas fa-info-circle me-2"></i>Personal Information</h5>
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <p><span class="info-label"><i class="fas fa-calendar-alt me-2 text-success"></i>Age:</span> 45</p>
+                            <p><span class="info-label"><i class="fas fa-calendar-alt me-2 text-success"></i>Age:</span> <?php echo $age; ?></p>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <p><span class="info-label"><i class="fas fa-venus-mars me-2 text-success"></i>Gender:</span> Male</p>
+                            <p><span class="info-label"><i class="fas fa-venus-mars me-2 text-success"></i>Gender:</span> <?php echo $gender; ?></p>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <p><span class="info-label"><i class="fas fa-phone-alt me-2 text-success"></i>Contact:</span> 09123456789</p>
+                            <p><span class="info-label"><i class="fas fa-phone-alt me-2 text-success"></i>Contact:</span> <?php echo htmlspecialchars($farmer_data['contact_number']); ?></p>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <p><span class="info-label"><i class="fas fa-ring me-2 text-success"></i>Civil Status:</span> Married</p>
+                            <p><span class="info-label"><i class="fas fa-ring me-2 text-success"></i>Civil Status:</span> <?php echo $civil_status; ?></p>
                         </div>
                     </div>
                 </div>
@@ -313,21 +394,26 @@ if ($conn->connect_error) {
 
             <h5 class="section-title"><i class="fas fa-map-marked-alt me-2"></i>Land Details</h5>
 
-            <div class="card">
-                <div class="card-body">
-                    <p><strong>Location:</strong> Barangay Maybato Sur</p>
-                    <p><strong>Area:</strong> 2 hectares</p>
-                    <p class="mb-0"><strong>Crop:</strong> Palay (Rice)</p>
+            <?php if (!empty($farmer_data['land_details_decoded'])): ?>
+                <div class="card">
+                    <div class="card-body">
+                        <p><strong>Location:</strong> <?php echo htmlspecialchars($farmer_data['land_details_decoded']['location'] ?? 'N/A'); ?></p>
+                        <p><strong>Area:</strong> <?php echo htmlspecialchars($farmer_data['land_details_decoded']['size'] ?? 'N/A'); ?></p>
+                        <p><strong>Crop:</strong> <?php echo htmlspecialchars($crop); ?></p> <!-- Display fetched crop -->
+                    </div>
                 </div>
-            </div>
+            <?php else: ?>
+                <div class="card">
+                    <div class="card-body">
+                        <p class="mb-0 text-muted">No land details recorded.</p>
+                    </div>
+                </div>
+            <?php endif; ?>
 
-            <div class="card">
-                <div class="card-body">
-                    <p><strong>Location:</strong> Barangay San Jose</p>
-                    <p><strong>Area:</strong> 1.5 hectares</p>
-                    <p class="mb-0"><strong>Crop:</strong> Corn</p>
-                </div>
-            </div>
+            <!-- If a farmer has multiple land parcels, you'd typically store them in a separate table (e.g., FarmerLands)
+                 and loop through them here. For your current single JSON object, one card is sufficient.
+            -->
+
         </div>
     </main>
 
