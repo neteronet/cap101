@@ -1,3 +1,50 @@
+<?php
+session_start(); // Start the session at the very beginning of the script
+
+// Check if the user is logged in. If not, redirect to the login page.
+// Adjust 'farmers-login.php' to your actual login page filename and path if different.
+if (!isset($_SESSION['user_id'])) {
+    header("location: farmers-login.php");
+    exit();
+}
+
+// Retrieve the user's name from the session.
+// In your login example, you stored 'username' (e.g., 'delacruzjuan') in the session.
+// We'll use this for the display.
+$display_name = $_SESSION['name'] ?? 'Farmer'; // Fallback to 'Farmer' if not set
+
+// If you had a 'full_name' column in your database and stored it in the session,
+// you would use that instead. For example, if you stored $_SESSION['full_name']
+// $display_name = $_SESSION['full_name'] ?? 'Farmer';
+
+$servername = "localhost";
+$db_username = "root"; // Your database username
+$db_password = "";     // Your database password
+$dbname = "cap101"; // Your database name
+
+$conn = new mysqli($servername, $db_username, $db_password, $dbname);
+
+if ($conn->connect_error) {
+    // Log error or display a generic message, but don't expose database details
+    error_log("Database connection failed: " . $conn->connect_error);
+    // You might want to redirect to an error page or show a friendly message
+} else {
+    // Assuming your 'users' table has a 'username' column that serves as the display name
+    // If you have a 'first_name' and 'last_name', you'd fetch those.
+    $stmt = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
+    $stmt->bind_param("i", $_SESSION['user_id']);
+    $stmt->execute();
+    $stmt->bind_result($fetched_db_name);
+    $stmt->fetch();
+    if ($fetched_db_name) {
+        $display_name = $fetched_db_name; // Use the name fetched from DB
+    }
+    $stmt->close();
+    $conn->close();
+}
+
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -328,7 +375,7 @@
 
     <!-- Header (Top Nav) -->
     <div class="card-header card-header-custom d-flex justify-content-end align-items-center">
-        <span class="me-3">Hi, <strong>username</strong></span>
+        <span class="me-3">Hi, <strong><?php echo htmlspecialchars($display_name); ?></strong></span>
         <button class="logout-btn" onclick="location.href='farmers-logout.php'">
             <i class="fas fa-sign-out-alt me-1"></i> Logout
         </button>
