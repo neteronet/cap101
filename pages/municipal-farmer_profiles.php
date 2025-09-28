@@ -1,3 +1,73 @@
+<?php
+session_start();
+
+// Database connection details
+$servername = "localhost";
+$username_db = "root"; // Replace with your database username
+$password_db = "";     // Replace with your database password
+$dbname = "cap101"; // Replace with your database name
+
+// Create connection
+$conn = new mysqli($servername, $username_db, $password_db, $dbname);
+
+// Check connection
+if ($conn->connect_error) {
+    // Log error or display a generic message, but don't expose database details
+    error_log("Database connection failed: " . $conn->connect_error);
+    // You might want to redirect to an error page or show a friendly message
+    die("Error connecting to the database. Please try again later."); // Critical error, stop execution
+}
+
+// Check if user is logged in and is a 'mao' user type
+if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== 'mao') {
+    header("location: municipal-login.php"); // Redirect to MAO login page
+    exit();
+}
+
+$display_name = "Guest"; // Default display name
+
+// Fetch the display name from the database for the logged-in user
+// Only fetch if the connection is successful and user_id is set
+if (isset($_SESSION['user_id'])) {
+    $stmt = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
+    if ($stmt) {
+        $stmt->bind_param("i", $_SESSION['user_id']);
+        $stmt->execute();
+        $stmt->bind_result($fetched_db_name);
+        $stmt->fetch();
+        if ($fetched_db_name) {
+            $display_name = $fetched_db_name; // Use the name fetched from DB
+        }
+        $stmt->close();
+    } else {
+        error_log("Failed to prepare statement for fetching user name: " . $conn->error);
+    }
+}
+
+
+// Fetch farmer profiles from the database
+$farmers = [];
+// It's good practice to check if the query was successful
+$sql = "SELECT farmer_id, first_name, middle_name, last_name, address, contact_number, land_details, status, age, gender, civil_status, crop
+        FROM farmers
+        ORDER BY last_name ASC";
+$result = $conn->query($sql);
+
+if ($result) { // Check if query executed successfully
+    if ($result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $farmers[] = $row;
+        }
+    }
+    $result->free(); // Free the result set
+} else {
+    error_log("Error fetching farmer profiles: " . $conn->error);
+    // Optionally, display a user-friendly message or redirect
+}
+
+$conn->close(); // Close the connection ONLY AFTER all queries are done
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -176,6 +246,7 @@
             border-radius: 0.4rem;
             font-size: 13px;
             font-weight: 500;
+            text-transform: capitalize; /* Make status look nicer */
         }
 
         .status-verified {
@@ -231,7 +302,7 @@
 <body>
     <!-- Sidebar -->
     <nav class="sidebar">
-        <a href="ProvincialAgriHome.html" class="header-brand">
+        <a href="municipal-dashboard.php" class="header-brand">
             <img src="../photos/Department_of_Agriculture_of_the_Philippines.png" alt="Province of Antique" />
             <div>Province of Antique</div>
         </a>
@@ -271,7 +342,7 @@
 
     <!-- Header -->
     <div class="card-header card-header-custom d-flex justify-content-end align-items-center">
-        <span class="me-3">Hi, <strong>username</strong></span>
+        <span class="me-3">Hi, <strong><?php echo htmlspecialchars($display_name); ?></strong></span>
         <button class="logout-btn" onclick="location.href='municipal-logout.php'">
             <i class="fas fa-sign-out-alt me-1"></i> Logout
         </button>
@@ -308,36 +379,47 @@
                                 </tr>
                             </thead>
                             <tbody id="farmerTableBody">
-                                <!-- Sample Rows -->
-                                <tr>
-                                    <td>1</td>
-                                    <td>Juan Dela Cruz</td>
-                                    <td>Barangay Uno</td>
-                                    <td>09123456789</td>
-                                    <td>2.5</td>
-                                    <td>Rice</td>
-                                    <td><span class="status-badge status-verified">Verified</span></td>
-                                    <td>
-                                        <button class="btn btn-sm btn-primary"><i class="fas fa-eye"></i> View</button>
-                                        <button class="btn btn-sm btn-warning"><i class="fas fa-edit"></i> Edit</button>
-                                        <button class="btn btn-sm btn-danger"><i class="fas fa-trash-alt"></i> Delete</button>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>2</td>
-                                    <td>Maria Santos</td>
-                                    <td>Barangay Dos</td>
-                                    <td>09987654321</td>
-                                    <td>1.8</td>
-                                    <td>Corn</td>
-                                    <td><span class="status-badge status-pending">Pending</span></td>
-                                    <td>
-                                        <button class="btn btn-sm btn-primary"><i class="fas fa-eye"></i> View</button>
-                                        <button class="btn btn-sm btn-warning"><i class="fas fa-edit"></i> Edit</button>
-                                        <button class="btn btn-sm btn-danger"><i class="fas fa-trash-alt"></i> Delete</button>
-                                    </td>
-                                </tr>
-                                <!-- Add more dynamic rows here -->
+                                <?php if (empty($farmers)): ?>
+                                    <tr>
+                                        <td colspan="8" class="text-center">No farmer profiles found.</td>
+                                    </tr>
+                                <?php else: ?>
+                                    <?php $counter = 1; ?>
+                                    <?php foreach ($farmers as $farmer): ?>
+                                        <tr>
+                                            <td><?php echo $counter++; ?></td>
+                                            <td><?php echo htmlspecialchars($farmer['first_name'] . ' ' . (!empty($farmer['middle_name']) ? substr($farmer['middle_name'], 0, 1) . '. ' : '') . $farmer['last_name']); ?></td>
+                                            <td>
+                                                <?php
+                                                    $address_parts = explode(',', $farmer['address']);
+                                                    // This assumes barangay is always the first part and that 'address' is not null or malformed.
+                                                    // A more robust solution might parse the address more carefully or have a dedicated 'barangay' column.
+                                                    echo htmlspecialchars(trim($address_parts[0] ?? 'N/A'));
+                                                ?>
+                                            </td>
+                                            <td><?php echo htmlspecialchars($farmer['contact_number']); ?></td>
+                                            <td>
+                                                <?php
+                                                    $land_details = json_decode($farmer['land_details'], true);
+                                                    echo htmlspecialchars($land_details['size'] ?? 'N/A');
+                                                ?>
+                                            </td>
+                                            <td><?php echo htmlspecialchars($farmer['crop']); ?></td>
+                                            <td>
+                                                <?php
+                                                    $status_class = ($farmer['status'] == 'verified') ? 'status-verified' : 'status-pending';
+                                                    echo '<span class="status-badge ' . $status_class . '">' . htmlspecialchars($farmer['status']) . '</span>';
+                                                ?>
+                                            </td>
+                                            <td>
+                                                <!-- You'll need to link these buttons to actual pages/modals for viewing, editing, deleting -->
+                                                <button class="btn btn-sm btn-primary" title="View Details"><i class="fas fa-eye"></i></button>
+                                                <button class="btn btn-sm btn-warning" title="Edit Profile"><i class="fas fa-edit"></i></button>
+                                                <button class="btn btn-sm btn-danger" title="Delete Profile"><i class="fas fa-trash-alt"></i></button>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
@@ -354,8 +436,9 @@
         const rows = document.querySelectorAll("#farmerTableBody tr");
 
         rows.forEach(row => {
-            const text = row.textContent.toLowerCase();
-            row.style.display = text.includes(input) ? "" : "none";
+            // Get all text content from the row for searching
+            const rowText = row.textContent.toLowerCase();
+            row.style.display = rowText.includes(input) ? "" : "none";
         });
     }
     </script>

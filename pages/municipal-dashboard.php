@@ -4,14 +4,14 @@ session_start(); // Start the session at the very beginning of the script
 // Check if the user is logged in. If not, redirect to the login page.
 // Adjust 'farmers-login.php' to your actual login page filename and path if different.
 if (!isset($_SESSION['user_id'])) {
-    header("location: farmers-login.php");
+    header("location: municipal-login.php");
     exit();
 }
 
 // Retrieve the user's name from the session.
 // In your login example, you stored 'username' (e.g., 'delacruzjuan') in the session.
 // We'll use this for the display.
-$display_name = $_SESSION['name'] ?? 'Farmer'; // Fallback to 'Farmer' if not set
+$display_name = $_SESSION['name'] ?? 'Mao'; // Fallback to 'Farmer' if not set
 
 // If you had a 'full_name' column in your database and stored it in the session,
 // you would use that instead. For example, if you stored $_SESSION['full_name']
