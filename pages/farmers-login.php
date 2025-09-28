@@ -1,5 +1,55 @@
 <?php
-include '..includes/connnection.php';
+session_start();
+
+// Database connection details
+$servername = "localhost";
+$username_db = "root"; // Replace with your database username
+$password_db = "";     // Replace with your database password
+$dbname = "cap101"; // Replace with your database name
+
+// Create connection
+$conn = new mysqli($servername, $username_db, $password_db, $dbname);
+
+// Check connection
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+
+$error = '';    
+
+if (isset($_POST['login'])) {
+    $email = $_POST['username']; // Changed from username to email as per your form
+    $password = $_POST['password'];
+
+    // Prepare a select statement - NOW INCLUDING USER_TYPE FOR FARMERS
+    $stmt = $conn->prepare("SELECT user_id, username, password_hash, user_type FROM users WHERE email = ? AND user_type = 'farmer'");
+    $stmt->bind_param("s", $email);
+    $stmt->execute();
+    $stmt->store_result();
+
+    if ($stmt->num_rows == 1) {
+        $stmt->bind_result($user_id, $db_username, $password_hash, $user_type);
+        $stmt->fetch();
+
+        // Verify the password hash
+        if (hash('sha256', $password) === $password_hash) {
+            $_SESSION['user_id'] = $user_id;
+            $_SESSION['username'] = $db_username;
+            $_SESSION['user_type'] = $user_type;
+
+            // Redirect to farmer dashboard
+            header("location: farmer-dashboard.php"); 
+            exit();
+        } else {
+            $error = "Invalid email or password.";
+        }
+    } else {
+        // Updated error message to indicate user_type restriction
+        $error = "Invalid email or password or you are not authorized to login here as a farmer.";
+    }
+    $stmt->close();
+}
+$conn->close();
 ?>
 
 <!DOCTYPE html>
@@ -25,11 +75,10 @@ include '..includes/connnection.php';
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
         crossorigin="anonymous" referrerpolicy="no-referrer">
 
-    <!-- Custom Styles -->
     <style>
         body {
             font-family: "Poppins", sans-serif;
-            background: #f0f2f5; /* Light grey background */
+            background: #f0f2f5;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -54,7 +103,7 @@ include '..includes/connnection.php';
         }
 
         .login-container h1 {
-            color: #19860f; /* Green from the dashboard */
+            color: #19860f;
             font-weight: 700;
             margin-bottom: 1.5rem;
             font-size: 1.8rem;
@@ -64,7 +113,7 @@ include '..includes/connnection.php';
             border-radius: 0.5rem;
             border: 1px solid #ced4da;
             padding: 1rem 1.25rem;
-            height: auto; /* Adjust height for better padding */
+            height: auto;
         }
 
         .form-floating label {
@@ -78,7 +127,7 @@ include '..includes/connnection.php';
         }
 
         .btn-primary {
-            background-color: #19860f; /* Green from the dashboard */
+            background-color: #19860f;
             border-color: #19860f;
             font-weight: 600;
             padding: 0.75rem 1.5rem;
@@ -87,7 +136,7 @@ include '..includes/connnection.php';
         }
 
         .btn-primary:hover {
-            background-color: #146c0b; /* Darker green on hover */
+            background-color: #146c0b;
             border-color: #146c0b;
         }
 
@@ -102,6 +151,12 @@ include '..includes/connnection.php';
             color: #146c0b;
             text-decoration: underline;
         }
+
+        .error-message {
+            color: red;
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+        }
     </style>
 </head>
 
@@ -111,13 +166,19 @@ include '..includes/connnection.php';
             <img class="logo" src="../photos/OfficialSeal.png" alt="Official Seal">
             <h1 class="mb-4">FARMERS LOGIN</h1>
 
+            <?php if (!empty($error)) : ?>
+                <div class="error-message"><?php echo htmlspecialchars($error); ?></div>
+            <?php endif; ?>
+
             <div class="form-floating mb-3">
-                <input type="email" class="form-control" id="floatingInput" name="username" placeholder="name@example.com" required>
+                <input type="email" class="form-control" id="floatingInput" name="username"
+                    placeholder="name@example.com" required>
                 <label for="floatingInput">Email address</label>
             </div>
 
             <div class="form-floating mb-4">
-                <input type="password" class="form-control" id="floatingPassword" name="password" placeholder="Password" required>
+                <input type="password" class="form-control" id="floatingPassword" name="password" placeholder="Password"
+                    required>
                 <label for="floatingPassword">Password</label>
             </div>
 
