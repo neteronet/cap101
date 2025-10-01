@@ -361,7 +361,7 @@ if ($conn->connect_error) {
     <main>
         <div class="container">
             <h1 class="page-title">
-                <i class="fas fa-file-invoice"></i> Apply for Assistance
+                </i> Apply for Assistance
             </h1>
 
             <?php if (!empty($message)): ?>

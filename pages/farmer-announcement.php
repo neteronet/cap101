@@ -422,7 +422,7 @@ $conn->close();
 
     <!-- Main Content -->
     <main>
-        <h1 class="page-title"><i class="fas fa-bullhorn me-2"></i>Announcements & Updates</h1>
+        <h1 class="page-title"></i>Announcements & Updates</h1>
         <p class="text-muted mb-4">
             Stay informed with the latest news, advisories, and program updates from the Provincial Agriculture Office.
         </p>

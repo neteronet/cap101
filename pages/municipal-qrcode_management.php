@@ -1,9 +1,45 @@
+<?php
+session_start();
+
+// Check if the user is logged in. If not, redirect to the login page.
+// Adjust 'municipal-login.php' to your actual login page filename and path if different.
+if (!isset($_SESSION['user_id'])) {
+    header("location: municipal-login.php");
+    exit();
+}
+
+// Retrieve the user's name from the session.
+$display_name = $_SESSION['name'] ?? 'Mao'; // Fallback to 'Mao' if not set
+
+$servername = "localhost";
+$db_username = "root"; // Your database username
+$db_password = "";     // Your database password
+$dbname = "cap101"; // Your database name
+
+$conn = new mysqli($servername, $db_username, $db_password, $dbname);
+
+if ($conn->connect_error) {
+    error_log("Database connection failed: " . $conn->connect_error);
+} else {
+    // Fetch the name from the database based on the user_id in the session
+    $stmt = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
+    $stmt->bind_param("i", $_SESSION['user_id']);
+    $stmt->execute();
+    $stmt->bind_result($fetched_db_name);
+    $stmt->fetch();
+    if ($fetched_db_name) {
+        $display_name = $fetched_db_name; // Use the name fetched from DB
+    }
+    $stmt->close();
+    $conn->close();
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Municipal Account - Reports & Analytics</title>
+    <title>Municipal Account - QR Code Management</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet" />
     <!-- Google Fonts -->
@@ -150,40 +186,70 @@
             font-size: 1.25rem;
             margin-bottom: 0.75rem;
         }
-        /* Specific styles for form labels and selects */
-        .form-label {
-            font-weight: 500;
-            color: #555;
-            font-size: 0.95rem;
-        }
-        .form-select {
-            border-radius: 0.25rem;
-            padding: 0.5rem 1rem;
-            font-size: 0.95rem;
+        /* Specific styles for QR Code Management */
+        .qr-scanner-container {
             border: 1px solid #ced4da;
-        }
-        .form-select:focus {
-            border-color: #19860f;
-            box-shadow: 0 0 0 0.25rem rgba(25, 134, 15, 0.25);
-        }
-        .alert {
-            font-size: 0.95rem;
-            padding: 0.75rem 1.25rem;
             border-radius: 0.25rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background-color: #fff;
+            min-height: 300px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
         }
+        #reader {
+            width: 100%;
+            max-width: 400px; /* Limit scanner width */
+            margin-bottom: 1rem;
+        }
+        .qr-result {
+            font-size: 1rem;
+            font-weight: 500;
+            color: #333;
+            margin-top: 1rem;
+            text-align: center;
+        }
+        .qr-result strong {
+            color: #19860f;
+        }
+        #qr-report-table {
+            width: 100%;
+            margin-top: 1.5rem;
+        }
+        #qr-report-table th, #qr-report-table td {
+            vertical-align: middle;
+        }
+        .status-badge {
+            padding: 0.4em 0.7em;
+            border-radius: 0.25rem;
+            font-size: 0.8em;
+            font-weight: 600;
+            color: #fff;
+        }
+        .status-claimed { background-color: #28a745; } /* Green */
+        .status-pending { background-color: #ffc107; color: #333; } /* Yellow */
+        .status-not-claimed { background-color: #dc3545; } /* Red */
     </style>
+    <!-- Instascan JS for QR Code scanning -->
+    <!-- You might need to self-host this or use a modern QR scanner library if Instascan is too old/problematic -->
+    <!-- For a more robust solution, consider libraries like html5-qrcode or jsqr -->
+    <script src="https://rawgit.com/schmich/instascan-js/master/docs/bundle.js"></script>
 </head>
 <body>
     <!-- Sidebar -->
     <nav class="sidebar">
-        <a href="ProvincialAgriHome.html" class="header-brand">
+        <a href="municipal-dashboard.php" class="header-brand">
             <img src="../photos/Department_of_Agriculture_of_the_Philippines.png" alt="Province of Antique" />
             <div>Province of Antique</div>
         </a>
+
         <ul class="nav flex-column">
             <li class="nav-item">
-                <a href="municipal-quick_access.php" class="nav-link">
-                    <i class="fas fa-tachometer-alt"></i> Quick Access
+                <a href="municipal-dashboard.php" class="nav-link">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
                 </a>
             </li>
             <li class="nav-item">
@@ -202,12 +268,12 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a href="municipal-reports_anaytics.php" class="nav-link active">
-                    <i class="fas fa-chart-line"></i> Reports & Analytics
+                <a href="municipal-announcements.php" class="nav-link">
+                    <i class="fas fa-bullhorn"></i> Announcements
                 </a>
             </li>
             <li class="nav-item">
-                <a href="municipal-qrcode_management.php" class="nav-link">
+                <a href="municipal-qrcode_management.php" class="nav-link active">
                     <i class="fas fa-qrcode"></i> QR Code Management
                 </a>
             </li>
@@ -216,7 +282,7 @@
 
     <!-- Header -->
     <div class="card-header card-header-custom d-flex justify-content-end align-items-center">
-        <span class="me-3">Hi, <strong>username</strong></span>
+        <span class="me-3">Hi, <strong><?php echo htmlspecialchars($display_name); ?></strong></span>
         <button class="logout-btn" onclick="location.href='municipal-logout.php'">
             <i class="fas fa-sign-out-alt me-1"></i> Logout
         </button>
@@ -225,84 +291,121 @@
     <!-- Main Content -->
     <main>
         <div class="container-fluid">
-            <h1 class="page-title">Reports & Analytics</h1>
-            <p class="text-muted mb-4">Generate and view progress reports and disaster impact data.</p>
+            <h1 class="page-title">QR Code Management</h1>
 
-            <div class="row g-4">
-                <!-- Generate Progress Reports -->
-                <div class="col-md-6">
+            <div class="row">
+                <div class="col-lg-6 mb-4">
                     <div class="card h-100">
-                        <div class="card-body d-flex flex-column">
-                            <h5 class="card-title mb-3"><i class="fas fa-chart-bar me-2"></i>Progress Reports</h5>
-                            <form id="progressReportForm">
-                                <div class="mb-3">
-                                    <label for="cropSelect" class="form-label">Select Crop</label>
-                                    <select class="form-select" id="cropSelect" required>
-                                        <option value="">Choose crop...</option>
-                                        <option value="rice">Rice</option>
-                                        <option value="corn">Corn</option>
-                                        <option value="vegetables">Vegetables</option>
-                                        <option value="fruits">Fruits</option>
-                                    </select>
+                        <div class="card-body">
+                            <h5 class="card-title">Scan Farmer QR Code</h5>
+                            <p class="card-text">
+                                Use the camera to scan a farmer's unique QR code for subsidy verification.
+                            </p>
+                            <div class="qr-scanner-container">
+                                <video id="preview" style="width: 100%; max-width: 400px; display: none;"></video>
+                                <div id="qr-scan-message" class="text-center text-muted">
+                                    <i class="fas fa-camera fa-3x mb-3"></i>
+                                    <p>Click 'Start Scanner' to activate your camera and scan a QR code.</p>
                                 </div>
-
-                                <div class="mb-3">
-                                    <label for="barangaySelect" class="form-label">Select Barangay</label>
-                                    <select class="form-select" id="barangaySelect" required>
-                                        <option value="">Choose barangay...</option>
-                                        <option value="Barangay1">Barangay 1</option>
-                                        <option value="Barangay2">Barangay 2</option>
-                                        <option value="Barangay3">Barangay 3</option>
-                                    </select>
+                                <div class="mt-3">
+                                    <button id="startButton" class="btn btn-theme me-2">
+                                        <i class="fas fa-play me-1"></i> Start Scanner
+                                    </button>
+                                    <button id="stopButton" class="btn btn-secondary" style="display: none;">
+                                        <i class="fas fa-stop me-1"></i> Stop Scanner
+                                    </button>
                                 </div>
-
-                                <div class="mb-3">
-                                    <label for="seasonSelect" class="form-label">Select Season</label>
-                                    <select class="form-select" id="seasonSelect" required>
-                                        <option value="">Choose season...</option>
-                                        <option value="dry">Dry Season</option>
-                                        <option value="wet">Wet Season</option>
-                                        <option value="planting">Planting Season</option>
-                                    </select>
+                                <div id="qr-result-display" class="qr-result mt-3" style="display: none;">
+                                    Scanned Data: <strong id="scannedData"></strong>
                                 </div>
-
-                                <button type="submit" class="btn btn-theme mt-auto">Generate Report</button>
-                            </form>
-                            <div class="mt-3" id="progressReportResult"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Disaster Impact Reports -->
-                <div class="col-md-6">
+                <div class="col-lg-6 mb-4">
                     <div class="card h-100">
-                        <div class="card-body d-flex flex-column">
-                            <h5 class="card-title mb-3"><i class="fas fa-house-damage me-2"></i>Disaster Impact Reports</h5>
-                            <form id="disasterReportForm">
+                        <div class="card-body">
+                            <h5 class="card-title">Subsidy Claim Verification</h5>
+                            <p class="card-text">
+                                Details of the scanned QR code and options to verify the claim.
+                            </p>
+                            <form id="verifyClaimForm">
                                 <div class="mb-3">
-                                    <label for="disasterType" class="form-label">Select Disaster Type</label>
-                                    <select class="form-select" id="disasterType" required>
-                                        <option value="">Choose disaster...</option>
-                                        <option value="flood">Flood</option>
-                                        <option value="typhoon">Typhoon</option>
-                                        <option value="drought">Drought</option>
-                                        <option value="earthquake">Earthquake</option>
-                                    </select>
+                                    <label for="farmerId" class="form-label">Farmer ID:</label>
+                                    <input type="text" class="form-control" id="farmerId" readonly>
                                 </div>
-
                                 <div class="mb-3">
-                                    <label for="disasterBarangay" class="form-label">Select Barangay</label>
-                                    <select class="form-select" id="disasterBarangay" required>
-                                        <option value="">Choose barangay...</option>
-                                        <option value="Barangay1">Barangay 1</option>
-                                        <option value="Barangay2">Barangay 2</option>
-                                        <option value="Barangay3">Barangay 3</option>
-                                    </select>
+                                    <label for="subsidyId" class="form-label">Subsidy ID:</label>
+                                    <input type="text" class="form-control" id="subsidyId" readonly>
                                 </div>
-
-                                <button type="submit" class="btn btn-theme mt-auto">Generate Disaster Report</button>
+                                <div class="mb-3">
+                                    <label for="farmerName" class="form-label">Farmer Name:</label>
+                                    <input type="text" class="form-control" id="farmerName" readonly>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="subsidyType" class="form-label">Subsidy Type:</label>
+                                    <input type="text" class="form-control" id="subsidyType" readonly>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="claimStatus" class="form-label">Current Status:</label>
+                                    <input type="text" class="form-control" id="claimStatus" readonly>
+                                </div>
+                                <button type="submit" class="btn btn-theme mt-3" id="verifyButton" disabled>
+                                    <i class="fas fa-check-circle me-1"></i> Mark as Claimed
+                                </button>
+                                <div id="verificationMessage" class="mt-3"></div>
                             </form>
-                            <div class="mt-3" id="disasterReportResult"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Recent QR Claim Transactions</h5>
+                            <p class="card-text">A log of recent subsidy claims verified through QR codes.</p>
+                            <div class="table-responsive">
+                                <table class="table table-hover" id="qr-report-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date/Time</th>
+                                            <th>Farmer ID</th>
+                                            <th>Farmer Name</th>
+                                            <th>Subsidy ID</th>
+                                            <th>Subsidy Type</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Dynamic rows will be added here via JavaScript/AJAX -->
+                                        <tr>
+                                            <td>2023-10-26 10:30 AM</td>
+                                            <td>FARM-001</td>
+                                            <td>Juan dela Cruz</td>
+                                            <td>SUB-RICE-001</td>
+                                            <td>Rice Seeds</td>
+                                            <td><span class="status-claimed">Claimed</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>2023-10-25 02:15 PM</td>
+                                            <td>FARM-003</td>
+                                            <td>Maria Clara</td>
+                                            <td>SUB-FERT-002</td>
+                                            <td>Fertilizer</td>
+                                            <td><span class="status-pending">Pending Verification</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>2023-10-24 09:00 AM</td>
+                                            <td>FARM-002</td>
+                                            <td>Pedro Reyes</td>
+                                            <td>SUB-FUEL-001</td>
+                                            <td>Fuel Subsidy</td>
+                                            <td><span class="status-claimed">Claimed</span></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -313,26 +416,231 @@
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Simple JavaScript to simulate report generation -->
     <script>
-        document.getElementById('progressReportForm').addEventListener('submit', function (e) {
-            e.preventDefault();
-            const crop = document.getElementById('cropSelect').value;
-            const barangay = document.getElementById('barangaySelect').value;
-            const season = document.getElementById('seasonSelect').value;
-            const resultDiv = document.getElementById('progressReportResult');
-            resultDiv.innerHTML = `<div class="alert alert-info">Generating progress report for <strong>${crop}</strong> in <strong>${barangay}</strong> during <strong>${season}</strong> season...</div>`;
-            // Here you can add AJAX to fetch real data
+        const video = document.getElementById('preview');
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const qrScanMessage = document.getElementById('qr-scan-message');
+        const qrResultDisplay = document.getElementById('qr-result-display');
+        const scannedDataSpan = document.getElementById('scannedData');
+
+        const farmerIdInput = document.getElementById('farmerId');
+        const subsidyIdInput = document.getElementById('subsidyId');
+        const farmerNameInput = document.getElementById('farmerName');
+        const subsidyTypeInput = document.getElementById('subsidyType');
+        const claimStatusInput = document.getElementById('claimStatus');
+        const verifyButton = document.getElementById('verifyButton');
+        const verificationMessage = document.getElementById('verificationMessage');
+
+        let scanner; // Declare scanner in a broader scope
+
+        startButton.addEventListener('click', () => {
+            if (scanner) {
+                scanner.stop(); // Stop any existing scanner
+            }
+
+            scanner = new Instascan.Scanner({ video: video, scanPeriod: 5 });
+
+            scanner.addListener('scan', function (content) {
+                console.log('Scanned:', content);
+                scannedDataSpan.textContent = content;
+                qrResultDisplay.style.display = 'block';
+                populateVerificationForm(content);
+                scanner.stop(); // Stop scanning after one successful scan
+                video.style.display = 'none';
+                qrScanMessage.style.display = 'block';
+                startButton.style.display = 'block';
+                stopButton.style.display = 'none';
+            });
+
+            Instascan.Camera.getCameras().then(function (cameras) {
+                if (cameras.length > 0) {
+                    // You might want to let the user select a camera if multiple are available
+                    scanner.start(cameras[0]);
+                    video.style.display = 'block';
+                    qrScanMessage.style.display = 'none';
+                    startButton.style.display = 'none';
+                    stopButton.style.display = 'block';
+                } else {
+                    alert('No cameras found.');
+                    console.error('No cameras found.');
+                }
+            }).catch(function (e) {
+                console.error(e);
+                alert('Error accessing camera. Please ensure permissions are granted.');
+                startButton.style.display = 'block'; // Show start button again if error
+                stopButton.style.display = 'none';
+            });
         });
 
-        document.getElementById('disasterReportForm').addEventListener('submit', function (e) {
-            e.preventDefault();
-            const disaster = document.getElementById('disasterType').value;
-            const barangay = document.getElementById('disasterBarangay').value;
-            const resultDiv = document.getElementById('disasterReportResult');
-            resultDiv.innerHTML = `<div class="alert alert-warning">Generating disaster impact report for <strong>${disaster}</strong> in <strong>${barangay}</strong>...</div>`;
-            // Here you can add AJAX to fetch real data
+        stopButton.addEventListener('click', () => {
+            if (scanner) {
+                scanner.stop();
+                video.style.display = 'none';
+                qrScanMessage.style.display = 'block';
+                startButton.style.display = 'block';
+                stopButton.style.display = 'none';
+            }
         });
+
+        function populateVerificationForm(qrData) {
+            // This is where you would parse the QR data and ideally
+            // make an AJAX call to your server to fetch actual farmer/subsidy details
+            // based on the farmer ID and subsidy ID in the QR code.
+
+            // For demonstration, we'll parse a simple string.
+            // Expected format: "FarmerID:FARM-001, SubsidyID:SUB-RICE-001"
+            const dataParts = qrData.split(',').map(part => part.trim());
+            let farmerID = '';
+            let subsidyID = '';
+
+            dataParts.forEach(part => {
+                if (part.startsWith('FarmerID:')) {
+                    farmerID = part.substring('FarmerID:'.length);
+                } else if (part.startsWith('SubsidyID:')) {
+                    subsidyID = part.substring('SubsidyID:'.length);
+                }
+            });
+
+            farmerIdInput.value = farmerID;
+            subsidyIdInput.value = subsidyID;
+
+            // Simulate fetching details from a database
+            // In a real app, this would be an AJAX call
+            if (farmerID && subsidyID) {
+                fetchFarmerAndSubsidyDetails(farmerID, subsidyID);
+            } else {
+                farmerNameInput.value = 'Invalid QR Data';
+                subsidyTypeInput.value = '';
+                claimStatusInput.value = '';
+                verifyButton.disabled = true;
+                verificationMessage.innerHTML = '<div class="alert alert-danger">Invalid QR code data scanned.</div>';
+            }
+        }
+
+        function fetchFarmerAndSubsidyDetails(farmerID, subsidyID) {
+            // This is a placeholder for an AJAX call to your backend (e.g., 'get_subsidy_details.php')
+            // which would query your database.
+
+            // Simulate database response
+            const mockDb = {
+                'FARM-001': { name: 'Juan dela Cruz' },
+                'FARM-002': { name: 'Pedro Reyes' },
+                'FARM-003': { name: 'Maria Clara' }
+            };
+
+            const mockSubsidies = {
+                'SUB-RICE-001': { type: 'Rice Seeds', status: 'Pending' },
+                'SUB-FERT-002': { type: 'Fertilizer', status: 'Approved' },
+                'SUB-FUEL-001': { type: 'Fuel Subsidy', status: 'Claimed' }
+            };
+
+            const farmer = mockDb[farmerID];
+            const subsidy = mockSubsidies[subsidyID];
+
+            if (farmer && subsidy) {
+                farmerNameInput.value = farmer.name;
+                subsidyTypeInput.value = subsidy.type;
+                claimStatusInput.value = subsidy.status;
+                if (subsidy.status !== 'Claimed') {
+                    verifyButton.disabled = false;
+                    verifyButton.textContent = 'Mark as Claimed';
+                    verifyButton.classList.remove('btn-secondary');
+                    verifyButton.classList.add('btn-theme');
+                } else {
+                    verifyButton.disabled = true;
+                    verifyButton.textContent = 'Already Claimed';
+                    verifyButton.classList.remove('btn-theme');
+                    verifyButton.classList.add('btn-secondary');
+                    verificationMessage.innerHTML = '<div class="alert alert-warning">This subsidy has already been claimed.</div>';
+                }
+            } else {
+                farmerNameInput.value = 'Not Found';
+                subsidyTypeInput.value = 'Not Found';
+                claimStatusInput.value = 'N/A';
+                verifyButton.disabled = true;
+                verificationMessage.innerHTML = '<div class="alert alert-danger">Farmer or Subsidy not found in the system.</div>';
+            }
+        }
+
+
+        verifyClaimForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const farmerId = farmerIdInput.value;
+            const subsidyId = subsidyIdInput.value;
+
+            if (!farmerId || !subsidyId || verifyButton.disabled) {
+                verificationMessage.innerHTML = '<div class="alert alert-danger">Cannot process claim. Invalid data or already claimed.</div>';
+                return;
+            }
+
+            // In a real application, you'd send an AJAX request to update the subsidy status in the database.
+            // Example:
+            /*
+            fetch('update_subsidy_status.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ farmer_id: farmerId, subsidy_id: subsidyId, status: 'Claimed' })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    verificationMessage.innerHTML = '<div class="alert alert-success">Subsidy successfully marked as claimed!</div>';
+                    claimStatusInput.value = 'Claimed';
+                    verifyButton.disabled = true;
+                    verifyButton.textContent = 'Already Claimed';
+                    verifyButton.classList.remove('btn-theme');
+                    verifyButton.classList.add('btn-secondary');
+                    // Refresh the recent transactions table
+                    addTransactionToTable(farmerId, farmerNameInput.value, subsidyId, subsidyTypeInput.value, 'Claimed');
+                } else {
+                    verificationMessage.innerHTML = `<div class="alert alert-danger">Error claiming subsidy: ${data.message}</div>`;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                verificationMessage.innerHTML = '<div class="alert alert-danger">An error occurred during verification.</div>';
+            });
+            */
+
+            // Simulate success
+            verificationMessage.innerHTML = '<div class="alert alert-success">Subsidy successfully marked as claimed!</div>';
+            claimStatusInput.value = 'Claimed';
+            verifyButton.disabled = true;
+            verifyButton.textContent = 'Already Claimed';
+            verifyButton.classList.remove('btn-theme');
+            verifyButton.classList.add('btn-secondary');
+            addTransactionToTable(farmerId, farmerNameInput.value, subsidyId, subsidyTypeInput.value, 'Claimed');
+        });
+
+        function addTransactionToTable(farmerId, farmerName, subsidyId, subsidyType, status) {
+            const tableBody = document.querySelector('#qr-report-table tbody');
+            const newRow = tableBody.insertRow(0); // Add to the top
+
+            const dateTimeCell = newRow.insertCell(0);
+            const farmerIdCell = newRow.insertCell(1);
+            const farmerNameCell = newRow.insertCell(2);
+            const subsidyIdCell = newRow.insertCell(3);
+            const subsidyTypeCell = newRow.insertCell(4);
+            const statusCell = newRow.insertCell(5);
+
+            const now = new Date();
+            dateTimeCell.textContent = now.toLocaleString();
+            farmerIdCell.textContent = farmerId;
+            farmerNameCell.textContent = farmerName;
+            subsidyIdCell.textContent = subsidyId;
+            subsidyTypeCell.textContent = subsidyType;
+            statusCell.innerHTML = `<span class="status-badge status-${status.toLowerCase().replace(/\s/g, '-')}}">${status}</span>`;
+        }
+
+        // Initial state for the verification form
+        farmerIdInput.value = '';
+        subsidyIdInput.value = '';
+        farmerNameInput.value = '';
+        subsidyTypeInput.value = '';
+        claimStatusInput.value = '';
+        verifyButton.disabled = true;
+        verificationMessage.innerHTML = '';
     </script>
 </body>
 </html>

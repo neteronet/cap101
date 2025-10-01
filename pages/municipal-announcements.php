@@ -162,6 +162,7 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -325,7 +326,8 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
         main {
             margin-left: 250px;
             padding: 1rem 2rem 2rem 2rem;
-            padding-top: 72px; /* Adjust for fixed header */
+            padding-top: 72px;
+            /* Adjust for fixed header */
             background: #f8f9fa;
             min-height: 100vh;
         }
@@ -358,16 +360,19 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
             border-radius: 0.4rem;
             font-size: 13px;
             font-weight: 500;
-            text-transform: capitalize; /* Make status look nicer */
+            text-transform: capitalize;
+            /* Make status look nicer */
         }
 
         .status-published {
-            background-color: #28a745; /* Success green */
+            background-color: #28a745;
+            /* Success green */
             color: #fff;
         }
 
         .status-draft {
-            background-color: #ffc107; /* Warning yellow */
+            background-color: #ffc107;
+            /* Warning yellow */
             color: #856404;
         }
 
@@ -386,6 +391,7 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
             background-color: #17a2b8;
             border-color: #17a2b8;
         }
+
         .btn-info:hover {
             background-color: #138496;
             border-color: #138496;
@@ -395,6 +401,7 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
             background-color: #007bff;
             border-color: #007bff;
         }
+
         .btn-primary:hover {
             background-color: #0056b3;
             border-color: #0056b3;
@@ -403,8 +410,10 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
         .btn-warning {
             background-color: #ffc107;
             border-color: #ffc107;
-            color: #212529; /* Dark text for warning */
+            color: #212529;
+            /* Dark text for warning */
         }
+
         .btn-warning:hover {
             background-color: #e0a800;
             border-color: #e0a800;
@@ -414,6 +423,7 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
             background-color: #dc3545;
             border-color: #dc3545;
         }
+
         .btn-danger:hover {
             background-color: #c82333;
             border-color: #c82333;
@@ -434,11 +444,31 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
             text-transform: capitalize;
         }
 
-        .category-advisory { background-color: #007bff; } /* Blue */
-        .category-program { background-color: #6f42c1; } /* Purple */
-        .category-alert { background-color: #dc3545; } /* Red */
-        .category-general { background-color: #6c757d; } /* Gray */
-        .category-agriculture { background-color: #28a745; } /* Green, for your example */
+        .category-advisory {
+            background-color: #007bff;
+        }
+
+        /* Blue */
+        .category-program {
+            background-color: #6f42c1;
+        }
+
+        /* Purple */
+        .category-alert {
+            background-color: #dc3545;
+        }
+
+        /* Red */
+        .category-general {
+            background-color: #6c757d;
+        }
+
+        /* Gray */
+        .category-agriculture {
+            background-color: #28a745;
+        }
+
+        /* Green, for your example */
 
         .pagination-container {
             display: flex;
@@ -446,12 +476,112 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
             align-items: center;
             margin-top: 1.5rem;
         }
+
         .page-info {
             font-size: 0.9em;
             color: #6c757d;
         }
+
+        /* New Card Body Design for Announcements */
+        .announcement-card-body {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .announcement-item {
+            display: flex;
+            align-items: flex-start;
+            /* Align image and text at the top */
+            padding: 15px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .announcement-item:last-child {
+            border-bottom: none;
+        }
+
+        .announcement-image-container {
+            flex-shrink: 0;
+            /* Prevent image from shrinking */
+            width: 120px;
+            /* Fixed width for image */
+            height: 80px;
+            /* Fixed height for image */
+            margin-right: 15px;
+            border-radius: 5px;
+            overflow: hidden;
+            background-color: #f0f0f0;
+            /* Placeholder background */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .announcement-image-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            /* Cover the container */
+        }
+
+        .announcement-image-container .no-image-placeholder {
+            color: #bbb;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        .announcement-content-area {
+            flex-grow: 1;
+            /* Allow content to take remaining space */
+        }
+
+        .announcement-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .announcement-title {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: #19860f;
+            margin-bottom: 0;
+        }
+
+        .announcement-meta {
+            font-size: 0.85rem;
+            color: #777;
+        }
+
+        .announcement-category {
+            margin-left: 10px;
+        }
+
+        .announcement-description {
+            font-size: 0.95rem;
+            color: #555;
+            margin-top: 5px;
+            /* Limit to 2 lines for brevity */
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .announcement-actions {
+            margin-top: 10px;
+            text-align: right;
+            /* Align action buttons to the right */
+        }
+
+        .announcement-actions .btn {
+            margin-left: 5px;
+        }
     </style>
 </head>
+
 <body>
     <!-- Sidebar -->
     <nav class="sidebar">
@@ -505,7 +635,7 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
     <main>
         <div class="container-fluid">
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1 class="page-title"><i class="fas fa-bullhorn me-2"></i>Announcements</h1>
+
                 <div class="add-announcement-btn-container">
                     <!-- Link to a dummy add announcement page -->
                     <a href="municipal-add_announcement.php" class="add-announcement-btn">
@@ -513,9 +643,6 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
                     </a>
                 </div>
             </div>
-            <p class="text-muted mb-4">
-                Manage all published and draft announcements for farmers.
-            </p>
 
             <?php if (isset($_SESSION['message'])): ?>
                 <div class="alert alert-<?php echo $_SESSION['message_type']; ?> alert-dismissible fade show" role="alert">
@@ -558,65 +685,61 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
                         </div>
                     </div>
 
-                    <div class="table-responsive">
-                        <table class="table table-hover table-custom">
-                            <thead>
-                                <tr>
-                                    <th scope="col">ANNOUNCEMENT TITLE</th>
-                                    <th scope="col">CATEGORY</th>
-                                    <th scope="col">PUBLISH DATE</th>
-                                    <th scope="col">STATUS</th>
-                                    <th scope="col" class="actions-col">ACTIONS</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if (!empty($announcements)): ?>
-                                    <?php foreach ($announcements as $announcement): ?>
-                                        <tr>
-                                            <td><?php echo htmlspecialchars($announcement['title']); ?></td>
-                                            <td>
-                                                <span class="category-label category-<?php echo strtolower(htmlspecialchars($announcement['category'])); ?>">
-                                                    <?php echo htmlspecialchars($announcement['category']); ?>
-                                                </span>
-                                            </td>
-                                            <td><?php echo date('M d, Y', strtotime($announcement['publish_date'])); ?></td>
-                                            <td>
+                    <div class="announcement-card-body">
+                        <?php if (!empty($announcements)): ?>
+                            <?php foreach ($announcements as $announcement): ?>
+                                <div class="announcement-item">
+                                    <div class="announcement-image-container">
+                                        <?php if (!empty($announcement['image_url']) && $announcement['image_url'] !== 'null'): ?>
+                                            <img src="<?php echo htmlspecialchars($announcement['image_url']); ?>" alt="Announcement Image">
+                                        <?php else: ?>
+                                            <span class="no-image-placeholder">No Image</span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="announcement-content-area">
+                                        <div class="announcement-header">
+                                            <h5 class="announcement-title"><?php echo htmlspecialchars($announcement['title']); ?></h5>
+                                            <div class="d-flex align-items-center">
                                                 <span class="status-badge status-<?php echo strtolower(htmlspecialchars($announcement['status'])); ?>">
                                                     <?php echo htmlspecialchars($announcement['status']); ?>
                                                 </span>
-                                            </td>
-                                            <td class="actions-col">
-                                                <button type="button" class="btn btn-info btn-sm"
-                                                    data-bs-toggle="modal" data-bs-target="#announcementDetailModal"
-                                                    data-id="<?php echo $announcement['id']; ?>"
-                                                    data-title="<?php echo htmlspecialchars($announcement['title']); ?>"
-                                                    data-date="<?php echo date('M d, Y', strtotime($announcement['publish_date'])); ?>"
-                                                    data-category="<?php echo htmlspecialchars($announcement['category']); ?>"
-                                                    data-image="<?php echo htmlspecialchars($announcement['image_url']); ?>"
-                                                    data-content="<?php echo htmlspecialchars($announcement['content']); ?>"
-                                                    title="View Details">
-                                                    <i class="fas fa-eye"></i>
-                                                </button>
-                                                <!-- Link to a dummy edit announcement page -->
-                                                <a href="municipal-edit_announcement.php?id=<?php echo $announcement['id']; ?>" class="btn btn-primary btn-sm" title="Edit Announcement">
-                                                    <i class="fas fa-edit"></i>
-                                                </a>
-                                                <button type="button" class="btn btn-danger btn-sm"
-                                                    data-bs-toggle="modal" data-bs-target="#deleteConfirmationModal"
-                                                    data-id="<?php echo $announcement['id']; ?>"
-                                                    title="Delete Announcement">
-                                                    <i class="fas fa-trash-alt"></i>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                <?php else: ?>
-                                    <tr>
-                                        <td colspan="5" class="text-center py-4">No announcements found.</td>
-                                    </tr>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
+                                                <span class="category-label announcement-category category-<?php echo strtolower(htmlspecialchars($announcement['category'])); ?>">
+                                                    <?php echo htmlspecialchars($announcement['category']); ?>
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <p class="announcement-meta">Published: <?php echo date('M d, Y', strtotime($announcement['publish_date'])); ?></p>
+                                        <p class="announcement-description"><?php echo htmlspecialchars($announcement['content']); ?></p>
+                                        <div class="announcement-actions">
+                                            <button type="button" class="btn btn-info btn-sm"
+                                                data-bs-toggle="modal" data-bs-target="#announcementDetailModal"
+                                                data-id="<?php echo $announcement['id']; ?>"
+                                                data-title="<?php echo htmlspecialchars($announcement['title']); ?>"
+                                                data-date="<?php echo date('M d, Y', strtotime($announcement['publish_date'])); ?>"
+                                                data-category="<?php echo htmlspecialchars($announcement['category']); ?>"
+                                                data-image="<?php echo htmlspecialchars($announcement['image_url']); ?>"
+                                                data-content="<?php echo htmlspecialchars($announcement['content']); ?>"
+                                                title="View Details">
+                                                <i class="fas fa-eye"></i> View
+                                            </button>
+                                            <a href="municipal-edit_announcement.php?id=<?php echo $announcement['id']; ?>" class="btn btn-primary btn-sm" title="Edit Announcement">
+                                                <i class="fas fa-edit"></i> Edit
+                                            </a>
+                                            <button type="button" class="btn btn-danger btn-sm"
+                                                data-bs-toggle="modal" data-bs-target="#deleteConfirmationModal"
+                                                data-id="<?php echo $announcement['id']; ?>"
+                                                title="Delete Announcement">
+                                                <i class="fas fa-trash-alt"></i> Delete
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <div class="alert alert-info text-center mt-3" role="alert">
+                                No announcements found matching your criteria.
+                            </div>
+                        <?php endif; ?>
                     </div>
 
                     <!-- Pagination -->
@@ -762,4 +885,5 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
         });
     </script>
 </body>
-</html> 
+
+</html>

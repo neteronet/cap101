@@ -277,8 +277,8 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a href="municipal-reports_analytics.php" class="nav-link">
-                    <i class="fas fa-chart-line"></i> Reports & Analytics
+                <a href="municipal-announcements.php" class="nav-link">
+                    <i class="fas fa-bullhorn"></i> Announcements
                 </a>
             </li>
             <li class="nav-item">

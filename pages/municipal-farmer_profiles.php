@@ -270,33 +270,6 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
             background-color: #f0f8f0;
         }
 
-        .btn-primary {
-            background-color: #007bff;
-            border-color: #007bff;
-        }
-        .btn-primary:hover {
-            background-color: #0056b3;
-            border-color: #0056b3;
-        }
-
-        .btn-warning {
-            background-color: #ffc107;
-            border-color: #ffc107;
-            color: #212529; /* Dark text for warning */
-        }
-        .btn-warning:hover {
-            background-color: #e0a800;
-            border-color: #e0a800;
-        }
-
-        .btn-danger {
-            background-color: #dc3545;
-            border-color: #dc3545;
-        }
-        .btn-danger:hover {
-            background-color: #c82333;
-            border-color: #c82333;
-        }
     </style>
 </head>
 <body>
@@ -328,8 +301,8 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
                 </a>
             </li>
             <li class="nav-item">
-                <a href="municipal-reports_analytics.php" class="nav-link">
-                    <i class="fas fa-chart-line"></i> Reports & Analytics
+                <a href="municipal-announcements.php" class="nav-link">
+                    <i class="fas fa-bullhorn"></i> Announcements
                 </a>
             </li>
             <li class="nav-item">
@@ -375,13 +348,12 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
                                     <th>Farm Size (ha)</th>
                                     <th>Crop Type</th>
                                     <th>Status</th>
-                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="farmerTableBody">
                                 <?php if (empty($farmers)): ?>
                                     <tr>
-                                        <td colspan="8" class="text-center">No farmer profiles found.</td>
+                                        <td colspan="7" class="text-center">No farmer profiles found.</td>
                                     </tr>
                                 <?php else: ?>
                                     <?php $counter = 1; ?>
@@ -410,12 +382,6 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
                                                     $status_class = ($farmer['status'] == 'verified') ? 'status-verified' : 'status-pending';
                                                     echo '<span class="status-badge ' . $status_class . '">' . htmlspecialchars($farmer['status']) . '</span>';
                                                 ?>
-                                            </td>
-                                            <td>
-                                                <!-- You'll need to link these buttons to actual pages/modals for viewing, editing, deleting -->
-                                                <button class="btn btn-sm btn-primary" title="View Details"><i class="fas fa-eye"></i></button>
-                                                <button class="btn btn-sm btn-warning" title="Edit Profile"><i class="fas fa-edit"></i></button>
-                                                <button class="btn btn-sm btn-danger" title="Delete Profile"><i class="fas fa-trash-alt"></i></button>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
