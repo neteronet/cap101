@@ -1,48 +1,123 @@
 <?php
-session_start(); // Start the session at the very beginning of the script
+session_start();
+
+// Initialize message variables
+$message = '';
+$message_type = '';
 
 // Check if the user is logged in. If not, redirect to the login page.
-// Adjust 'farmers-login.php' to your actual login page filename and path if different.
 if (!isset($_SESSION['user_id'])) {
     header("location: farmers-login.php");
     exit();
 }
 
-// Retrieve the user's name from the session.
-// In your login example, you stored 'username' (e.g., 'delacruzjuan') in the session.
-// We'll use this for the display.
-$display_name = $_SESSION['name'] ?? 'Farmer'; // Fallback to 'Farmer' if not set
-
-// If you had a 'full_name' column in your database and stored it in the session,
-// you would use that instead. For example, if you stored $_SESSION['full_name']
-// $display_name = $_SESSION['full_name'] ?? 'Farmer';
-
+// Database connection details
 $servername = "localhost";
 $db_username = "root"; // Your database username
 $db_password = "";     // Your database password
 $dbname = "cap101"; // Your database name
 
+// Create database connection
 $conn = new mysqli($servername, $db_username, $db_password, $dbname);
 
+// Check connection
 if ($conn->connect_error) {
-    // Log error or display a generic message, but don't expose database details
     error_log("Database connection failed: " . $conn->connect_error);
-    // You might want to redirect to an error page or show a friendly message
-} else {
-    // Assuming your 'users' table has a 'username' column that serves as the display name
-    // If you have a 'first_name' and 'last_name', you'd fetch those.
-    $stmt = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
-    $stmt->bind_param("i", $_SESSION['user_id']);
-    $stmt->execute();
-    $stmt->bind_result($fetched_db_name);
-    $stmt->fetch();
-    if ($fetched_db_name) {
-        $display_name = $fetched_db_name; // Use the name fetched from DB
-    }
-    $stmt->close();
-    $conn->close();
+    die("Database connection failed. Please try again later.");
 }
 
+// Retrieve the user's name from the session or database.
+$display_name = $_SESSION['name'] ?? 'Farmer'; // Fallback
+$user_id = $_SESSION['user_id'];
+
+$stmt = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$stmt->bind_result($fetched_db_name);
+$stmt->fetch();
+if ($fetched_db_name) {
+    $display_name = $fetched_db_name; // Use the name fetched from DB
+}
+$stmt->close();
+
+// Handle form submission
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    // Sanitize and validate common fields
+    $assistanceType = filter_input(INPUT_POST, 'assistanceType', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    $remarks = filter_input(INPUT_POST, 'remarks', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+
+    // Initialize specific fields
+    $cropType = null; // Removed from form, can be null or derived
+    $seedType = null;
+    $seedQuantity = null; // Stored as string, e.g., "10kg"
+    $engineType = null;
+
+    // Validate main assistance type
+    if (empty($assistanceType)) {
+        $message = "Please select a Type of Assistance.";
+        $message_type = "danger";
+    } else {
+        // Handle specific assistance types
+        switch ($assistanceType) {
+            case 'Seeds':
+                $seedType = filter_input(INPUT_POST, 'seedType', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+                $seedQuantity = filter_input(INPUT_POST, 'seedQuantity', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+                if (empty($seedType) || empty($seedQuantity)) {
+                    $message = "Please select Seed Type and Seed Quantity.";
+                    $message_type = "danger";
+                }
+                break;
+            case 'Fuel':
+                $engineType = filter_input(INPUT_POST, 'engineType', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+                if (empty($engineType)) {
+                    $message = "Please select an Engine Type for fuel assistance.";
+                    $message_type = "danger";
+                }
+                break;
+            case 'Fertilizer':
+            case 'Cash Assistance':
+                // These types don't require additional specific fields for now
+                break;
+            default:
+                $message = "Invalid assistance type selected.";
+                $message_type = "danger";
+                break;
+        }
+
+        // If no validation errors so far, proceed with database insertion
+        if (empty($message)) {
+            $status = 'Pending'; // Default status for new applications
+
+            $insert_stmt = $conn->prepare("INSERT INTO assistance_applications (user_id, assistance_type, seed_type, seed_quantity, engine_type, remarks, status, application_date) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
+            // The 's' in "issssss" stands for string. Adjust based on your actual data types if needed.
+            // i = integer for user_id
+            // s = string for assistance_type
+            // s = string for seed_type
+            // s = string for seed_quantity
+            // s = string for engine_type
+            // s = string for remarks
+            // s = string for status
+            $insert_stmt->bind_param("issssss", $user_id, $assistanceType, $seedType, $seedQuantity, $engineType, $remarks, $status);
+
+            if ($insert_stmt->execute()) {
+                $message = "Your assistance request has been submitted successfully!";
+                $message_type = "success";
+                // Clear POST data to prevent re-submission on refresh
+                $_POST = array();
+            } else {
+                error_log("Error submitting request for user $user_id: " . $insert_stmt->error);
+                $message = "Error submitting your request. Please try again: " . $insert_stmt->error;
+                $message_type = "danger";
+            }
+            $insert_stmt->close();
+        }
+    }
+}
+
+// Close the database connection
+if ($conn) {
+    $conn->close();
+}
 ?>
 
 <!DOCTYPE html>
@@ -361,7 +436,7 @@ if ($conn->connect_error) {
     <main>
         <div class="container">
             <h1 class="page-title">
-                </i> Apply for Assistance
+                <i class="fas fa-file-invoice"></i> Apply for Assistance
             </h1>
 
             <?php if (!empty($message)): ?>
@@ -386,7 +461,7 @@ if ($conn->connect_error) {
                     Assistance Request Form
                 </div>
                 <div class="card-body p-4">
-                    <form method="POST" action=""> <!-- Form method set to POST, action to current page -->
+                    <form method="POST" action="">
                         <div class="mb-4">
                             <label for="assistanceType" class="form-label">
                                 <i class="fas fa-hands-helping"></i>Type of Assistance
@@ -400,26 +475,53 @@ if ($conn->connect_error) {
                             </select>
                         </div>
 
-                        <div class="mb-4">
-                            <label for="cropType" class="form-label">
-                                <i class="fas fa-leaf"></i>Crop Type (if applicable)
-                            </label>
-                            <select class="form-select" id="cropType" name="cropType">
-                                <option value="">-- Select Crop Type --</option>
-                                <option value="Rice" <?php echo (isset($_POST['cropType']) && $_POST['cropType'] == 'Rice') ? 'selected' : ''; ?>>Rice</option>
-                                <option value="Corn" <?php echo (isset($_POST['cropType']) && $_POST['cropType'] == 'Corn') ? 'selected' : ''; ?>>Corn</option>
-                                <option value="Vegetables" <?php echo (isset($_POST['cropType']) && $_POST['cropType'] == 'Vegetables') ? 'selected' : ''; ?>>Vegetables</option>
-                            </select>
-                            <small class="form-text text-muted">Specify the crop type this assistance is for (e.g., Rice for seeds).</small>
+                        <!-- Dynamic Seed Details Section -->
+                        <div id="seedDetails" class="mb-4" style="display: <?php echo (isset($_POST['assistanceType']) && $_POST['assistanceType'] == 'Seeds') ? 'block' : 'none'; ?>;">
+                            <div class="mb-4">
+                                <label for="seedType" class="form-label">
+                                    <i class="fas fa-seedling"></i>Seed Type
+                                </label>
+                                <select class="form-select" id="seedType" name="seedType">
+                                    <option value="">-- Select Seed Type --</option>
+                                    <option value="Hybrid Rice Seeds" <?php echo (isset($_POST['seedType']) && $_POST['seedType'] == 'Hybrid Rice Seeds') ? 'selected' : ''; ?>>Hybrid Rice Seeds</option>
+                                    <option value="Inbred Rice Seeds" <?php echo (isset($_POST['seedType']) && $_POST['seedType'] == 'Inbred Rice Seeds') ? 'selected' : ''; ?>>Inbred Rice Seeds</option>
+                                    <option value="Hybrid Corn Seeds" <?php echo (isset($_POST['seedType']) && $_POST['seedType'] == 'Hybrid Corn Seeds') ? 'selected' : ''; ?>>Hybrid Corn Seeds</option>
+                                    <option value="Vegetable Seeds (Assorted)" <?php echo (isset($_POST['seedType']) && $_POST['seedType'] == 'Vegetable Seeds (Assorted)') ? 'selected' : ''; ?>>Vegetable Seeds (Assorted)</option>
+                                    <option value="Other" <?php echo (isset($_POST['seedType']) && $_POST['seedType'] == 'Other') ? 'selected' : ''; ?>>Other</option>
+                                </select>
+                            </div>
+                            <div class="mb-4">
+                                <label for="seedQuantity" class="form-label">
+                                    <i class="fas fa-boxes"></i>Seed Quantity (e.g., in kg)
+                                </label>
+                                <select class="form-select" id="seedQuantity" name="seedQuantity">
+                                    <option value="">-- Select Quantity --</option>
+                                    <option value="10kg" <?php echo (isset($_POST['seedQuantity']) && $_POST['seedQuantity'] == '10kg') ? 'selected' : ''; ?>>10 kg</option>
+                                    <option value="20kg" <?php echo (isset($_POST['seedQuantity']) && $_POST['seedQuantity'] == '20kg') ? 'selected' : ''; ?>>20 kg</option>
+                                    <option value="25kg" <?php echo (isset($_POST['seedQuantity']) && $_POST['seedQuantity'] == '25kg') ? 'selected' : ''; ?>>25 kg</option>
+                                    <option value="50kg" <?php echo (isset($_POST['seedQuantity']) && $_POST['seedQuantity'] == '50kg') ? 'selected' : ''; ?>>50 kg</option>
+                                    <option value="100kg" <?php echo (isset($_POST['seedQuantity']) && $_POST['seedQuantity'] == '100kg') ? 'selected' : ''; ?>>100 kg</option>
+                                </select>
+                            </div>
                         </div>
+                        <!-- End Dynamic Seed Details Section -->
 
-                        <div class="mb-4">
-                            <label for="quantity" class="form-label">
-                                <i class="fas fa-boxes"></i>Quantity / Amount Needed
+                        <!-- Dynamic Engine Details Section -->
+                        <div id="engineDetails" class="mb-4" style="display: <?php echo (isset($_POST['assistanceType']) && $_POST['assistanceType'] == 'Fuel') ? 'block' : 'none'; ?>;">
+                            <label for="engineType" class="form-label">
+                                <i class="fas fa-tractor"></i>Engine Type
                             </label>
-                            <input type="text" class="form-control" id="quantity" name="quantity" placeholder="e.g., 50kg seeds, 10 liters fuel, P5,000 cash" value="<?php echo htmlspecialchars($_POST['quantity'] ?? ''); ?>" required />
-                            <small class="form-text text-muted">Be specific with quantity and units for faster processing.</small>
+                            <select class="form-select" id="engineType" name="engineType">
+                                <option value="">-- Select Engine Type --</option>
+                                <option value="Tractor" <?php echo (isset($_POST['engineType']) && $_POST['engineType'] == 'Tractor') ? 'selected' : ''; ?>>Tractor</option>
+                                <option value="Water Pump" <?php echo (isset($_POST['engineType']) && $_POST['engineType'] == 'Water Pump') ? 'selected' : ''; ?>>Water Pump</option>
+                                <option value="Hand Tractor" <?php echo (isset($_POST['engineType']) && $_POST['engineType'] == 'Hand Tractor') ? 'selected' : ''; ?>>Hand Tractor</option>
+                                <option value="Generator" <?php echo (isset($_POST['engineType']) && $_POST['engineType'] == 'Generator') ? 'selected' : ''; ?>>Generator</option>
+                                <option value="Harvester" <?php echo (isset($_POST['engineType']) && $_POST['engineType'] == 'Harvester') ? 'selected' : ''; ?>>Harvester</option>
+                                <option value="Other" <?php echo (isset($_POST['engineType']) && $_POST['engineType'] == 'Other') ? 'selected' : ''; ?>>Other</option>
+                            </select>
                         </div>
+                        <!-- End Dynamic Engine Details Section -->
 
                         <div class="mb-4">
                             <label for="remarks" class="form-label">
@@ -442,5 +544,31 @@ if ($conn->connect_error) {
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const assistanceTypeSelect = document.getElementById('assistanceType');
+            const seedDetailsDiv = document.getElementById('seedDetails');
+            const engineDetailsDiv = document.getElementById('engineDetails');
+
+            function toggleDynamicFields() {
+                // Hide all dynamic sections first
+                seedDetailsDiv.style.display = 'none';
+                engineDetailsDiv.style.display = 'none';
+
+                // Show relevant section based on selection
+                if (assistanceTypeSelect.value === 'Seeds') {
+                    seedDetailsDiv.style.display = 'block';
+                } else if (assistanceTypeSelect.value === 'Fuel') {
+                    engineDetailsDiv.style.display = 'block';
+                }
+            }
+
+            // Initial check when the page loads (useful if form repopulates on error)
+            toggleDynamicFields();
+
+            // Event listener for changes in the assistance type dropdown
+            assistanceTypeSelect.addEventListener('change', toggleDynamicFields);
+        });
+    </script>
 </body>
-</html> 
+</html>

@@ -329,7 +329,7 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
 
             <!-- Search Bar -->
             <div class="input-group mb-3">
-                <input type="text" class="form-control" placeholder="Search by name, barangay, or ID..." id="searchInput">
+                <input type="text" class="form-control" placeholder="Search by name, address, or ID..." id="searchInput">
                 <button class="btn btn-theme" type="button" onclick="searchFarmers()"><i class="fas fa-search me-1"></i> Search</button>
             </div>
 
@@ -343,7 +343,7 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
                                 <tr>
                                     <th>#</th>
                                     <th>Full Name</th>
-                                    <th>Barangay</th>
+                                    <th>Address</th> <!-- Column header changed to Address -->
                                     <th>Contact</th>
                                     <th>Farm Size (ha)</th>
                                     <th>Crop Type</th>
@@ -363,10 +363,8 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
                                             <td><?php echo htmlspecialchars($farmer['first_name'] . ' ' . (!empty($farmer['middle_name']) ? substr($farmer['middle_name'], 0, 1) . '. ' : '') . $farmer['last_name']); ?></td>
                                             <td>
                                                 <?php
-                                                    $address_parts = explode(',', $farmer['address']);
-                                                    // This assumes barangay is always the first part and that 'address' is not null or malformed.
-                                                    // A more robust solution might parse the address more carefully or have a dedicated 'barangay' column.
-                                                    echo htmlspecialchars(trim($address_parts[0] ?? 'N/A'));
+                                                    // Display the full address directly from the 'address' column
+                                                    echo htmlspecialchars($farmer['address'] ?? 'N/A');
                                                 ?>
                                             </td>
                                             <td><?php echo htmlspecialchars($farmer['contact_number']); ?></td>

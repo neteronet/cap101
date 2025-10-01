@@ -286,7 +286,7 @@
                                 <tr>
                                     <th>ID</th>
                                     <th>Farmer Name</th>
-                                    <th>Barangay</th>
+                                    <th>Address</th>
                                     <th>Crop</th>
                                     <th>Requested Subsidy</th>
                                     <th>Status</th>
@@ -357,7 +357,7 @@
 
             // Generate sample QR code
             const farmerName = row.children[1].textContent.replace(/\s+/g, '');
-            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${farmerName}2025&size=50x50`;
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${}2025&size=50x50`;
             qrCell.innerHTML = `<img src="${qrUrl}" alt="QR Code" class="img-fluid">`;
 
             // Disable buttons
