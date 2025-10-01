@@ -106,15 +106,38 @@ if ($conn->connect_error) {
             background-color: #19860f; /* Inherit parent background */
             color: #fff;
             font-size: 0.95rem;
+            /* Ensure submenu items fill the full width for active state */
+            padding-right: 1rem;
         }
+        /* Active style for submenu items - now applies to the full width */
         .sidebar .nav-item .collapse .nav-link.active {
             background-color: #fff; /* Active submenu item background */
             color: #19860f;
             font-weight: 600;
+            /* Ensure full width highlight */
+            border-radius: 0;
         }
         .sidebar .nav-item .collapse .nav-link:hover:not(.active) {
             background-color: #146c0b; /* Hover for submenu item */
             color: #fff;
+        }
+
+        /* Specific style for the dropdown toggle link itself */
+        .sidebar .nav-link.dropdown-toggle-custom {
+            /* No active background for the toggle itself, only for the items within */
+            background-color: transparent;
+            color: #fff; /* Ensure it stays white */
+        }
+        .sidebar .nav-link.dropdown-toggle-custom:hover {
+            background-color: #146c0b; /* Darker green on hover */
+            color: #fff;
+        }
+        /* Style for the chevron icon to rotate */
+        .sidebar .nav-link.dropdown-toggle-custom[aria-expanded="true"] .fa-chevron-down {
+            transform: rotate(180deg);
+        }
+        .sidebar .nav-link .fa-chevron-down {
+            transition: transform 0.2s ease-in-out;
         }
 
 
@@ -311,13 +334,13 @@ if ($conn->connect_error) {
                 </a>
             </li>
             <li class="nav-item">
-                <!-- Data-bs-toggle added here -->
-                <a href="#cropMonitoringSubmenu" data-bs-toggle="collapse" class="nav-link d-flex justify-content-between align-items-center active" aria-expanded="true">
+                <!-- Data-bs-toggle added here - Removed 'active' class from this link -->
+                <a href="#cropMonitoringSubmenu" data-bs-toggle="collapse" class="nav-link dropdown-toggle-custom d-flex justify-content-between align-items-center" aria-expanded="true">
                     <div><i class="fas fa-seedling"></i> Crop Monitoring</div>
                     <i class="fas fa-chevron-down fa-xs"></i>
                 </a>
                 <div class="collapse show" id="cropMonitoringSubmenu">
-                    <ul class="nav flex-column ms-3">
+                    <ul class="nav flex-column"> <!-- Removed ms-3 here to make sub-items full width -->
                         <li class="nav-item">
                             <a href="farmer-planting_status.php" class="nav-link active">
                                 <i class="fas fa-leaf"></i> Planting Status
@@ -428,10 +451,7 @@ if ($conn->connect_error) {
                 if (parentCollapse) {
                     new bootstrap.Collapse(parentCollapse, { toggle: false }).show();
                     // Also, mark the main submenu toggle as active if any sub-item is active
-                    var parentToggleLink = document.querySelector('a[href="#' + parentCollapse.id + '"]');
-                    if(parentToggleLink) {
-                        parentToggleLink.classList.add('active');
-                    }
+                    // Removed adding 'active' class to the parentToggleLink as requested
                 }
             }
         });
