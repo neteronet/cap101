@@ -390,24 +390,14 @@ $conn->close();
                 </a>
             </li>
             <li class="nav-item">
-                <a href="#cropMonitoringSubmenu" data-bs-toggle="collapse" class="nav-link d-flex justify-content-between align-items-center">
-                    <div><i class="fas fa-seedling"></i> Crop Monitoring</div>
-                    <i class="fas fa-chevron-down fa-xs"></i>
+                <a href="farmer-planting_status.php" class="nav-link">
+                    <i class="fas fa-leaf"></i> Planting Status
                 </a>
-                <div class="collapse" id="cropMonitoringSubmenu">
-                    <ul class="nav flex-column ms-3">
-                        <li class="nav-item">
-                            <a href="farmer-planting_status.php" class="nav-link">
-                                <i class="fas fa-leaf"></i> Planting Status
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="farmer-progress_tracking.php" class="nav-link">
-                                <i class="fas fa-chart-line"></i> Progress Tracking
-                            </a>
-                        </li>
-                    </ul>
-                </div>
+            </li>
+            <li class="nav-item">
+                <a href="farmer-progress_tracking.php" class="nav-link">
+                    <i class="fas fa-chart-line"></i> Progress Tracking
+                </a>
             </li>
         </ul>
     </nav>
@@ -422,7 +412,7 @@ $conn->close();
 
     <!-- Main Content -->
     <main>
-        <h1 class="page-title"></i>Announcements & Updates</h1>
+        <h1 class="page-title"> </i>Announcements & Updates</h1>
         <p class="text-muted mb-4">
             Stay informed with the latest news, advisories, and program updates from the Provincial Agriculture Office.
         </p>

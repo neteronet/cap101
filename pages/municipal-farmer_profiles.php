@@ -48,7 +48,7 @@ if (isset($_SESSION['user_id'])) {
 // Fetch farmer profiles from the database
 $farmers = [];
 // It's good practice to check if the query was successful
-$sql = "SELECT farmer_id, first_name, middle_name, last_name, address, contact_number, land_details, status, age, gender, civil_status, crop
+$sql = "SELECT farmer_id, first_name, middle_name, last_name, address, contact_number, land_details, age, gender, civil_status, crop
         FROM farmers
         ORDER BY last_name ASC";
 $result = $conn->query($sql);
@@ -241,24 +241,6 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
             margin-bottom: 0.75rem;
         }
 
-        .status-badge {
-            padding: 0.3em 0.6em;
-            border-radius: 0.4rem;
-            font-size: 13px;
-            font-weight: 500;
-            text-transform: capitalize; /* Make status look nicer */
-        }
-
-        .status-verified {
-            background-color: #28a745; /* Success green */
-            color: #fff;
-        }
-
-        .status-pending {
-            background-color: #ffc107; /* Warning yellow */
-            color: #856404;
-        }
-
         .table thead th {
             background-color: #f2f2f2;
             color: #555;
@@ -329,7 +311,7 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
 
             <!-- Search Bar -->
             <div class="input-group mb-3">
-                <input type="text" class="form-control" placeholder="Search by name, address, or ID..." id="searchInput">
+                <input type="text" class="form-control" placeholder="Search by name, barangay, or ID..." id="searchInput">
                 <button class="btn btn-theme" type="button" onclick="searchFarmers()"><i class="fas fa-search me-1"></i> Search</button>
             </div>
 
@@ -343,17 +325,16 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
                                 <tr>
                                     <th>#</th>
                                     <th>Full Name</th>
-                                    <th>Address</th> <!-- Column header changed to Address -->
+                                    <th>Address</th>
                                     <th>Contact</th>
                                     <th>Farm Size (ha)</th>
                                     <th>Crop Type</th>
-                                    <th>Status</th>
                                 </tr>
                             </thead>
                             <tbody id="farmerTableBody">
                                 <?php if (empty($farmers)): ?>
                                     <tr>
-                                        <td colspan="7" class="text-center">No farmer profiles found.</td>
+                                        <td colspan="6" class="text-center">No farmer profiles found.</td>
                                     </tr>
                                 <?php else: ?>
                                     <?php $counter = 1; ?>
@@ -363,8 +344,10 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
                                             <td><?php echo htmlspecialchars($farmer['first_name'] . ' ' . (!empty($farmer['middle_name']) ? substr($farmer['middle_name'], 0, 1) . '. ' : '') . $farmer['last_name']); ?></td>
                                             <td>
                                                 <?php
-                                                    // Display the full address directly from the 'address' column
-                                                    echo htmlspecialchars($farmer['address'] ?? 'N/A');
+                                                    $address_parts = explode(',', $farmer['address']);
+                                                    // This assumes barangay is always the first part and that 'address' is not null or malformed.
+                                                    // A more robust solution might parse the address more carefully or have a dedicated 'barangay' column.
+                                                    echo htmlspecialchars(trim($address_parts[0] ?? 'N/A'));
                                                 ?>
                                             </td>
                                             <td><?php echo htmlspecialchars($farmer['contact_number']); ?></td>
@@ -375,12 +358,6 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
                                                 ?>
                                             </td>
                                             <td><?php echo htmlspecialchars($farmer['crop']); ?></td>
-                                            <td>
-                                                <?php
-                                                    $status_class = ($farmer['status'] == 'verified') ? 'status-verified' : 'status-pending';
-                                                    echo '<span class="status-badge ' . $status_class . '">' . htmlspecialchars($farmer['status']) . '</span>';
-                                                ?>
-                                            </td>
                                         </tr>
                                     <?php endforeach; ?>
                                 <?php endif; ?>

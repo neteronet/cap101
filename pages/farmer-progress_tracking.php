@@ -100,45 +100,8 @@ if ($conn->connect_error) {
             color: #fff;
         }
 
-        /* Submenu styles */
-        .sidebar .nav-item .collapse .nav-link {
-            padding-left: 2.5rem; /* Indent for submenu items */
-            background-color: #19860f; /* Inherit parent background */
-            color: #fff;
-            font-size: 0.95rem;
-            /* Ensure submenu items fill the full width for active state */
-            padding-right: 1rem;
-        }
-        /* Active style for submenu items - now applies to the full width */
-        .sidebar .nav-item .collapse .nav-link.active {
-            background-color: #fff; /* Active submenu item background */
-            color: #19860f;
-            font-weight: 600;
-            /* Ensure full width highlight */
-            border-radius: 0;
-        }
-        .sidebar .nav-item .collapse .nav-link:hover:not(.active) {
-            background-color: #146c0b; /* Hover for submenu item */
-            color: #fff;
-        }
+        /* Submenu styles - REMOVED */
 
-        /* Specific style for the dropdown toggle link itself */
-        .sidebar .nav-link.dropdown-toggle-custom {
-            /* No active background for the toggle itself, only for the items within */
-            background-color: transparent;
-            color: #fff; /* Ensure it stays white */
-        }
-        .sidebar .nav-link.dropdown-toggle-custom:hover {
-            background-color: #146c0b; /* Darker green on hover */
-            color: #fff;
-        }
-        /* Style for the chevron icon to rotate */
-        .sidebar .nav-link .fa-chevron-down {
-            transition: transform 0.2s ease-in-out;
-        }
-        .sidebar .nav-link.dropdown-toggle-custom[aria-expanded="true"] .fa-chevron-down {
-            transform: rotate(180deg);
-        }
 
         .sidebar .header-brand {
             display: flex;
@@ -323,25 +286,14 @@ if ($conn->connect_error) {
                 </a>
             </li>
             <li class="nav-item">
-                <!-- Data-bs-toggle added here - using dropdown-toggle-custom for no active background on parent -->
-                <a href="#cropMonitoringSubmenu" data-bs-toggle="collapse" class="nav-link dropdown-toggle-custom d-flex justify-content-between align-items-center" aria-expanded="true">
-                    <div><i class="fas fa-seedling"></i> Crop Monitoring</div>
-                    <i class="fas fa-chevron-down fa-xs"></i>
+                <a href="farmer-planting_status.php" class="nav-link">
+                    <i class="fas fa-leaf"></i> Planting Status
                 </a>
-                <div class="collapse show" id="cropMonitoringSubmenu">
-                    <ul class="nav flex-column">
-                        <li class="nav-item">
-                            <a href="farmer-planting_status.php" class="nav-link">
-                                <i class="fas fa-leaf"></i> Planting Status
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="farmer-progress_tracking.php" class="nav-link active">
-                                <i class="fas fa-chart-line"></i> Progress Tracking
-                            </a>
-                        </li>
-                    </ul>
-                </div>
+            </li>
+            <li class="nav-item">
+                <a href="farmer-progress_tracking.php" class="nav-link active">
+                    <i class="fas fa-chart-line"></i> Progress Tracking
+                </a>
             </li>
         </ul>
     </nav>
@@ -408,20 +360,9 @@ if ($conn->connect_error) {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Optional: Keep submenu expanded if an item within it is active
+        // This script is no longer necessary since the dropdown is removed, but keeping it as a placeholder if future dropdowns are added.
         document.addEventListener('DOMContentLoaded', function() {
-            var cropMonitoringSubmenu = document.getElementById('cropMonitoringSubmenu');
-            var activeSublink = cropMonitoringSubmenu.querySelector('.nav-link.active');
-            if (activeSublink) {
-                var parentCollapse = activeSublink.closest('.collapse');
-                if (parentCollapse) {
-                    new bootstrap.Collapse(parentCollapse, { toggle: false }).show();
-                    // Also, ensure the parent toggle link updates its aria-expanded state if needed
-                    var parentToggleLink = document.querySelector('a[href="#' + parentCollapse.id + '"]');
-                    if (parentToggleLink) {
-                        parentToggleLink.setAttribute('aria-expanded', 'true');
-                    }
-                }
-            }
+            // Your existing logic for dropdowns if you re-introduce them
         });
     </script>
 </body>

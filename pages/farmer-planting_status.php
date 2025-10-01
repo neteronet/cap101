@@ -1,5 +1,5 @@
 <?php
-session_start(); // Start the session at the very beginning of the script
+session_start();
 
 // Check if the user is logged in. If not, redirect to the login page.
 if (!isset($_SESSION['user_id'])) {
@@ -7,21 +7,28 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-// Retrieve the user's name from the session.
-$display_name = $_SESSION['name'] ?? 'Farmer'; // Fallback to 'Farmer' if not set
-
+// Database connection details
 $servername = "localhost";
-$db_username = "root"; // Your database username
-$db_password = "";     // Your database password
-$dbname = "cap101"; // Your database name
+$db_username = "root";
+$db_password = "";
+$dbname = "cap101";
 
 $conn = new mysqli($servername, $db_username, $db_password, $dbname);
 
 if ($conn->connect_error) {
     error_log("Database connection failed: " . $conn->connect_error);
-} else {
-    $stmt = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
-    $stmt->bind_param("i", $_SESSION['user_id']);
+    // In a real application, you might redirect to an error page or show a friendly message
+    die("Connection failed: " . $conn->connect_error);
+}
+
+// Retrieve the user's name from the session and database
+$display_name = $_SESSION['name'] ?? 'Farmer'; // Fallback
+$user_id = $_SESSION['user_id'];
+
+// Fetch user's name from DB for display, if not already accurate in session
+$stmt = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
+if ($stmt) {
+    $stmt->bind_param("i", $user_id);
     $stmt->execute();
     $stmt->bind_result($fetched_db_name);
     $stmt->fetch();
@@ -29,9 +36,137 @@ if ($conn->connect_error) {
         $display_name = $fetched_db_name;
     }
     $stmt->close();
-    $conn->close();
+} else {
+    error_log("Failed to prepare statement for user name: " . $conn->error);
 }
 
+// Initialize messages
+$success_message = '';
+$error_message = '';
+$alerts = []; // To store dynamic alerts from the database
+
+// --- Handle Form Submission ---
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $crop_identifier = $_POST['cropSelect'] ?? '';
+    $planting_status_val = $_POST['plantingStatus'] ?? ''; // Renamed to avoid conflict with planting_status in the loop
+    $photo_path = NULL; // Default to NULL
+
+    // Basic validation
+    if (empty($crop_identifier) || $crop_identifier == 'Choose...' || empty($planting_status_val)) {
+        $error_message = "Please select a crop and its planting status.";
+    } else {
+        // Handle file upload
+        if (isset($_FILES['photoUpload']) && $_FILES['photoUpload']['error'] == UPLOAD_ERR_OK) {
+            $target_dir = "uploads/planting_photos/"; // Create this directory in your project root
+            if (!is_dir($target_dir)) {
+                mkdir($target_dir, 0777, true); // Create directory if it doesn't exist
+            }
+
+            $file_name = uniqid() . "_" . basename($_FILES["photoUpload"]["name"]);
+            $target_file = $target_dir . $file_name;
+            $imageFileType = strtolower(pathinfo($target_file, PATHINFO_EXTENSION));
+
+            // Check if image file is a actual image or fake image
+            $check = getimagesize($_FILES["photoUpload"]["tmp_name"]);
+            if ($check !== false) {
+                // Check file size (max 5MB)
+                if ($_FILES["photoUpload"]["size"] > 5000000) {
+                    $error_message = "Sorry, your file is too large (max 5MB).";
+                } else {
+                    // Allow certain file formats
+                    if ($imageFileType != "jpg" && $imageFileType != "png" && $imageFileType != "jpeg") {
+                        $error_message = "Sorry, only JPG, JPEG, & PNG files are allowed.";
+                    } else {
+                        if (move_uploaded_file($_FILES["photoUpload"]["tmp_name"], $target_file)) {
+                            $photo_path = $target_file;
+                            if (empty($error_message)) { // Don't overwrite existing error
+                                $success_message = "The file ". htmlspecialchars( basename( $_FILES["photoUpload"]["name"])). " has been uploaded.";
+                            }
+                        } else {
+                            $error_message = "Sorry, there was an error uploading your file.";
+                        }
+                    }
+                }
+            } else {
+                $error_message = "File is not an image.";
+            }
+        }
+
+        // Prepare to insert or update the database
+        // We'll upsert (update if exists, insert if not) based on user_id and crop_identifier
+        // Add a UNIQUE constraint to (user_id, crop_identifier) in your SQL table if you intend to use ON DUPLICATE KEY UPDATE.
+        // For now, let's assume one entry per user per crop_identifier.
+        $stmt = $conn->prepare("INSERT INTO planting_status (user_id, crop_identifier, status, photo_path)
+                                VALUES (?, ?, ?, ?)
+                                ON DUPLICATE KEY UPDATE status = VALUES(status), photo_path = VALUES(photo_path), update_date = CURRENT_TIMESTAMP");
+
+        if ($stmt) {
+            $stmt->bind_param("isss", $user_id, $crop_identifier, $planting_status_val, $photo_path);
+            if ($stmt->execute()) {
+                if (empty($error_message)) { // Only show success if no file upload error
+                    $success_message = "Planting status updated successfully for " . htmlspecialchars($crop_identifier) . ".";
+                }
+            } else {
+                $error_message = "Error updating planting status: " . $stmt->error;
+            }
+            $stmt->close();
+        } else {
+            $error_message = "Database error: Could not prepare statement to update planting status.";
+        }
+    }
+}
+
+// --- Fetch User's Current Planting Statuses (for displaying in the form or elsewhere) ---
+$user_planting_statuses = [];
+$stmt = $conn->prepare("SELECT crop_identifier, status, photo_path, update_date FROM planting_status WHERE user_id = ? ORDER BY update_date DESC");
+if ($stmt) {
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $user_planting_statuses[] = $row;
+    }
+    $stmt->close();
+} else {
+    error_log("Failed to prepare statement for fetching user planting statuses: " . $conn->error);
+}
+
+// --- Dynamic Alerts/Reminders (Example) ---
+// This part is for demonstration. In a real system, alerts would be more sophisticated.
+// For now, let's just mimic the "Action Required" for a specific crop if its status is "Not Planted"
+// or if it hasn't been updated recently.
+// For this example, let's say an alert is needed if 'Corn (Field 2)' is 'Not Planted' or has no recent update.
+
+$corn_field2_status_found = false;
+foreach ($user_planting_statuses as $status_item) {
+    if ($status_item['crop_identifier'] == 'Corn (Field 2)') {
+        $corn_field2_status_found = true;
+        if ($status_item['status'] == 'Not Planted') {
+            $alerts[] = [
+                'type' => 'warning',
+                'message' => 'Please update the planting status for your <strong class="text-dark">Corn crop (Field 2)</strong>. It is currently marked as "Not Planted".'
+            ];
+        }
+        // You could also add a logic for "not updated in X days"
+        // $last_update_timestamp = strtotime($status_item['update_date']);
+        // if (time() - $last_update_timestamp > (7 * 24 * 60 * 60)) { // 7 days
+        //     $alerts[] = [
+        //         'type' => 'warning',
+        //         'message' => 'Your <strong class="text-dark">Corn crop (Field 2)</strong> hasn\'t been updated in over a week.'
+        //     ];
+        // }
+        break;
+    }
+}
+if (!$corn_field2_status_found) {
+    // If Corn (Field 2) has no entry at all, prompt them to plant it.
+    $alerts[] = [
+        'type' => 'warning',
+        'message' => 'You haven\'t recorded planting status. Please update it.'
+    ];
+}
+
+$conn->close(); // Close the connection after all database operations
 ?>
 
 <!DOCTYPE html>
@@ -48,6 +183,7 @@ if ($conn->connect_error) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <!-- Custom Styles -->
     <style>
+        /* ... (Your existing CSS styles go here) ... */
         body {
             font-family: "Poppins", sans-serif;
             background: #f8f9fa;
@@ -100,21 +236,19 @@ if ($conn->connect_error) {
             color: #fff;
         }
 
-        /* Submenu styles */
+        /* Submenu styles (these styles are no longer directly used for Crop Monitoring,
+           but kept in case other dropdowns exist or are added later) */
         .sidebar .nav-item .collapse .nav-link {
             padding-left: 2.5rem; /* Indent for submenu items */
             background-color: #19860f; /* Inherit parent background */
             color: #fff;
             font-size: 0.95rem;
-            /* Ensure submenu items fill the full width for active state */
             padding-right: 1rem;
         }
-        /* Active style for submenu items - now applies to the full width */
         .sidebar .nav-item .collapse .nav-link.active {
             background-color: #fff; /* Active submenu item background */
             color: #19860f;
             font-weight: 600;
-            /* Ensure full width highlight */
             border-radius: 0;
         }
         .sidebar .nav-item .collapse .nav-link:hover:not(.active) {
@@ -122,17 +256,15 @@ if ($conn->connect_error) {
             color: #fff;
         }
 
-        /* Specific style for the dropdown toggle link itself */
+        /* Specific style for the dropdown toggle link itself (no longer needed for crop monitoring) */
         .sidebar .nav-link.dropdown-toggle-custom {
-            /* No active background for the toggle itself, only for the items within */
             background-color: transparent;
-            color: #fff; /* Ensure it stays white */
-        }
-        .sidebar .nav-link.dropdown-toggle-custom:hover {
-            background-color: #146c0b; /* Darker green on hover */
             color: #fff;
         }
-        /* Style for the chevron icon to rotate */
+        .sidebar .nav-link.dropdown-toggle-custom:hover {
+            background-color: #146c0b;
+            color: #fff;
+        }
         .sidebar .nav-link.dropdown-toggle-custom[aria-expanded="true"] .fa-chevron-down {
             transform: rotate(180deg);
         }
@@ -297,6 +429,51 @@ if ($conn->connect_error) {
             background-color: #146c0b;
             color: #fff; /* Keep text white on hover */
         }
+        .planting-status-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 8px;
+            border: 1px solid #eee;
+            border-radius: 5px;
+            background-color: #fcfcfc;
+        }
+        .planting-status-item img {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 5px;
+            margin-right: 15px;
+            border: 1px solid #ddd;
+        }
+        .planting-status-item .details {
+            flex-grow: 1;
+        }
+        .planting-status-item .details strong {
+            color: #19860f;
+            font-size: 1.05rem;
+        }
+        .planting-status-item .details span {
+            display: block;
+            font-size: 0.85rem;
+            color: #666;
+        }
+        .alert-custom-success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .alert-custom-danger {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
     </style>
 </head>
 <body>
@@ -334,25 +511,14 @@ if ($conn->connect_error) {
                 </a>
             </li>
             <li class="nav-item">
-                <!-- Data-bs-toggle added here - Removed 'active' class from this link -->
-                <a href="#cropMonitoringSubmenu" data-bs-toggle="collapse" class="nav-link dropdown-toggle-custom d-flex justify-content-between align-items-center" aria-expanded="true">
-                    <div><i class="fas fa-seedling"></i> Crop Monitoring</div>
-                    <i class="fas fa-chevron-down fa-xs"></i>
+                <a href="farmer-planting_status.php" class="nav-link active">
+                    <i class="fas fa-leaf"></i> Planting Status
                 </a>
-                <div class="collapse show" id="cropMonitoringSubmenu">
-                    <ul class="nav flex-column"> <!-- Removed ms-3 here to make sub-items full width -->
-                        <li class="nav-item">
-                            <a href="farmer-planting_status.php" class="nav-link active">
-                                <i class="fas fa-leaf"></i> Planting Status
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="farmer-progress_tracking.php" class="nav-link">
-                                <i class="fas fa-chart-line"></i> Progress Tracking
-                            </a>
-                        </li>
-                    </ul>
-                </div>
+            </li>
+            <li class="nav-item">
+                <a href="farmer-progress_tracking.php" class="nav-link">
+                    <i class="fas fa-chart-line"></i> Progress Tracking
+                </a>
             </li>
         </ul>
     </nav>
@@ -371,24 +537,61 @@ if ($conn->connect_error) {
             <h2 class="page-title"><i class="fas fa-seedling me-2"></i>Planting Status</h2>
             <p class="text-muted mb-4">Update your crop's planting progress and check for alerts.</p>
 
+            <?php if ($success_message): ?>
+                <div class="alert alert-custom-success" role="alert">
+                    <?php echo $success_message; ?>
+                </div>
+            <?php endif; ?>
+
+            <?php if ($error_message): ?>
+                <div class="alert alert-custom-danger" role="alert">
+                    <?php echo $error_message; ?>
+                </div>
+            <?php endif; ?>
+
             <div class="row">
                 <!-- Reminders/Alerts Card -->
                 <div class="col-md-6 mb-4">
                     <div class="card h-100">
                         <div class="card-body">
                             <h5 class="card-title"><i class="fas fa-bell me-2"></i>Reminders & Alerts</h5>
-                            <div class="alert-custom-warning mb-3" role="alert">
-                                <i class="fas fa-exclamation-triangle"></i>
-                                <div>
-                                    <h6 class="alert-heading mb-1">Action Required!</h6>
-                                    Please update the planting status for your <strong class="text-dark">Corn crop</strong> this week.
+                            <?php if (!empty($alerts)): ?>
+                                <?php foreach ($alerts as $alert): ?>
+                                    <div class="alert-custom-warning mb-3" role="alert">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                        <div>
+                                            <h6 class="alert-heading mb-1">Action Required!</h6>
+                                            <?php echo $alert['message']; ?>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <div class="alert alert-info" role="alert">
+                                    <i class="fas fa-info-circle me-2"></i>No immediate alerts or reminders. All good!
                                 </div>
-                            </div>
-                            <p class="text-muted small">Upcoming alerts:</p>
-                            <ul class="list-unstyled mb-0">
-                                <li><i class="fas fa-clock text-info me-2"></i> Fertilizer application reminder for Rice (next week).</li>
-                                <li><i class="fas fa-cloud-showers-heavy text-primary me-2"></i> Weather advisory: Possible heavy rains in 3 days.</li>
-                            </ul>
+                            <?php endif; ?>
+
+                            <p class="text-muted small mt-3">Your recorded planting statuses:</p>
+                            <?php if (!empty($user_planting_statuses)): ?>
+                                <div class="list-group">
+                                    <?php foreach ($user_planting_statuses as $status_item): ?>
+                                        <div class="planting-status-item">
+                                            <?php if ($status_item['photo_path'] && file_exists($status_item['photo_path'])): ?>
+                                                <img src="<?php echo htmlspecialchars($status_item['photo_path']); ?>" alt="Crop Photo" class="img-thumbnail">
+                                            <?php else: ?>
+                                                <img src="https://via.placeholder.com/50?text=No+Photo" alt="No Photo" class="img-thumbnail">
+                                            <?php endif; ?>
+                                            <div class="details">
+                                                <strong><?php echo htmlspecialchars($status_item['crop_identifier']); ?></strong>
+                                                <span>Status: <?php echo htmlspecialchars($status_item['status']); ?></span>
+                                                <span>Last Updated: <?php echo date("M d, Y H:i", strtotime($status_item['update_date'])); ?></span>
+                                            </div>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php else: ?>
+                                <p class="text-muted">No planting statuses recorded yet. Use the form to submit one!</p>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -398,26 +601,28 @@ if ($conn->connect_error) {
                     <div class="card h-100">
                         <div class="card-body">
                             <h5 class="card-title"><i class="fas fa-clipboard-check me-2"></i>Update Planting Status</h5>
-                            <form>
+                            <form method="POST" enctype="multipart/form-data"> <!-- Added method="POST" and enctype -->
                                 <div class="mb-3">
                                     <label for="cropSelect" class="form-label">Select Crop:</label>
-                                    <select class="form-select" id="cropSelect" aria-label="Select Crop">
-                                        <option selected>Choose...</option>
-                                        <option value="rice">Rice (Field 1)</option>
-                                        <option value="corn">Corn (Field 2)</option>
-                                        <option value="vegetables">Vegetables (Plot 3)</option>
+                                    <select class="form-select" id="cropSelect" name="cropSelect" aria-label="Select Crop" required>
+                                        <option value="Choose..." selected>Choose...</option>
+                                        <!-- Populate options dynamically from a database table of registered crops if available -->
+                                        <option value="Rice (Field 1)">Rice (Field 1)</option>
+                                        <option value="Corn (Field 2)">Corn (Field 2)</option>
+                                        <option value="Vegetables (Plot 3)">Vegetables (Plot 3)</option>
+                                        <!-- Add more options as needed -->
                                     </select>
                                 </div>
 
                                 <div class="form-check mb-2">
-                                    <input class="form-check-input" type="radio" name="plantingStatus" id="planted" value="Planted">
+                                    <input class="form-check-input" type="radio" name="plantingStatus" id="planted" value="Planted" required>
                                     <label class="form-check-label" for="planted">
                                         ✅ Seeds have been planted
                                     </label>
                                 </div>
 
                                 <div class="form-check mb-3">
-                                    <input class="form-check-input" type="radio" name="plantingStatus" id="notPlanted" value="Not Planted">
+                                    <input class="form-check-input" type="radio" name="plantingStatus" id="notPlanted" value="Not Planted" required>
                                     <label class="form-check-label" for="notPlanted">
                                         ❌ Seeds not yet planted
                                     </label>
@@ -425,7 +630,7 @@ if ($conn->connect_error) {
 
                                 <div class="mb-3">
                                     <label for="photoUpload" class="form-label">Upload Crop Photo (optional)</label>
-                                    <input class="form-control" type="file" id="photoUpload">
+                                    <input class="form-control" type="file" id="photoUpload" name="photoUpload" accept="image/jpeg,image/png">
                                     <div class="form-text">Max file size 5MB. Accepted formats: JPG, PNG.</div>
                                 </div>
 
@@ -441,20 +646,17 @@ if ($conn->connect_error) {
     <!-- Bootstrap Script -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Optional: Keep submenu expanded if an item within it is active
-        document.addEventListener('DOMContentLoaded', function() {
-            var cropMonitoringSubmenu = document.getElementById('cropMonitoringSubmenu');
-            var activeSublink = cropMonitoringSubmenu.querySelector('.nav-link.active');
-            if (activeSublink) {
-                // Ensure the parent collapse is shown if an active link is inside it
-                var parentCollapse = activeSublink.closest('.collapse');
-                if (parentCollapse) {
-                    new bootstrap.Collapse(parentCollapse, { toggle: false }).show();
-                    // Also, mark the main submenu toggle as active if any sub-item is active
-                    // Removed adding 'active' class to the parentToggleLink as requested
-                }
-            }
-        });
+        // No longer needed as there's no dropdown to keep expanded
+        // document.addEventListener('DOMContentLoaded', function() {
+        //     var cropMonitoringSubmenu = document.getElementById('cropMonitoringSubmenu');
+        //     var activeSublink = cropMonitoringSubmenu.querySelector('.nav-link.active');
+        //     if (activeSublink) {
+        //         var parentCollapse = activeSublink.closest('.collapse');
+        //         if (parentCollapse) {
+        //             new bootstrap.Collapse(parentCollapse, { toggle: false }).show();
+        //         }
+        //     }
+        // });
     </script>
 </body>
 </html>

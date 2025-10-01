@@ -2,7 +2,6 @@
 session_start(); // Start the session at the very beginning of the script
 
 // Check if the user is logged in. If not, redirect to the login page.
-// Adjust 'farmers-login.php' to your actual login page filename and path if different.
 if (!isset($_SESSION['user_id'])) {
     header("location: farmers-login.php");
     exit();
@@ -28,9 +27,6 @@ if ($conn->connect_error) {
 }
 
 // --- 1. Fetch user's display name for the header ---
-// Assuming your 'users' table has a 'name' column.
-// If not, you might want to fetch first_name and last_name from the 'Farmers' table
-// and combine them for the display_name.
 if (isset($_SESSION['user_id'])) {
     $stmt_user = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
     if ($stmt_user) {
@@ -39,7 +35,7 @@ if (isset($_SESSION['user_id'])) {
         $stmt_user->bind_result($fetched_db_name);
         $stmt_user->fetch();
         if ($fetched_db_name) {
-            $display_name = htmlspecialchars($fetched_db_name); // Use fetched name
+            $display_name = htmlspecialchars($fetched_db_name);
         }
         $stmt_user->close();
     } else {
@@ -49,10 +45,11 @@ if (isset($_SESSION['user_id'])) {
 
 // --- 2. Fetch farmer's profile data ---
 if (isset($_SESSION['user_id'])) {
+    // Removed 'status' from the SELECT query
     $stmt_farmer = $conn->prepare("SELECT
                                     farmer_id, rsbsa_id, first_name, middle_name, last_name,
-                                    address, contact_number, land_details, status,
-                                    age, gender, civil_status, crop /* Added crop */
+                                    address, contact_number, land_details,
+                                    age, gender, civil_status, crop
                                    FROM Farmers
                                    WHERE user_id = ?");
     if ($stmt_farmer) {
@@ -63,14 +60,14 @@ if (isset($_SESSION['user_id'])) {
         $stmt_farmer->close();
 
         // If land_details is a JSON string, decode it
-        if ($farmer_data && isset($farmer_data['land_details'])) {
+        if ($farmer_data && isset($farmer_data['land_details']) && !empty($farmer_data['land_details'])) {
             $farmer_data['land_details_decoded'] = json_decode($farmer_data['land_details'], true);
             if (json_last_error() !== JSON_ERROR_NONE) {
-                error_log("JSON decoding error for farmer_id " . ($farmer_data['farmer_id'] ?? 'unknown') . ": " . json_last_error_msg());
+                error_log("JSON decoding error for farmer_id " . ($farmer_data['farmer_id'] ?? 'unknown') . ": " . json_last_error_msg() . " Raw data: " . $farmer_data['land_details']);
                 $farmer_data['land_details_decoded'] = []; // Fallback to empty array on error
             }
         } else if ($farmer_data) {
-             $farmer_data['land_details_decoded'] = []; // Initialize if no land_details
+             $farmer_data['land_details_decoded'] = []; // Initialize if no land_details or empty string
         }
     } else {
         error_log("Failed to prepare farmer data statement: " . $conn->error);
@@ -81,35 +78,32 @@ $conn->close();
 
 // Fallback for cases where farmer_data couldn't be fetched or doesn't exist
 if (!$farmer_data) {
-    // This could mean the user_id exists but no corresponding farmer record,
-    // or an error occurred.
-    // In a real application, you might prompt them to complete their farmer profile.
     $farmer_data = [
         'first_name' => 'N/A',
-        'middle_name' => '', // Keep empty for easier full name construction
+        'middle_name' => '',
         'last_name' => 'N/A',
         'rsbsa_id' => 'N/A',
         'address' => 'N/A',
         'contact_number' => 'N/A',
-        'land_details_decoded' => [], // Ensure it's an empty array
-        'status' => 'unknown', // Default status
-        'age' => 'N/A',      // Default age
-        'gender' => 'N/A',   // Default gender
-        'civil_status' => 'N/A', // Default civil status
-        'crop' => 'N/A'      // Default crop
+        'land_details' => null,
+        'land_details_decoded' => [],
+        'age' => 'N/A',
+        'gender' => 'N/A',
+        'civil_status' => 'N/A',
+        'crop' => 'N/A'
     ];
 }
 
 // Construct full name for display in the profile body
 $full_name_profile = htmlspecialchars($farmer_data['first_name'] . ' ' .
-                       ($farmer_data['middle_name'] ? substr($farmer_data['middle_name'], 0, 1) . '. ' : '') .
+                       (!empty($farmer_data['middle_name']) ? substr($farmer_data['middle_name'], 0, 1) . '. ' : '') .
                        $farmer_data['last_name']);
 
 // Use the fetched age, gender, civil_status, and crop directly
 $age = htmlspecialchars($farmer_data['age'] ?? 'N/A');
 $gender = htmlspecialchars($farmer_data['gender'] ?? 'N/A');
 $civil_status = htmlspecialchars($farmer_data['civil_status'] ?? 'N/A');
-$crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A'); // Fetching crop here
+$crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
 ?>
 
 <!DOCTYPE html>
@@ -334,18 +328,8 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A'); // Fetching crop here
             <li class="nav-item"><a href="farmer-subsidy_status.php" class="nav-link"><i class="fas fa-hand-holding-usd"></i> Subsidy Status</a></li>
             <li class="nav-item"><a href="farmer-announcement.php" class="nav-link"><i class="fas fa-bullhorn"></i> Announcements</a></li>
             <li class="nav-item"><a href="farmer-apply_for_assistance.php" class="nav-link"><i class="fas fa-file-invoice"></i> Apply for Assistance</a></li>
-            <li class="nav-item">
-                <a href="#cropMonitoringSubmenu" data-bs-toggle="collapse" class="nav-link d-flex justify-content-between align-items-center">
-                    <div><i class="fas fa-seedling"></i> Crop Monitoring</div>
-                    <i class="fas fa-chevron-down fa-xs"></i>
-                </a>
-                <div class="collapse" id="cropMonitoringSubmenu">
-                    <ul class="nav flex-column ms-3">
-                        <li class="nav-item"><a href="farmer-planting_status.php" class="nav-link"><i class="fas fa-leaf"></i> Planting Status</a></li>
-                        <li class="nav-item"><a href="farmer-progress_tracking.php" class="nav-link"><i class="fas fa-chart-line"></i> Progress Tracking</a></li>
-                    </ul>
-                </div>
-            </li>
+            <li class="nav-item"><a href="farmer-planting_status.php" class="nav-link"><i class="fas fa-leaf"></i> Planting Status</a></li>
+            <li class="nav-item"><a href="farmer-progress_tracking.php" class="nav-link"><i class="fas fa-chart-line"></i> Progress Tracking</a></li>
         </ul>
     </nav>
 
@@ -370,7 +354,7 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A'); // Fetching crop here
                             <h4><?php echo $full_name_profile; ?></h4>
                             <p class="mb-1 text-muted small">RSBSA ID: <strong><?php echo htmlspecialchars($farmer_data['rsbsa_id']); ?></strong></p>
                             <p class="mb-0 text-muted small">Address: <?php echo htmlspecialchars($farmer_data['address']); ?></p>
-                            <p class="mb-0 text-muted small">Status: <span class="badge <?php echo ($farmer_data['status'] == 'verified') ? 'bg-success' : 'bg-warning text-dark'; ?>"><?php echo htmlspecialchars(ucfirst($farmer_data['status'])); ?></span></p>
+                            <!-- Removed the Status line here -->
                         </div>
                     </div>
 
@@ -399,7 +383,7 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A'); // Fetching crop here
                     <div class="card-body">
                         <p><strong>Location:</strong> <?php echo htmlspecialchars($farmer_data['land_details_decoded']['location'] ?? 'N/A'); ?></p>
                         <p><strong>Area:</strong> <?php echo htmlspecialchars($farmer_data['land_details_decoded']['size'] ?? 'N/A'); ?></p>
-                        <p><strong>Crop:</strong> <?php echo htmlspecialchars($crop); ?></p> <!-- Display fetched crop -->
+                        <p><strong>Crop:</strong> <?php echo htmlspecialchars($crop); ?></p>
                     </div>
                 </div>
             <?php else: ?>
@@ -409,10 +393,6 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A'); // Fetching crop here
                     </div>
                 </div>
             <?php endif; ?>
-
-            <!-- If a farmer has multiple land parcels, you'd typically store them in a separate table (e.g., FarmerLands)
-                 and loop through them here. For your current single JSON object, one card is sufficient.
-            -->
 
         </div>
     </main>
