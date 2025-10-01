@@ -9,28 +9,23 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 // Retrieve the user's name from the session.
-// In your login example, you stored 'username' (e.g., 'delacruzjuan') in the session.
-// We'll use this for the display.
 $display_name = $_SESSION['name'] ?? 'Farmer'; // Fallback to 'Farmer' if not set
-
-// If you had a 'full_name' column in your database and stored it in the session,
-// you would use that instead. For example, if you stored $_SESSION['full_name']
-// $display_name = $_SESSION['full_name'] ?? 'Farmer';
 
 $servername = "localhost";
 $db_username = "root"; // Your database username
 $db_password = "";     // Your database password
 $dbname = "cap101"; // Your database name
 
+// Create database connection
 $conn = new mysqli($servername, $db_username, $db_password, $dbname);
 
+// Check connection
 if ($conn->connect_error) {
-    // Log error or display a generic message, but don't expose database details
     error_log("Database connection failed: " . $conn->connect_error);
     // You might want to redirect to an error page or show a friendly message
+    die("Connection failed: " . $conn->connect_error); // For debugging, remove in production
 } else {
-    // Assuming your 'users' table has a 'username' column that serves as the display name
-    // If you have a 'first_name' and 'last_name', you'd fetch those.
+    // Fetch user's name from DB if available
     $stmt = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
     $stmt->bind_param("i", $_SESSION['user_id']);
     $stmt->execute();
@@ -40,8 +35,28 @@ if ($conn->connect_error) {
         $display_name = $fetched_db_name; // Use the name fetched from DB
     }
     $stmt->close();
-    $conn->close();
 }
+
+// --- Fetch Announcements from the Database ---
+$announcements = []; // Initialize an empty array to store announcements
+
+// Assuming your table name for announcements is 'announcements'
+$sql = "SELECT id, title, category, content, image_url, publish_date FROM announcements ORDER BY publish_date DESC";
+$result = $conn->query($sql);
+
+if ($result) {
+    if ($result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $announcements[] = $row;
+        }
+    }
+    $result->free(); // Free result set
+} else {
+    error_log("Error fetching announcements: " . $conn->error);
+}
+
+// Close the database connection after all operations
+$conn->close();
 
 ?>
 
@@ -260,18 +275,13 @@ if ($conn->connect_error) {
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
         }
 
-        .announcement-card.type-advisory {
-            border-left-color: #ffc107; /* Warning yellow */
-        }
-        .announcement-card.type-program {
-            border-left-color: #19860f; /* Primary green */
-        }
-        .announcement-card.type-alert {
-            border-left-color: #dc3545; /* Danger red */
-        }
-        .announcement-card.type-general {
-            border-left-color: #0d6efd; /* Info blue */
-        }
+        /* Dynamic border colors based on category */
+        .announcement-card.type-advisory { border-left-color: #ffc107; } /* Warning yellow */
+        .announcement-card.type-program { border-left-color: #19860f; } /* Primary green */
+        .announcement-card.type-alert { border-left-color: #dc3545; } /* Danger red */
+        .announcement-card.type-general { border-left-color: #0d6efd; } /* Info blue */
+        /* If category is not one of above, no specific border will be applied */
+
 
         .announcement-date {
             font-size: 0.85rem;
@@ -285,10 +295,17 @@ if ($conn->connect_error) {
             border-radius: 0.3rem;
             margin-left: 10px;
         }
+        /* Dynamic background colors for category badges */
         .category-advisory { background-color: #fff3cd; color: #664d03; }
         .category-program { background-color: #e6f2e6; color: #19860f; }
         .category-alert { background-color: #f8d7da; color: #842029; }
         .category-general { background-color: #cfe2ff; color: #052c65; }
+        /* Fallback if category doesn't match a specific style */
+        .announcement-category:not(.category-advisory):not(.category-program):not(.category-alert):not(.category-general) {
+            background-color: #6c757d; /* grey */
+            color: #fff;
+        }
+
 
         #announcementDetailModal .modal-title {
             color: #19860f;
@@ -424,141 +441,54 @@ if ($conn->connect_error) {
                     <option value="program">Programs</option>
                     <option value="alert">Alerts</option>
                     <option value="general">General Updates</option>
+                    <!-- Add more options if you have more distinct categories -->
                 </select>
             </div>
         </div>
 
         <div class="row" id="announcementList">
-            <!-- Announcement Card Example 1: Advisory -->
-            <div class="col-md-6 col-lg-4 announcement-item type-advisory">
-                <div class="card announcement-card h-100" data-bs-toggle="modal" data-bs-target="#announcementDetailModal"
-                    data-title="Advisory: Managing Fall Armyworm Infestation"
-                    data-date="May 15, 2024"
-                    data-category="Advisory"
-                    data-image="https://via.placeholder.com/600x400/ffc107/ffffff?text=Fall+Armyworm"
-                    data-content="Farmers are advised to take immediate action against the potential threat of Fall Armyworm (FAW) infestation. FAW can cause significant damage to corn and other crops. Early detection and proper management strategies are crucial. Please refer to the attached detailed guide for identification and control methods. Contact your local agricultural officer for assistance."
-                >
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h6 class="card-subtitle announcement-date">May 15, 2024</h6>
-                            <span class="announcement-category category-advisory">Advisory</span>
-                        </div>
-                        <h5 class="card-title">Managing Fall Armyworm Infestation</h5>
-                        <p class="card-text text-muted small">
-                            Immediate actions to protect your crops from Fall Armyworm.
-                        </p>
+            <?php if (empty($announcements)): ?>
+                <div class="col-12">
+                    <div class="alert alert-info" role="alert">
+                        No announcements available at the moment. Please check back later!
                     </div>
                 </div>
-            </div>
-
-            <!-- Announcement Card Example 2: Program Update -->
-            <div class="col-md-6 col-lg-4 announcement-item type-program">
-                <div class="card announcement-card h-100" data-bs-toggle="modal" data-bs-target="#announcementDetailModal"
-                    data-title="New Rice Seed Distribution Program"
-                    data-date="May 10, 2024"
-                    data-category="Program"
-                    data-image="https://via.placeholder.com/600x400/19860f/ffffff?text=Rice+Program"
-                    data-content="The Provincial Agriculture Office is launching a new rice seed distribution program for the wet season planting. Registered farmers are encouraged to apply for high-yielding rice varieties. Eligibility criteria and application procedures are available online and at your local MAO office. Deadline for applications is June 15, 2024."
-                >
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h6 class="card-subtitle announcement-date">May 10, 2024</h6>
-                            <span class="announcement-category category-program">Program</span>
+            <?php else: ?>
+                <?php foreach ($announcements as $announcement):
+                    // Format the date for display
+                    $formatted_date = date("F d, Y", strtotime($announcement['publish_date']));
+                    // Sanitize category for class names (lowercase and remove spaces if necessary)
+                    $category_slug = strtolower(str_replace(' ', '', $announcement['category']));
+                ?>
+                    <div class="col-md-6 col-lg-4 announcement-item type-<?php echo htmlspecialchars($category_slug); ?>">
+                        <div class="card announcement-card h-100" data-bs-toggle="modal" data-bs-target="#announcementDetailModal"
+                            data-title="<?php echo htmlspecialchars($announcement['title']); ?>"
+                            data-date="<?php echo htmlspecialchars($formatted_date); ?>"
+                            data-category="<?php echo htmlspecialchars($announcement['category']); ?>"
+                            data-image="<?php echo htmlspecialchars($announcement['image_url']); ?>"
+                            data-content="<?php echo htmlspecialchars($announcement['content']); ?>"
+                        >
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="card-subtitle announcement-date"><?php echo htmlspecialchars($formatted_date); ?></h6>
+                                    <span class="announcement-category category-<?php echo htmlspecialchars($category_slug); ?>"><?php echo htmlspecialchars($announcement['category']); ?></span>
+                                </div>
+                                <h5 class="card-title"><?php echo htmlspecialchars($announcement['title']); ?></h5>
+                                <p class="card-text text-muted small">
+                                    <?php
+                                        // Display a truncated version of the content
+                                        $short_content = substr($announcement['content'], 0, 100);
+                                        if (strlen($announcement['content']) > 100) {
+                                            $short_content .= '...';
+                                        }
+                                        echo htmlspecialchars($short_content);
+                                    ?>
+                                </p>
+                            </div>
                         </div>
-                        <h5 class="card-title">New Rice Seed Distribution Program</h5>
-                        <p class="card-text text-muted small">
-                            Details on the upcoming rice seed distribution for the wet season.
-                        </p>
                     </div>
-                </div>
-            </div>
-
-            <!-- Announcement Card Example 3: Disaster Alert -->
-            <div class="col-md-6 col-lg-4 announcement-item type-alert">
-                <div class="card announcement-card h-100" data-bs-toggle="modal" data-bs-target="#announcementDetailModal"
-                    data-title="TYPHOON ALERT: Prepare for 'Bagyong Lando'"
-                    data-date="May 08, 2024"
-                    data-category="Alert"
-                    data-image="https://via.placeholder.com/600x400/dc3545/ffffff?text=Typhoon+Alert"
-                    data-content="A strong typhoon, 'Bagyong Lando', is expected to make landfall in the province within the next 48 hours. Farmers are urged to secure their farms, harvest mature crops if possible, and ensure the safety of livestock. Follow local government advisories for evacuation plans. Emergency hotlines are available."
-                >
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h6 class="card-subtitle announcement-date">May 08, 2024</h6>
-                            <span class="announcement-category category-alert">Alert</span>
-                        </div>
-                        <h5 class="card-title">TYPHOON ALERT: Prepare for 'Bagyong Lando'</h5>
-                        <p class="card-text text-muted small">
-                            Urgent advisory regarding an approaching strong typhoon.
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Announcement Card Example 4: General Update -->
-            <div class="col-md-6 col-lg-4 announcement-item type-general">
-                <div class="card announcement-card h-100" data-bs-toggle="modal" data-bs-target="#announcementDetailModal"
-                    data-title="Agricultural Census 2024 Extension"
-                    data-date="May 01, 2024"
-                    data-category="General"
-                    data-image="https://via.placeholder.com/600x400/0d6efd/ffffff?text=Census+Extension"
-                    data-content="The deadline for the 2024 Agricultural Census has been extended until May 31, 2024. All farmers who have not yet participated are requested to complete the survey as soon as possible. Your cooperation is vital for accurate data collection and effective policy-making. Visit your barangay hall or MAO for assistance."
-                >
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h6 class="card-subtitle announcement-date">May 01, 2024</h6>
-                            <span class="announcement-category category-general">General</span>
-                        </div>
-                        <h5 class="card-title">Agricultural Census 2024 Extension</h5>
-                        <p class="card-text text-muted small">
-                            Extended deadline for the vital Agricultural Census.
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- More announcements can be added here -->
-            <div class="col-md-6 col-lg-4 announcement-item type-program">
-                <div class="card announcement-card h-100" data-bs-toggle="modal" data-bs-target="#announcementDetailModal"
-                    data-title="Organic Farming Workshop Schedule"
-                    data-date="April 28, 2024"
-                    data-category="Program"
-                    data-image="https://via.placeholder.com/600x400/19860f/ffffff?text=Organic+Workshop"
-                    data-content="Learn sustainable practices at our upcoming organic farming workshops. Sessions will cover natural pest control, composting, and soil health. Open to all interested farmers. Registration is required due to limited slots. See the full schedule and topics at the MAO office or online portal."
-                >
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h6 class="card-subtitle announcement-date">April 28, 2024</h6>
-                            <span class="announcement-category category-program">Program</span>
-                        </div>
-                        <h5 class="card-title">Organic Farming Workshop Schedule</h5>
-                        <p class="card-text text-muted small">
-                            Enroll now for free workshops on sustainable agriculture.
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-6 col-lg-4 announcement-item type-advisory">
-                <div class="card announcement-card h-100" data-bs-toggle="modal" data-bs-target="#announcementDetailModal"
-                    data-title="Water Conservation Tips for Dry Season"
-                    data-date="April 20, 2024"
-                    data-category="Advisory"
-                    data-image="https://via.placeholder.com/600x400/ffc107/ffffff?text=Water+Conservation"
-                    data-content="With the dry season in full swing, it's crucial to practice water conservation in farming. This advisory provides practical tips for efficient irrigation, mulching, and selecting drought-resistant crops to maximize water use and protect your yield. Learn more about effective water management."
-                >
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h6 class="card-subtitle announcement-date">April 20, 2024</h6>
-                            <span class="announcement-category category-advisory">Advisory</span>
-                        </div>
-                        <h5 class="card-title">Water Conservation Tips for Dry Season</h5>
-                        <p class="card-text text-muted small">
-                            Strategies for efficient water usage during the dry months.
-                        </p>
-                    </div>
-                </div>
-            </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
         </div>
     </main>
 
@@ -608,15 +538,19 @@ if ($conn->connect_error) {
 
                 modalTitle.textContent = title;
                 modalDate.textContent = date;
+                // Update category text
                 modalCategory.textContent = category;
-                modalCategory.className = `announcement-category category-${category.toLowerCase()}`;
+                // Update category class for styling
+                const categorySlug = category.toLowerCase().replace(/\s/g, ''); // Convert 'General Updates' to 'generalupdates'
+                modalCategory.className = `announcement-category category-${categorySlug}`;
                 modalContent.textContent = content;
 
-                if (image) {
+                if (image && image !== 'null' && image !== '') { // Check if image_url is not empty or 'null' string
                     modalImage.src = image;
                     modalImage.classList.remove('d-none');
                 } else {
                     modalImage.classList.add('d-none');
+                    modalImage.src = ''; // Clear src to prevent broken image icon
                 }
             });
 
@@ -624,20 +558,26 @@ if ($conn->connect_error) {
             const announcementSearch = document.getElementById('announcementSearch');
             const announcementFilter = document.getElementById('announcementFilter');
             const announcementList = document.getElementById('announcementList');
-            const announcementItems = announcementList.querySelectorAll('.announcement-item');
+            // Get all announcement items dynamically after they are loaded
+            let announcementItems = announcementList.querySelectorAll('.announcement-item');
 
             function filterAnnouncements() {
                 const searchTerm = announcementSearch.value.toLowerCase();
-                const filterCategory = announcementFilter.value;
+                const filterCategory = announcementFilter.value.toLowerCase(); // Ensure lowercase for comparison
 
                 announcementItems.forEach(item => {
                     const title = item.querySelector('.card-title').textContent.toLowerCase();
-                    const textContent = item.textContent.toLowerCase();
-                    const itemCategory = item.classList.contains(`type-${filterCategory}`) || filterCategory === 'all';
+                    const shortContent = item.querySelector('.card-text').textContent.toLowerCase(); // Search in short content too
+                    // Get the category from the span's text content, then slugify it for comparison
+                    const itemCategorySpan = item.querySelector('.announcement-category').textContent;
+                    const itemCategorySlug = itemCategorySpan.toLowerCase().replace(/\s/g, '');
 
-                    const matchesSearch = title.includes(searchTerm) || textContent.includes(searchTerm);
 
-                    if (matchesSearch && itemCategory) {
+                    const matchesSearch = title.includes(searchTerm) || shortContent.includes(searchTerm);
+                    const matchesCategory = itemCategorySlug.includes(filterCategory) || filterCategory === 'all';
+
+
+                    if (matchesSearch && matchesCategory) {
                         item.style.display = 'block';
                     } else {
                         item.style.display = 'none';
@@ -647,6 +587,9 @@ if ($conn->connect_error) {
 
             announcementSearch.addEventListener('keyup', filterAnnouncements);
             announcementFilter.addEventListener('change', filterAnnouncements);
+
+            // Initial filter call to ensure correct display if a filter is pre-selected or search bar is not empty
+            filterAnnouncements();
         });
     </script>
 </body>

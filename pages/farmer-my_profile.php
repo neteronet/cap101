@@ -365,7 +365,7 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A'); // Fetching crop here
             <div class="card mb-4">
                 <div class="card-body">
                     <div class="profile-header">
-                        <img src="../photos/farmer-avatar.png" alt="Farmer Photo">
+                        <img src="../photos/Avatar.png" alt="Farmer Photo">
                         <div>
                             <h4><?php echo $full_name_profile; ?></h4>
                             <p class="mb-1 text-muted small">RSBSA ID: <strong><?php echo htmlspecialchars($farmer_data['rsbsa_id']); ?></strong></p>
