@@ -9,13 +9,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 // Retrieve the user's name from the session.
-// In your login example, you stored 'username' (e.g., 'delacruzjuan') in the session.
-// We'll use this for the display.
 $display_name = $_SESSION['name'] ?? 'Farmer'; // Fallback to 'Farmer' if not set
-
-// If you had a 'full_name' column in your database and stored it in the session,
-// you would use that instead. For example, if you stored $_SESSION['full_name']
-// $display_name = $_SESSION['full_name'] ?? 'Farmer';
 
 $servername = "localhost";
 $db_username = "root"; // Your database username
@@ -30,7 +24,6 @@ if ($conn->connect_error) {
     // You might want to redirect to an error page or show a friendly message
 } else {
     // Assuming your 'users' table has a 'username' column that serves as the display name
-    // If you have a 'first_name' and 'last_name', you'd fetch those.
     $stmt = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
     $stmt->bind_param("i", $_SESSION['user_id']);
     $stmt->execute();
@@ -40,6 +33,25 @@ if ($conn->connect_error) {
         $display_name = $fetched_db_name; // Use the name fetched from DB
     }
     $stmt->close();
+
+    // --- Fetch Latest Announcements ---
+    $announcements = [];
+    // Changed LIMIT from 2 to 1 to fetch only the latest announcement
+    $stmt_announcements = $conn->prepare("SELECT title, content, publish_date FROM announcements ORDER BY publish_date DESC LIMIT 1"); 
+    if ($stmt_announcements) {
+        $stmt_announcements->execute();
+        $stmt_announcements->bind_result($title, $content, $publish_date);
+        while ($stmt_announcements->fetch()) {
+            $announcements[] = [
+                'title' => $title,
+                'content' => $content,
+                'publish_date' => $publish_date
+            ];
+        }
+        $stmt_announcements->close();
+    }
+    // --- End Fetch Latest Announcements ---
+
     $conn->close();
 }
 
@@ -323,8 +335,19 @@ if ($conn->connect_error) {
                                 Stay updated with government programs, advisories, and disaster alerts here.
                             </p>
                             <ul class="list-unstyled small mb-3">
-                                <li><i class="fas fa-circle-info text-info me-2"></i>Advisory: Typhoons and Crop Protection</li>
-                                <li><i class="fas fa-calendar-alt text-primary me-2"></i>New program for Rice Farmers starting June 2024</li>
+                                <?php if (!empty($announcements)) : ?>
+                                    <?php foreach ($announcements as $announcement) : ?>
+                                        <li>
+                                            <i class="fas fa-circle-info text-info me-2"></i>
+                                            <strong><?php echo htmlspecialchars($announcement['title']); ?></strong>
+                                            <br>
+                                            <span class="text-muted"><?php echo date('F j, Y', strtotime($announcement['publish_date'])); ?></span>
+                                            <p class="mb-0"><?php echo htmlspecialchars(substr($announcement['content'], 0, 70)); ?>...</p>
+                                        </li>
+                                    <?php endforeach; ?>
+                                <?php else : ?>
+                                    <li>No recent announcements.</li>
+                                <?php endif; ?>
                             </ul>
                             <a href="farmer-announcement.php" class="btn btn-theme mt-auto">View All Announcements</a>
                         </div>
@@ -357,10 +380,20 @@ if ($conn->connect_error) {
                                 Keep track of your crop's progress and update planting status.
                             </p>
                             <ul class="list-unstyled small mb-3">
-                                <li><i class="fas fa-calendar-check text-success me-2"></i>Last update: Rice (Harvested 2 weeks ago)</li>
-                                <li><i class="fas fa-hourglass-half text-warning me-2"></i>Reminder: Update corn planting status this week.</li>
+                                <?php if (!empty($latest_crop_status)) : ?>
+                                    <li>
+                                        <i class="fas fa-calendar-check text-success me-2"></i>
+                                        Last update for <strong><?php echo htmlspecialchars($latest_crop_status['crop_identifier']); ?></strong>:
+                                        <span class="fw-bold"><?php echo htmlspecialchars($latest_crop_status['status']); ?></span>
+                                        <br>
+                                        <span class="text-muted small ms-4">(<?php echo date('F j, Y', strtotime($latest_crop_status['update_date'])); ?>)</span>
+                                    </li>
+                                <?php else : ?>
+                                    <li>No crop monitoring data available. Add your first crop!</li>
+                                <?php endif; ?>
+                                <li><i class="fas fa-hourglass-half text-warning me-2"></i>Reminder: Regularly update your crop status.</li>
                             </ul>
-                            <a href="farmer-crop_monitoring.php" class="btn btn-theme mt-auto">View Crop Details</a>
+                            <a href="farmer-planting_status.php" class="btn btn-theme mt-auto">View Crop Details</a>
                         </div>
                     </div>
                 </div>

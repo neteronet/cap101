@@ -1,75 +1,61 @@
 <?php
 session_start();
-header('Content-Type: application/json'); // Set header for JSON response
+header('Content-Type: application/json');
 
-$response = ['success' => false, 'message' => 'An unknown error occurred.'];
-
-// Ensure the user is logged in and is a municipal officer (optional, but good practice)
+// Check if the user is logged in and authorized (optional but recommended)
 if (!isset($_SESSION['user_id'])) {
-    $response['message'] = 'User not authenticated.';
-    echo json_encode($response);
+    echo json_encode(['success' => false, 'message' => 'Unauthorized access.']);
     exit();
 }
 
-// Database connection details
+// Database connection details (ensure these match your main file)
 $servername = "localhost";
 $db_username = "root";
 $db_password = "";
 $dbname = "cap101";
 
+// Create database connection
 $conn = new mysqli($servername, $db_username, $db_password, $dbname);
 
+// Check connection
 if ($conn->connect_error) {
-    error_log("Database connection failed: " . $conn->connect_error);
-    $response['message'] = 'Database connection error.';
-    echo json_encode($response);
+    echo json_encode(['success' => false, 'message' => 'Database connection failed: ' . $conn->connect_error]);
     exit();
 }
 
-// Get the raw POST data
-$input = file_get_contents('php://input');
-$data = json_decode($input, true);
+// Get the POST data
+$input = json_decode(file_get_contents('php://input'), true);
 
-if (json_last_error() !== JSON_ERROR_NONE) {
-    $response['message'] = 'Invalid JSON input.';
-    echo json_encode($response);
+$application_id = $input['application_id'] ?? null;
+$status = $input['status'] ?? null;
+$qr_code_data = $input['qr_code_data'] ?? null; // This will be null for rejected/pending
+
+if (!$application_id || !$status) {
+    echo json_encode(['success' => false, 'message' => 'Missing application ID or status.']);
     $conn->close();
     exit();
 }
 
-$application_id = $data['application_id'] ?? null;
-$new_status = $data['status'] ?? null;
-$qr_code_data = $data['qr_code_data'] ?? null; // Will be null for reject/pending
+// Prepare the update statement
+$sql = "UPDATE assistance_applications SET status = ?, qr_code_data = ? WHERE application_id = ?";
+$stmt = $conn->prepare($sql);
 
-if (!$application_id || !$new_status) {
-    $response['message'] = 'Missing application ID or status.';
-    echo json_encode($response);
+if ($stmt === false) {
+    echo json_encode(['success' => false, 'message' => 'Prepare failed: ' . $conn->error]);
     $conn->close();
     exit();
 }
 
-$municipal_officer_id = $_SESSION['user_id']; // The ID of the logged-in municipal officer
-$current_datetime = date('Y-m-d H:i:s'); // Current timestamp
-
-// Prepare SQL update statement
-if ($new_status == 'Approved') {
-    $stmt = $conn->prepare("UPDATE assistance_applications SET status = ?, approved_by_id = ?, approval_date = ?, qr_code_data = ? WHERE application_id = ?");
-    $stmt->bind_param("sisss", $new_status, $municipal_officer_id, $current_datetime, $qr_code_data, $application_id);
-} else { // 'Rejected' or 'Pending'
-    $stmt = $conn->prepare("UPDATE assistance_applications SET status = ?, approved_by_id = NULL, approval_date = NULL, qr_code_data = NULL WHERE application_id = ?");
-    $stmt->bind_param("si", $new_status, $application_id);
-}
+// Bind parameters and execute
+// 's' for status (string), 's' for qr_code_data (string or null), 'i' for application_id (integer)
+$stmt->bind_param("ssi", $status, $qr_code_data, $application_id);
 
 if ($stmt->execute()) {
-    $response['success'] = true;
-    $response['message'] = 'Application status updated successfully.';
+    echo json_encode(['success' => true, 'message' => 'Status updated successfully.']);
 } else {
-    error_log("Error updating application status: " . $stmt->error);
-    $response['message'] = 'Failed to update application status: ' . $stmt->error;
+    echo json_encode(['success' => false, 'message' => 'Execute failed: ' . $stmt->error]);
 }
 
 $stmt->close();
 $conn->close();
-
-echo json_encode($response);
 ?>

@@ -271,7 +271,6 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
             height: 100px;
             border-radius: 50%;
             object-fit: cover;
-            border: 4px solid #19860f;
         }
 
         .profile-header h4 {
@@ -401,4 +400,4 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 
-</html>
+</html> 

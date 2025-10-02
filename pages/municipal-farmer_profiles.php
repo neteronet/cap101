@@ -288,6 +288,11 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
                 </a>
             </li>
             <li class="nav-item">
+                <a href="municipal-reports_analytics.php" class="nav-link">
+                    <i class="fas fa-chart-line"></i> Reports & Analytics
+                </a>
+            </li>
+            <li class="nav-item">
                 <a href="municipal-qrcode_management.php" class="nav-link">
                     <i class="fas fa-qrcode"></i> QR Code Management
                 </a>
@@ -311,7 +316,7 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
 
             <!-- Search Bar -->
             <div class="input-group mb-3">
-                <input type="text" class="form-control" placeholder="Search by name, barangay, or ID..." id="searchInput">
+                <input type="text" class="form-control" placeholder="Search by name, address, or ID..." id="searchInput">
                 <button class="btn btn-theme" type="button" onclick="searchFarmers()"><i class="fas fa-search me-1"></i> Search</button>
             </div>
 

@@ -374,6 +374,11 @@ $conn->close();
                 </a>
             </li>
             <li class="nav-item">
+                <a href="municipal-reports_analytics.php" class="nav-link">
+                    <i class="fas fa-chart-line"></i> Reports & Analytics
+                </a>
+            </li>
+            <li class="nav-item">
                 <a href="municipal-qrcode_management.php" class="nav-link">
                     <i class="fas fa-qrcode"></i> QR Code Management
                 </a>

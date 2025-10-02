@@ -562,7 +562,6 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
             font-size: 0.95rem;
             color: #555;
             margin-top: 5px;
-            /* Limit to 2 lines for brevity */
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
@@ -613,6 +612,11 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
             <li class="nav-item">
                 <a href="municipal-announcements.php" class="nav-link active">
                     <i class="fas fa-bullhorn"></i> Announcements
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="municipal-reports_analytics.php" class="nav-link">
+                    <i class="fas fa-chart-line"></i> Reports & Analytics
                 </a>
             </li>
             <li class="nav-item">

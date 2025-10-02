@@ -534,7 +534,7 @@ $conn->close(); // Close the connection after all database operations
     <!-- Content -->
     <main>
         <div class="container">
-            <h2 class="page-title"><i class="fas fa-seedling me-2"></i>Planting Status</h2>
+            <h2 class="page-title"></i>Planting Status</h2>
             <p class="text-muted mb-4">Update your crop's planting progress and check for alerts.</p>
 
             <?php if ($success_message): ?>
