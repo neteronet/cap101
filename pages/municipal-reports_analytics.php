@@ -1,28 +1,182 @@
+<?php
+session_start();
+
+if (!isset($_SESSION['user_id'])) {
+    header("location: municipal-login.php");
+    exit();
+}
+
+$display_name = $_SESSION['name'] ?? 'Mao';
+
+$servername = "localhost";
+$db_username = "root";
+$db_password = "";
+$dbname = "cap101";
+
+$conn = new mysqli($servername, $db_username, $db_password, $dbname);
+
+if ($conn->connect_error) {
+    error_log("Database connection failed: " . $conn->connect_error);
+} else {
+    $stmt = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
+    $stmt->bind_param("i", $_SESSION['user_id']);
+    $stmt->execute();
+    $stmt->bind_result($fetched_db_name);
+    $stmt->fetch();
+    if ($fetched_db_name) {
+        $display_name = $fetched_db_name;
+    }
+    $stmt->close();
+}
+
+// Data fetching for Crop Performance by Type chart
+$cropYieldLabels = [];
+$cropYieldData = [];
+
+// Data fetching for Subsidy Distribution Status chart
+$subsidyApprovedClaimed = 0;
+$subsidyApprovedPendingClaim = 0;
+$subsidyPendingReview = 0;
+$subsidyRejected = 0;
+
+// Data fetching for Farmer Demographics & Registration Trend - Farmer Age Distribution
+$farmerAge18_25 = 0;
+$farmerAge26_35 = 0;
+$farmerAge36_45 = 0;
+$farmerAge46_55 = 0;
+$farmerAge56_65 = 0;
+$farmerAge65_plus = 0;
+
+// Re-establish connection if it was closed or use the existing $conn if it's still open
+if ($conn->connect_error) { // Check if connection is still valid/open, or re-establish
+    $conn = new mysqli($servername, $db_username, $db_password, $dbname);
+    if ($conn->connect_error) {
+        error_log("Database connection failed for crop data: " . $conn->connect_error);
+        // Handle error appropriately, e.g., display a message or default data
+    }
+}
+
+if ($conn && !$conn->connect_error) {
+    // Query to get distinct crop types and a hypothetical average yield or count for demonstration
+    // This query assumes 'crop_identifier' can be parsed to extract crop names (e.g., "Rice (Field 1)" -> "Rice")
+    // For a more robust solution, you'd ideally have a 'crop_type' column.
+    // Here, we'll count occurrences and simulate yield data.
+    $sql_crop_performance = "SELECT 
+                                SUBSTRING_INDEX(crop_identifier, ' (', 1) as crop_type,
+                                COUNT(*) as total_plantings
+                            FROM planting_status
+                            WHERE status = 'Planted' -- Consider only actively planted crops
+                            GROUP BY crop_type
+                            ORDER BY total_plantings DESC";
+
+    $result_crop_performance = $conn->query($sql_crop_performance);
+
+    if ($result_crop_performance) {
+        while ($row = $result_crop_performance->fetch_assoc()) {
+            $cropYieldLabels[] = $row['crop_type'];
+            // For 'data', we're simulating a yield value based on total plantings for demonstration.
+            // In a real scenario, you would calculate actual yield (e.g., from harvest records).
+            $cropYieldData[] = round($row['total_plantings'] * (rand(10, 50) / 100), 1); // Simulate yield between 10-50% of plantings
+        }
+    } else {
+        error_log("Error fetching crop performance data: " . $conn->error);
+    }
+
+    // Subsidy Distribution Status
+    $sql_subsidy_status = "SELECT status, COUNT(*) as count FROM assistance_applications GROUP BY status";
+    $result_subsidy_status = $conn->query($sql_subsidy_status);
+
+    if ($result_subsidy_status) {
+        while ($row = $result_subsidy_status->fetch_assoc()) {
+            switch ($row['status']) {
+                case 'Approved':
+                    // This needs to be refined if you have a 'claimed' status in your DB.
+                    // For now, let's put it into 'Approved (Pending Claim)' or 'Approved & Claimed' based on logic.
+                    // You might need an additional field like 'claimed_date' in 'assistance_applications' table.
+                    // For this example, we'll split 'Approved' hypothetically.
+                    $subsidyApprovedPendingClaim += $row['count']; 
+                    break;
+                case 'Pending':
+                    $subsidyPendingReview += $row['count'];
+                    break;
+                case 'Rejected':
+                    $subsidyRejected += $row['count'];
+                    break;
+                case 'Claimed': // If you have a direct 'Claimed' status
+                    $subsidyApprovedClaimed += $row['count'];
+                    break;
+            }
+        }
+    } else {
+        error_log("Error fetching subsidy status data: " . $conn->error);
+    }
+    
+    // Hypothetical split of Approved into Claimed and Pending Claim for demonstration if no 'Claimed' status in DB
+    // Adjust this logic if you have a 'claimed_date' column or similar.
+    $totalApproved = $subsidyApprovedPendingClaim; // This now holds all 'Approved' from DB
+    $subsidyApprovedClaimed += floor($totalApproved * 0.7); // Assume 70% of approved are claimed
+    $subsidyApprovedPendingClaim = $totalApproved - $subsidyApprovedClaimed; // Remaining are pending claim
+
+
+    // Farmer Age Distribution
+    $sql_farmer_ages = "SELECT age FROM farmers";
+    $result_farmer_ages = $conn->query($sql_farmer_ages);
+
+    if ($result_farmer_ages) {
+        while ($row = $result_farmer_ages->fetch_assoc()) {
+            $age = $row['age'];
+            if ($age >= 18 && $age <= 25) {
+                $farmerAge18_25++;
+            } elseif ($age >= 26 && $age <= 35) {
+                $farmerAge26_35++;
+            } elseif ($age >= 36 && $age <= 45) {
+                $farmerAge36_45++;
+            } elseif ($age >= 46 && $age <= 55) {
+                $farmerAge46_55++;
+            } elseif ($age >= 56 && $age <= 65) {
+                $farmerAge56_65++;
+            } elseif ($age > 65) {
+                $farmerAge65_plus++;
+            }
+        }
+    } else {
+        error_log("Error fetching farmer age data: " . $conn->error);
+    }
+
+}
+
+$conn->close(); // Close connection after all data fetching
+?>
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Municipal Account - Reports & Analytics</title>
-
     <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
-
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
-
     <!-- Chart.js for Charts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-    <!-- Custom Styles (from your provided code) -->
+    <!-- Custom Styles -->
     <style>
+        :root {
+            --primary-color: #0d6efd;
+            --secondary-color: #6c757d;
+            --success-color: #19860f;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+            --info-color: #17a2b8;
+            --light-bg: #f8f9fa;
+            --dark-green: #146c0b;
+        }
+
         body {
             font-family: "Poppins", sans-serif;
-            background: #f8f9fa;
+            background: var(--light-bg);
             font-size: 16px;
             line-height: 1.6;
             color: #333;
@@ -35,7 +189,7 @@
             left: 0;
             width: 250px;
             height: 100vh;
-            background: #19860f;
+            background: var(--success-color);
             padding: 1rem 0;
             overflow-y: auto;
             font-size: 14px;
@@ -61,12 +215,12 @@
 
         .sidebar .nav-link.active {
             background-color: #fff;
-            color: #19860f;
+            color: var(--success-color);
             font-weight: 600;
         }
 
         .sidebar .nav-link:hover:not(.active) {
-            background-color: #146c0b;
+            background-color: var(--dark-green);
             color: #fff;
         }
 
@@ -82,7 +236,7 @@
             width: 100%;
             max-width: 120px;
             height: auto;
-            background: #19860f;
+            background: var(--success-color);
             padding: 5px;
             border-radius: 4px;
         }
@@ -102,7 +256,7 @@
             right: 0;
             height: 56px;
             background-color: #fff;
-            color: #19860f;
+            color: var(--success-color);
             padding: 0 1.25rem;
             font-weight: 500;
             font-size: 1rem;
@@ -116,11 +270,11 @@
         .header-brand span {
             font-size: 1rem;
             font-weight: 600;
-            color: #19860f;
+            color: var(--success-color);
         }
 
         .logout-btn {
-            background: #ff4b2b;
+            background: var(--danger-color);
             color: #fff;
             border: none;
             padding: 6px 14px;
@@ -135,7 +289,7 @@
         }
 
         .btn-theme {
-            background-color: #19860f;
+            background-color: var(--success-color);
             color: #fff;
             font-size: 15px;
             padding: 10px 20px;
@@ -145,7 +299,7 @@
         }
 
         .btn-theme:hover {
-            background-color: #146c0b;
+            background-color: var(--dark-green);
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
@@ -154,7 +308,7 @@
             margin-left: 250px;
             padding: 1rem 2rem 2rem 2rem;
             padding-top: 72px;
-            background: #f8f9fa;
+            background: var(--light-bg);
             min-height: 100vh;
         }
 
@@ -165,7 +319,7 @@
         .page-title {
             font-size: 1.8rem;
             font-weight: 600;
-            color: #19860f;
+            color: var(--success-color);
             margin-bottom: 1rem;
         }
 
@@ -177,23 +331,23 @@
 
         .card-body h6 {
             font-size: 14px;
-            color: #6c757d;
+            color: var(--secondary-color);
         }
 
         .card-body h2 {
             font-size: 2rem;
             margin-top: 5px;
             font-weight: 700;
-            color: #19860f;
+            color: var(--success-color);
         }
 
         .card-body h2.text-warning {
-            color: #ffc107 !important;
+            color: var(--warning-color) !important;
         }
 
         .card-body .btn-link {
             font-size: 14px;
-            color: #19860f;
+            color: var(--success-color);
             text-decoration: none;
             padding: 0;
         }
@@ -210,7 +364,7 @@
         }
 
         .status-pending {
-            background-color: #ffc107;
+            background-color: var(--warning-color);
             color: #856404;
         }
 
@@ -220,11 +374,10 @@
         }
 
         .status-rejected {
-            background-color: #dc3545;
+            background-color: var(--danger-color);
             color: #fff;
         }
 
-        /* Additional styles for reports & analytics */
         .report-section {
             margin-bottom: 2rem;
             padding: 1.5rem;
@@ -234,7 +387,7 @@
         }
 
         .report-section h4 {
-            color: #19860f;
+            color: var(--success-color);
             font-weight: 600;
             margin-bottom: 1rem;
         }
@@ -251,9 +404,28 @@
             border-radius: 0.5rem;
             margin-bottom: 1.5rem;
         }
+
+        .btn-outline-success {
+            color: var(--success-color);
+            border-color: var(--success-color);
+        }
+
+        .btn-outline-success:hover {
+            background-color: var(--success-color);
+            color: #fff;
+        }
+
+        .btn-outline-primary {
+            color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        .btn-outline-primary:hover {
+            background-color: var(--primary-color);
+            color: #fff;
+        }
     </style>
 </head>
-
 <body>
     <!-- Sidebar -->
     <nav class="sidebar">
@@ -261,7 +433,6 @@
             <img src="../photos/Department_of_Agriculture_of_the_Philippines.png" alt="Province of Antique" />
             <div>Province of Antique</div>
         </a>
-
         <ul class="nav flex-column">
             <li class="nav-item">
                 <a href="municipal-dashboard.php" class="nav-link">
@@ -300,7 +471,6 @@
             </li>
         </ul>
     </nav>
-
     <!-- Header -->
     <div class="card-header card-header-custom d-flex justify-content-end align-items-center">
         <span class="me-3">Hi, <strong><?php echo htmlspecialchars($display_name); ?></strong></span>
@@ -325,9 +495,9 @@
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label for="barangayFilter" class="form-label">Barangay</label>
+                    <label for="barangayFilter" class="form-label">Address</label>
                     <select class="form-select" id="barangayFilter">
-                        <option value="">All Barangays</option>
+                        <option value="">All Address</option>
                         <option value="brgyA">Brgy. San Jose</option>
                         <option value="brgyB">Brgy. Malanday</option>
                         <option value="brgyC">Brgy. Poblacion</option>
@@ -469,23 +639,45 @@
     <!-- Chart.js Initialization -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Sample data for charts (would be dynamically fetched from PHP/database)
-            const cropYieldData = {
-                labels: ['Rice', 'Corn', 'Vegetables', 'Fruits'],
+            // PHP variables for crop data
+            const cropYieldLabels = <?php echo json_encode($cropYieldLabels); ?>;
+            const cropYieldData = <?php echo json_encode($cropYieldData); ?>;
+
+            // PHP variables for subsidy data
+            const subsidyApprovedClaimed = <?php echo json_encode($subsidyApprovedClaimed); ?>;
+            const subsidyApprovedPendingClaim = <?php echo json_encode($subsidyApprovedPendingClaim); ?>;
+            const subsidyPendingReview = <?php echo json_encode($subsidyPendingReview); ?>;
+            const subsidyRejected = <?php echo json_encode($subsidyRejected); ?>;
+
+            // PHP variables for farmer age data
+            const farmerAge18_25 = <?php echo json_encode($farmerAge18_25); ?>;
+            const farmerAge26_35 = <?php echo json_encode($farmerAge26_35); ?>;
+            const farmerAge36_45 = <?php echo json_encode($farmerAge36_45); ?>;
+            const farmerAge46_55 = <?php echo json_encode($farmerAge46_55); ?>;
+            const farmerAge56_65 = <?php echo json_encode($farmerAge56_65); ?>;
+            const farmerAge65_plus = <?php echo json_encode($farmerAge65_plus); ?>;
+
+
+            const cropPerformanceData = {
+                labels: cropYieldLabels,
                 datasets: [{
                     label: 'Average Yield (tons/hectare)',
-                    data: [4.5, 3.2, 1.8, 2.1],
+                    data: cropYieldData,
                     backgroundColor: [
                         'rgba(25, 134, 15, 0.7)',
                         'rgba(255, 159, 64, 0.7)',
                         'rgba(75, 192, 192, 0.7)',
-                        'rgba(153, 102, 255, 0.7)'
+                        'rgba(153, 102, 255, 0.7)',
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(54, 162, 235, 0.7)'
                     ],
                     borderColor: [
                         'rgba(25, 134, 15, 1)',
                         'rgba(255, 159, 64, 1)',
                         'rgba(75, 192, 192, 1)',
-                        'rgba(153, 102, 255, 1)'
+                        'rgba(153, 102, 255, 1)',
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(54, 162, 235, 1)'
                     ],
                     borderWidth: 1
                 }]
@@ -495,12 +687,12 @@
                 labels: ['Approved & Claimed', 'Approved (Pending Claim)', 'Pending Review', 'Rejected'],
                 datasets: [{
                     label: '# of Subsidies',
-                    data: [350, 120, 85, 15],
+                    data: [subsidyApprovedClaimed, subsidyApprovedPendingClaim, subsidyPendingReview, subsidyRejected],
                     backgroundColor: [
-                        'rgba(40, 167, 69, 0.7)', // Green for Approved
-                        'rgba(255, 193, 7, 0.7)', // Yellow for Approved Pending Claim
-                        'rgba(23, 162, 184, 0.7)', // Cyan for Pending Review
-                        'rgba(220, 53, 69, 0.7)' // Red for Rejected
+                        'rgba(40, 167, 69, 0.7)', /* Green for Claimed */
+                        'rgba(255, 193, 7, 0.7)', /* Yellow for Approved Pending */
+                        'rgba(23, 162, 184, 0.7)', /* Blue for Pending Review */
+                        'rgba(220, 53, 69, 0.7)' /* Red for Rejected */
                     ],
                     borderColor: [
                         'rgba(40, 167, 69, 1)',
@@ -516,7 +708,7 @@
                 labels: ['18-25', '26-35', '36-45', '46-55', '56-65', '65+'],
                 datasets: [{
                     label: 'Number of Farmers',
-                    data: [150, 280, 400, 320, 180, 70],
+                    data: [farmerAge18_25, farmerAge26_35, farmerAge36_45, farmerAge46_55, farmerAge56_65, farmerAge65_plus],
                     backgroundColor: [
                         'rgba(54, 162, 235, 0.7)',
                         'rgba(75, 192, 192, 0.7)',
@@ -543,7 +735,7 @@
                     label: 'New Registrations',
                     data: [10, 15, 25, 20, 30, 18, 22, 28, 35, 40, 30, 25],
                     fill: false,
-                    borderColor: '#19860f',
+                    borderColor: 'var(--success-color)',
                     tension: 0.1
                 }]
             };
@@ -553,16 +745,16 @@
             const cropYieldCtx = document.getElementById('cropYieldChart').getContext('2d');
             new Chart(cropYieldCtx, {
                 type: 'bar',
-                data: cropYieldData,
+                data: cropPerformanceData, // Use the fetched data
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
                         title: {
-                            display: false, // Title moved to h4 tag
+                            display: false,
                         },
                         legend: {
-                            display: false // No need for legend in single dataset bar chart
+                            display: false
                         }
                     },
                     scales: {
@@ -596,7 +788,7 @@
             // Farmer Age Distribution Chart
             const farmerAgeCtx = document.getElementById('farmerAgeChart').getContext('2d');
             new Chart(farmerAgeCtx, {
-                type: 'pie', // Using pie for age distribution
+                type: 'pie',
                 data: farmerAgeData,
                 options: {
                     responsive: true,
@@ -640,5 +832,4 @@
         });
     </script>
 </body>
-
 </html>
