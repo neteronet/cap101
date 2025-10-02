@@ -1,3 +1,84 @@
+<?php
+session_start(); // Start the session at the very beginning of the script
+
+// Check if the user is logged in. If not, redirect to the login page.
+if (!isset($_SESSION['user_id'])) {
+    header("location: municipal-login.php");
+    exit();
+}
+
+// Database connection details
+$servername = "localhost";
+$db_username = "root"; // Your database username
+$db_password = "";     // Your database password
+$dbname = "cap101"; // Your database name
+
+// Create database connection
+$conn = new mysqli($servername, $db_username, $db_password, $dbname);
+
+// Check connection
+if ($conn->connect_error) {
+    error_log("Database connection failed: " . $conn->connect_error);
+    die("Connection failed: " . $conn->connect_error);
+}
+
+// Retrieve the user's name from the session or database
+$display_name = 'Mao'; // Fallback name
+if (isset($_SESSION['user_id'])) {
+    $stmt = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
+    $stmt->bind_param("i", $_SESSION['user_id']);
+    $stmt->execute();
+    $stmt->bind_result($fetched_db_name);
+    $stmt->fetch();
+    if ($fetched_db_name) {
+        $display_name = $fetched_db_name; // Use the name fetched from DB
+    }
+    $stmt->close();
+}
+
+// Fetch crop monitoring data, including photo_path
+$crop_monitoring_data = [];
+$sql = "SELECT
+            ps.id,
+            u.name AS farmer_name,
+            f.address AS farmer_address, -- Fetched address from 'farmers' table
+            ps.crop_identifier,
+            ps.status,
+            ps.update_date,
+            ps.photo_path
+        FROM
+            planting_status ps
+        JOIN
+            users u ON ps.user_id = u.user_id
+        LEFT JOIN
+            farmers f ON u.user_id = f.user_id -- Join with farmers table using user_id
+        ORDER BY
+            ps.update_date DESC";
+
+$result = $conn->query($sql);
+
+if ($result && $result->num_rows > 0) {
+    while ($row = $result->fetch_assoc()) {
+        $crop_monitoring_data[] = $row;
+    }
+}
+
+// Fetch unique addresses for the filter dropdown
+$unique_addresses = [];
+$address_sql = "SELECT DISTINCT address FROM farmers WHERE address IS NOT NULL AND address != '' ORDER BY address ASC";
+$address_result = $conn->query($address_sql);
+
+if ($address_result && $address_result->num_rows > 0) {
+    while ($row = $address_result->fetch_assoc()) {
+        $unique_addresses[] = $row['address'];
+    }
+}
+
+
+// Close database connection
+$conn->close();
+
+?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -182,17 +263,20 @@
             font-weight: 500;
         }
 
+        .status-planted {
+            background-color: #28a745;
+            color: #fff;
+        }
+        .status-harvested {
+            background-color: #17a2b8;
+            color: #fff;
+        }
         .status-pending {
             background-color: #ffc107;
             color: #856404;
         }
 
-        .status-approved {
-            background-color: #28a745;
-            color: #fff;
-        }
-
-        .status-rejected {
+        .status-no-update {
             background-color: #dc3545;
             color: #fff;
         }
@@ -222,6 +306,14 @@
         .badge {
             font-size: 0.85em;
             padding: 0.4em 0.6em;
+        }
+
+        /* Styles for the modal image */
+        #photoModal img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: auto;
         }
 
         @media (max-width: 768px) {
@@ -291,7 +383,7 @@
 
     <!-- Header -->
     <div class="card-header card-header-custom d-flex justify-content-end align-items-center">
-        <span class="me-3">Hi, <strong>username</strong></span>
+        <span class="me-3">Hi, <strong><?php echo htmlspecialchars($display_name); ?></strong></span>
         <button class="logout-btn" onclick="location.href='municipal-logout.php'">
             <i class="fas fa-sign-out-alt me-1"></i> Logout
         </button>
@@ -309,9 +401,15 @@
                     <label for="filterType" class="form-label">Filter by</label>
                     <select class="form-select filter-select" id="filterType" onchange="filterTable()">
                         <option value="all">All</option>
-                        <option value="barangay">Barangay</option>
+                        <option value="address">Address</option>
+                        <?php foreach ($unique_addresses as $address): ?>
+                            <option value="<?php echo htmlspecialchars($address); ?>">Address: <?php echo htmlspecialchars($address); ?></option>
+                        <?php endforeach; ?>
                         <option value="farmer">Farmer</option>
                         <option value="notUpdated">No Recent Update</option>
+                        <option value="status-planted">Status: Planted</option>
+                        <option value="status-pending">Status: Pending</option>
+                        <option value="status-harvested">Status: Harvested</option>
                     </select>
                 </div>
                 <div class="col-md-6 text-md-end mt-3 mt-md-0">
@@ -328,54 +426,100 @@
                         <tr>
                             <th>#</th>
                             <th>Farmer Name</th>
-                            <th>Barangay</th>
+                            <th>Address</th>
                             <th>Crop</th>
-                            <th>Planted Area (ha)</th>
                             <th>Status</th>
                             <th>Last Update</th>
-                            <th>Growth Stage</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr>
-                            <td>1</td>
-                            <td>Juan Dela Cruz</td>
-                            <td>Barangay Uno</td>
-                            <td>Rice</td>
-                            <td>2.0</td>
-                            <td><span class="badge bg-success">Planted</span></td>
-                            <td>2025-09-03</td>
-                            <td>Tillering</td>
-                            <td><button class="btn btn-sm btn-outline-primary">View</button></td>
-                        </tr>
-                        <tr>
-                            <td>2</td>
-                            <td>Maria Santos</td>
-                            <td>Barangay Dos</td>
-                            <td>Corn</td>
-                            <td>1.5</td>
-                            <td><span class="badge bg-warning text-dark">Pending</span></td>
-                            <td>2025-08-12</td>
-                            <td>Not Yet Started</td>
-                            <td><button class="btn btn-sm btn-outline-primary">View</button></td>
-                        </tr>
-                        <tr>
-                            <td>3</td>
-                            <td>Pedro Gomez</td>
-                            <td>Barangay Tres</td>
-                            <td>Rice</td>
-                            <td>3.1</td>
-                            <td><span class="badge bg-danger">No Update</span></td>
-                            <td>2025-07-10</td>
-                            <td>Unknown</td>
-                            <td><button class="btn btn-sm btn-outline-primary">View</button></td>
-                        </tr>
+                        <?php if (empty($crop_monitoring_data)): ?>
+                            <tr>
+                                <td colspan="7" class="text-center">No crop monitoring data found.</td>
+                            </tr>
+                        <?php else: ?>
+                            <?php $row_number = 1; ?>
+                            <?php foreach ($crop_monitoring_data as $data): ?>
+                                <?php
+                                    $status_class = '';
+                                    switch (strtolower($data['status'])) {
+                                        case 'planted':
+                                            $status_class = 'bg-success status-planted';
+                                            break;
+                                        case 'pending':
+                                            $status_class = 'bg-warning text-dark status-pending';
+                                            break;
+                                        case 'harvested':
+                                            $status_class = 'bg-info status-harvested';
+                                            break;
+                                        case 'no update':
+                                            $status_class = 'bg-danger status-no-update';
+                                            break;
+                                        default:
+                                            $status_class = 'bg-secondary';
+                                            break;
+                                    }
+                                    $last_update_date = new DateTime($data['update_date']);
+                                    $current_date = new DateTime();
+                                    $interval = $current_date->diff($last_update_date);
+                                    $days_since_update = $interval->days;
+
+                                    if ($days_since_update > 30 && strtolower($data['status']) !== 'harvested') {
+                                        $status_class = 'bg-danger status-no-update';
+                                        $display_status = 'No Update (' . $days_since_update . ' days)';
+                                    } else {
+                                        $display_status = $data['status'];
+                                    }
+
+                                    // Check if photo_path exists and is not empty
+                                    $photo_available = !empty($data['photo_path']);
+                                ?>
+                                <tr>
+                                    <td><?php echo $row_number++; ?></td>
+                                    <td><?php echo htmlspecialchars($data['farmer_name']); ?></td>
+                                    <td><?php echo htmlspecialchars($data['farmer_address']); ?></td>
+                                    <td><?php echo htmlspecialchars($data['crop_identifier']); ?></td>
+                                    <td><span class="badge <?php echo $status_class; ?>"><?php echo htmlspecialchars($display_status); ?></span></td>
+                                    <td><?php echo htmlspecialchars(date('Y-m-d', strtotime($data['update_date']))); ?></td>
+                                    <td>
+                                        <?php if ($photo_available): ?>
+                                            <button class="btn btn-sm btn-outline-primary view-photo-btn"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#photoModal"
+                                                    data-photo-path="<?php echo htmlspecialchars($data['photo_path']); ?>">
+                                                View
+                                            </button>
+                                        <?php else: ?>
+                                            <button class="btn btn-sm btn-outline-secondary" disabled>No Photo</button>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </tbody>
                 </table>
             </div>
         </div>
     </main>
+
+    <!-- Photo Modal -->
+    <div class="modal fade" id="photoModal" tabindex="-1" aria-labelledby="photoModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="photoModalLabel">Crop Photo</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img id="cropPhotoDisplay" src="" alt="Crop Photo" class="img-fluid rounded" />
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Bootstrap Script -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
@@ -386,20 +530,36 @@
             const rows = document.querySelectorAll("#cropMonitoringTable tbody tr");
 
             rows.forEach((row) => {
-                const barangay = row.children[2].textContent.toLowerCase();
-                const farmer = row.children[1].textContent.toLowerCase();
-                const lastUpdate = row.children[6].textContent;
-                const status = row.children[5].textContent.toLowerCase();
+                if (row.children.length < 7) return; 
 
+                const farmerName = row.children[1].textContent.toLowerCase();
+                const address = row.children[2].textContent.toLowerCase(); // Use the fetched address
+                const statusElement = row.children[4].querySelector('.badge');
+                const status = statusElement ? statusElement.textContent.toLowerCase() : '';
+                const lastUpdate = row.children[5].textContent; 
                 const daysSinceUpdate = getDaysSince(lastUpdate);
+
                 let show = true;
 
-                if (filter === "barangay") {
-                    show = barangay.includes("uno"); // Adjust keyword for dynamic filtering
+                if (filter === "address") {
+                    // If "address" is selected, don't filter by a specific address here,
+                    // as the individual addresses are now options.
+                    // This case might be used if you had a search input for address.
+                    // For now, it will show all if 'address' is selected without a specific address option.
+                } else if (filter.startsWith("Address: ")) { // Check if the filter is one of the specific addresses
+                    const specificAddress = filter.replace("Address: ", "").toLowerCase();
+                    show = address.includes(specificAddress);
                 } else if (filter === "farmer") {
-                    show = farmer.includes("juan"); // Adjust keyword for dynamic filtering
+                    // This example assumes filtering by a specific farmer name part "juan"
+                    // In a real application, you'd likely have a search input for the farmer name.
+                    show = farmerName.includes("juan"); 
                 } else if (filter === "notUpdated") {
-                    show = daysSinceUpdate > 30 || status.includes("no update");
+                    show = daysSinceUpdate > 30 && !status.includes("harvested"); 
+                } else if (filter.startsWith("status-")) {
+                    const statusFilter = filter.replace("status-", "");
+                    show = status.includes(statusFilter);
+                } else if (filter === "all") {
+                    show = true; 
                 }
 
                 row.style.display = show ? "" : "none";
@@ -414,9 +574,27 @@
         }
 
         function sendReminders() {
-            alert("Reminders sent to all farmers who haven't updated in over 30 days.");
+            alert("Reminders sent to all farmers who haven't updated in over 30 days and whose crops are not harvested.");
             // TODO: Add AJAX call to backend for real reminder functionality
+            // This would involve sending user_ids of inactive farmers to a PHP script
+            // that handles sending email/SMS reminders.
         }
+
+        // Script to handle the photo modal
+        document.addEventListener('DOMContentLoaded', function() {
+            filterTable(); // Initial filter call to ensure correct display on page load
+
+            const photoModal = document.getElementById('photoModal');
+            photoModal.addEventListener('show.bs.modal', function (event) {
+                // Button that triggered the modal
+                const button = event.relatedTarget;
+                // Extract info from data-photo-path attribute
+                const photoPath = button.getAttribute('data-photo-path');
+                // Update the modal's content.
+                const modalImage = photoModal.querySelector('#cropPhotoDisplay');
+                modalImage.src = photoPath; // Set the image source
+            });
+        });
     </script>
 </body>
 
