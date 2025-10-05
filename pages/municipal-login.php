@@ -1,19 +1,8 @@
 <?php
 session_start();
 
-// Database connection details
-$servername = "localhost";
-$username_db = "root"; // Replace with your database username
-$password_db = "";     // Replace with your database password
-$dbname = "cap101"; // Replace with your database name
-
-// Create connection
-$conn = new mysqli($servername, $username_db, $password_db, $dbname);
-
-// Check connection
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
+// Include the database connection file
+include '../includes/connection.php'; // Make sure the path is correct
 
 $error = '';    
 
@@ -48,6 +37,7 @@ if (isset($_POST['login'])) {
     }
     $stmt->close();
 }
+// Close the connection when done with the script
 $conn->close();
 ?>
 
@@ -162,7 +152,7 @@ $conn->close();
 <body>
     <main class="login-container">
         <form class="w-100" method="POST">
-            <img class="logo" src="../photos/OfficialSeal.png" alt="Official Seal">
+            <img class="logo" src="../photos/Department_of_Agriculture_of_the_Philippines.png" alt="Official Seal">
             <h1 class="mb-4">MUNICIPAL AGRICULTURIST LOGIN</h1>
 
             <?php if (!empty($error)) : ?>

@@ -1,59 +1,79 @@
 <?php
 session_start(); // Start the session at the very beginning of the script
 
+include '../includes/connection.php'; // Ensure your connection file is correctly included
+
 // Check if the user is logged in. If not, redirect to the login page.
-// Adjust 'farmers-login.php' to your actual login page filename and path if different.
-if (!isset($_SESSION['user_id'])) {
+if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
     header("location: farmers-login.php");
     exit();
 }
 
-// Retrieve the user's name from the session.
-$display_name = $_SESSION['name'] ?? 'Farmer'; // Fallback to 'Farmer' if not set
+$user_id = $_SESSION['user_id'];
+$display_name = 'Farmer'; // Default fallback
 
-$servername = "localhost";
-$db_username = "root"; // Your database username
-$db_password = "";     // Your database password
-$dbname = "cap101"; // Your database name
-
-$conn = new mysqli($servername, $db_username, $db_password, $dbname);
-
-if ($conn->connect_error) {
-    // Log error or display a generic message, but don't expose database details
-    error_log("Database connection failed: " . $conn->connect_error);
-    // You might want to redirect to an error page or show a friendly message
+// --- IMPROVED NAME FETCHING ---
+// Always try to fetch the name from the database for accuracy.
+// This ensures that if the session name is outdated or not set, the DB name is used.
+$stmt_name = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
+if ($stmt_name) {
+    $stmt_name->bind_param("i", $user_id);
+    $stmt_name->execute();
+    $stmt_name->bind_result($db_name);
+    $stmt_name->fetch();
+    if ($db_name) {
+        $display_name = htmlspecialchars($db_name); // Sanitize immediately
+    }
+    $stmt_name->close();
 } else {
-    // Assuming your 'users' table has a 'username' column that serves as the display name
-    $stmt = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
-    $stmt->bind_param("i", $_SESSION['user_id']);
-    $stmt->execute();
-    $stmt->bind_result($fetched_db_name);
-    $stmt->fetch();
-    if ($fetched_db_name) {
-        $display_name = $fetched_db_name; // Use the name fetched from DB
-    }
-    $stmt->close();
-
-    // --- Fetch Latest Announcements ---
-    $announcements = [];
-    // Changed LIMIT from 2 to 1 to fetch only the latest announcement
-    $stmt_announcements = $conn->prepare("SELECT title, content, publish_date FROM announcements ORDER BY publish_date DESC LIMIT 1"); 
-    if ($stmt_announcements) {
-        $stmt_announcements->execute();
-        $stmt_announcements->bind_result($title, $content, $publish_date);
-        while ($stmt_announcements->fetch()) {
-            $announcements[] = [
-                'title' => $title,
-                'content' => $content,
-                'publish_date' => $publish_date
-            ];
-        }
-        $stmt_announcements->close();
-    }
-    // --- End Fetch Latest Announcements ---
-
-    $conn->close();
+    error_log("Failed to prepare statement for user name: " . $conn->error);
 }
+
+// --- Fetch Latest Announcements ---
+$announcements = [];
+$stmt_announcements = $conn->prepare("SELECT title, content, publish_date FROM announcements ORDER BY publish_date DESC LIMIT 1");
+if ($stmt_announcements) {
+    $stmt_announcements->execute();
+    $stmt_announcements->bind_result($title, $content, $publish_date);
+    while ($stmt_announcements->fetch()) {
+        $announcements[] = [
+            'title' => $title,
+            'content' => $content,
+            'publish_date' => $publish_date
+        ];
+    }
+    $stmt_announcements->close();
+} else {
+    // Handle error if announcement statement preparation fails
+    error_log("Failed to prepare announcement statement: " . $conn->error);
+}
+// --- End Fetch Latest Announcements ---
+
+// --- Fetch Latest Crop Monitoring Status for the logged-in user ---
+$latest_crop_status = null;
+// You'll need a 'planting_status' or similar table for this
+// Assuming a table 'farmer_crops' with columns: crop_id, user_id, crop_name, status, last_update_date
+// And 'crop_identifier' is 'crop_name' for this example. Adjust table/column names as per your DB schema.
+$stmt_crop_status = $conn->prepare("SELECT crop_name, status, update_date FROM farmer_crops WHERE user_id = ? ORDER BY update_date DESC LIMIT 1");
+if ($stmt_crop_status) {
+    $stmt_crop_status->bind_param("i", $user_id); // Assuming user_id is an integer
+    $stmt_crop_status->execute();
+    $stmt_crop_status->bind_result($crop_name, $status, $update_date);
+    if ($stmt_crop_status->fetch()) {
+        $latest_crop_status = [
+            'crop_identifier' => $crop_name,
+            'status' => $status,
+            'update_date' => $update_date
+        ];
+    }
+    $stmt_crop_status->close();
+} else {
+    // Handle error if crop status statement preparation fails
+    error_log("Failed to prepare crop status statement: " . $conn->error);
+}
+// --- End Fetch Latest Crop Monitoring Status ---
+
+$conn->close(); // Close the connection after all database operations
 
 ?>
 
@@ -304,6 +324,11 @@ if ($conn->connect_error) {
                     <i class="fas fa-chart-line"></i> Progress Tracking
                 </a>
             </li>
+            <li class="nav-item">
+                <a href="farmer-history_log.php" class="nav-link">
+                    <i class="fas fa-chart-line"></i> History Log
+                </a>
+            </li>
         </ul>
     </nav>
 
@@ -363,6 +388,7 @@ if ($conn->connect_error) {
                                 Check the status of your assistance applications and claim history.
                             </p>
                             <div class="mb-3">
+                                <!-- These are static examples, you'd fetch real data from your DB -->
                                 <p class="mb-1">Fertilizer Grant 2024: <span class="status-badge status-approved">Approved</span></p>
                                 <p class="mb-1">Seed Distribution Q2: <span class="status-badge status-pending">Pending Review</span></p>
                             </div>

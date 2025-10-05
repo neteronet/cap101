@@ -1,93 +1,96 @@
 <?php
 session_start();
 
-if (!isset($_SESSION['user_id'])) {
+include '../includes/connection.php'; // Ensure this path is correct
+
+// Redirect if user_id is not set or not an integer
+if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
     header("location: farmers-login.php");
     exit();
 }
 
-$display_name = $_SESSION['name'] ?? 'Farmer';
-$user_id = $_SESSION['user_id']; // Get the logged-in user's ID
+$user_id = $_SESSION['user_id'];
+$display_name = 'Farmer'; // Default fallback
 
-$servername = "localhost";
-$db_username = "root";
-$db_password = "";
-$dbname = "cap101";
-
-$conn = new mysqli($servername, $db_username, $db_password, $dbname);
-
-if ($conn->connect_error) {
-    error_log("Database connection failed: " . $conn->connect_error);
-    // Consider a user-friendly error page here
-    die("Error connecting to the database.");
+// --- IMPROVED NAME FETCHING ---
+// Always try to fetch the name from the database for accuracy.
+// This ensures that if the session name is outdated or not set, the DB name is used.
+$stmt_name = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
+if ($stmt_name) {
+    $stmt_name->bind_param("i", $user_id);
+    $stmt_name->execute();
+    $stmt_name->bind_result($db_name);
+    $stmt_name->fetch();
+    if ($db_name) {
+        $display_name = htmlspecialchars($db_name); // Sanitize immediately
+    }
+    $stmt_name->close();
+} else {
+    error_log("Failed to prepare statement for user name: " . $conn->error);
 }
-
-// Fetch user's name
-$stmt = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
-$stmt->bind_param("i", $user_id);
-$stmt->execute();
-$stmt->bind_result($fetched_db_name);
-$stmt->fetch();
-if ($fetched_db_name) {
-    $display_name = $fetched_db_name;
-}
-$stmt->close();
+// --- END IMPROVED NAME FETCHING ---
 
 // Initialize variables
 $approved_qr_code = null;
 $farmer_id_display = null;
-$application_id_for_display = null; // Store application_id for dynamic QR code data if needed
+$application_id_for_display = null;
 
 // Fetch approved application data, including qr_code_data
-// Added application_id to the select for potential dynamic QR code data generation if qr_code_data is empty
+// Use LEFT JOIN if qr_code_data is in a separate table, otherwise, direct select is fine.
 $stmt_qr = $conn->prepare("SELECT application_id, qr_code_data FROM assistance_applications WHERE farmer_user_id = ? AND status = 'Approved' LIMIT 1");
-$stmt_qr->bind_param("i", $user_id);
-$stmt_qr->execute();
-$stmt_qr->bind_result($fetched_application_id, $fetched_qr_code_data);
-$stmt_qr->fetch();
+if ($stmt_qr) {
+    $stmt_qr->bind_param("i", $user_id);
+    $stmt_qr->execute();
+    $stmt_qr->bind_result($fetched_application_id, $fetched_qr_code_data);
+    $stmt_qr->fetch();
 
-if ($fetched_application_id) { // Check if an application was found
-    $application_id_for_display = $fetched_application_id;
-    $farmer_id_display = "FRM-" . str_pad($fetched_application_id, 9, '0', STR_PAD_LEFT);
+    if ($fetched_application_id) { // Check if an application was found
+        $application_id_for_display = $fetched_application_id;
+        // The farmer_id_display should ideally use a unique ID, not just application_id.
+        // Assuming farmer_user_id (which is $user_id) is the unique farmer identifier.
+        // If farmer_id_display is intended to be a padded application ID, keep as is.
+        $farmer_id_display = "FRM-" . str_pad($user_id, 9, '0', STR_PAD_LEFT); // Using user_id for farmer display ID
 
-    // --- CRITICAL FIX/IMPROVEMENT HERE ---
-    // If qr_code_data is explicitly NULL or empty in the database,
-    // you need a fallback or a way to generate it here.
-    // Ideally, qr_code_data should be generated and stored when the application is approved.
-    if (!empty($fetched_qr_code_data)) {
-        $approved_qr_code = $fetched_qr_code_data;
-    } else {
-        // Fallback: If qr_code_data is missing, generate a simple one based on application ID.
-        // THIS LINE HAS BEEN MODIFIED to remove the user_id from the QR data.
-        $approved_qr_code = "app_id:" . $fetched_application_id;
-        // Optionally, update the database here if you want to store this generated QR data
-        // $update_stmt = $conn->prepare("UPDATE assistance_applications SET qr_code_data = ? WHERE application_id = ?");
-        // $update_stmt->bind_param("si", $approved_qr_code, $fetched_application_id);
-        // $update_stmt->execute();
-        // $update_stmt->close();
+        // If qr_code_data is explicitly NULL or empty in the database, generate and store it.
+        if (empty($fetched_qr_code_data)) {
+            // Generate QR code data. Keep it simple and relevant to the claim.
+            // Using application_id and user_id for more robust QR data
+            $generated_qr_data = "app_id:" . $fetched_application_id . "&user_id:" . $user_id;
+            $approved_qr_code = $generated_qr_data;
+
+            // Update the database to persist this generated QR data
+            $update_stmt = $conn->prepare("UPDATE assistance_applications SET qr_code_data = ? WHERE application_id = ?");
+            if ($update_stmt) {
+                $update_stmt->bind_param("si", $generated_qr_data, $fetched_application_id);
+                $update_stmt->execute();
+                $update_stmt->close();
+            } else {
+                error_log("Failed to prepare update statement for QR code: " . $conn->error);
+            }
+        } else {
+            $approved_qr_code = $fetched_qr_code_data;
+        }
     }
+    $stmt_qr->close();
+} else {
+    error_log("Failed to prepare statement for QR code: " . $conn->error);
 }
-$stmt_qr->close();
 
 $conn->close();
 
 ?>
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Farmer Account - Subsidy Status</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet" />
-
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
-
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
-
     <!-- Custom Styles -->
     <style>
         /* Your CSS styles remain the same */
@@ -385,7 +388,7 @@ $conn->close();
 
     <!-- Header (Top Nav) -->
     <div class="card-header card-header-custom d-flex justify-content-end align-items-center">
-        <span class="me-3">Hi, <strong><?php echo htmlspecialchars($display_name); ?></strong></span>
+        <span class="me-3">Hi, <strong><?php echo $display_name; ?></strong></span>
         <button class="logout-btn" onclick="location.href='farmers-logout.php'">
             <i class="fas fa-sign-out-alt me-1"></i> Logout
         </button>
@@ -394,7 +397,7 @@ $conn->close();
     <!-- Main Content -->
     <main>
         <div class="container">
-            <h2 class="page-title"></i> Subsidy Status</h2>
+            <h2 class="page-title"><i class="fas fa-hand-holding-usd"></i> Subsidy Status</h2>
             <p class="text-muted mb-4">
                 Approved assistance details and your unique QR code for claiming.
             </p>

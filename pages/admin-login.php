@@ -53,7 +53,7 @@
     <main class="flex-fill d-flex justify-content-center align-items-center py-5">
         <form class="form-login w-100 m-auto" method="POST">
             <div class="text-center mb-4">
-                <img class="mb-3" src="../photos/OfficialSeal.png" alt="" width="150px" height="149px">
+                <img class="mb-3" src="../photos/Department_of_Agriculture_of_the_Philippines.png" alt="" width="150px" height="149px">
                 <h1 class="h4 mb-1 fw-semibold">SYSTEM ADMIN LOGIN</h1>
             </div>
 

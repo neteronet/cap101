@@ -1,41 +1,30 @@
 <?php
 session_start();
 
+include '../includes/connection.php';
+
 // Check if the user is logged in. If not, redirect to the login page.
-if (!isset($_SESSION['user_id'])) {
+if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
     header("location: farmers-login.php");
     exit();
 }
 
-// Database connection details
-$servername = "localhost";
-$db_username = "root";
-$db_password = "";
-$dbname = "cap101";
-
-$conn = new mysqli($servername, $db_username, $db_password, $dbname);
-
-if ($conn->connect_error) {
-    error_log("Database connection failed: " . $conn->connect_error);
-    // In a real application, you might redirect to an error page or show a friendly message
-    die("Connection failed: " . $conn->connect_error);
-}
-
-// Retrieve the user's name from the session and database
-$display_name = $_SESSION['name'] ?? 'Farmer'; // Fallback
 $user_id = $_SESSION['user_id'];
+$display_name = 'Farmer'; // Default fallback
 
-// Fetch user's name from DB for display, if not already accurate in session
-$stmt = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
-if ($stmt) {
-    $stmt->bind_param("i", $user_id);
-    $stmt->execute();
-    $stmt->bind_result($fetched_db_name);
-    $stmt->fetch();
-    if ($fetched_db_name) {
-        $display_name = $fetched_db_name;
+// --- IMPROVED NAME FETCHING ---
+// Always try to fetch the name from the database for accuracy.
+// This ensures that if the session name is outdated or not set, the DB name is used.
+$stmt_name = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
+if ($stmt_name) {
+    $stmt_name->bind_param("i", $user_id);
+    $stmt_name->execute();
+    $stmt_name->bind_result($db_name);
+    $stmt_name->fetch();
+    if ($db_name) {
+        $display_name = htmlspecialchars($db_name); // Sanitize immediately
     }
-    $stmt->close();
+    $stmt_name->close();
 } else {
     error_log("Failed to prepare statement for user name: " . $conn->error);
 }
@@ -44,11 +33,78 @@ if ($stmt) {
 $success_message = '';
 $error_message = '';
 $alerts = []; // To store dynamic alerts from the database
+$user_planting_statuses = []; // Initialize here
+
+// --- Function to fetch user's current planting statuses ---
+function fetchUserPlantingStatuses($conn, $user_id) {
+    $statuses = [];
+    $stmt = $conn->prepare("SELECT crop_identifier, status, photo_path, update_date FROM planting_status WHERE user_id = ? ORDER BY update_date DESC");
+    if ($stmt) {
+        $stmt->bind_param("i", $user_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $statuses[] = $row;
+        }
+        $stmt->close();
+    } else {
+        error_log("Failed to prepare statement for fetching user planting statuses: " . $conn->error);
+    }
+    return $statuses;
+}
+
+// --- Function to generate alerts based on planting statuses ---
+function generateAlerts($user_planting_statuses) {
+    $generated_alerts = [];
+
+    // Example: Alert if 'Corn (Field 2)' is 'Not Planted'
+    $corn_field2_status_found = false;
+    foreach ($user_planting_statuses as $status_item) {
+        if ($status_item['crop_identifier'] == 'Corn (Field 2)') {
+            $corn_field2_status_found = true;
+            if ($status_item['status'] == 'Not Planted') {
+                $generated_alerts[] = [
+                    'type' => 'warning',
+                    'message' => 'Please update the planting status for your <strong class="text-dark">Corn crop (Field 2)</strong>. It is currently marked as "Not Planted".'
+                ];
+            }
+            // You can add more complex logic here, e.g., "not updated in X days"
+            // $last_update_timestamp = strtotime($status_item['update_date']);
+            // if (time() - $last_update_timestamp > (7 * 24 * 60 * 60)) { // 7 days
+            //     $generated_alerts[] = [
+            //         'type' => 'warning',
+            //         'message' => 'Your <strong class="text-dark">Corn crop (Field 2)</strong> hasn\'t been updated in over a week.'
+            //     ];
+            // }
+            break;
+        }
+    }
+    // General alert if no planting status is recorded at all
+    if (empty($user_planting_statuses)) {
+        $generated_alerts[] = [
+            'type' => 'info', // Changed to info, as it's less critical than a specific "not planted" warning
+            'message' => 'You haven\'t recorded any planting status yet. Please use the form to submit your first update!'
+        ];
+    } elseif (!$corn_field2_status_found) {
+        // If Corn (Field 2) is a required crop for the farmer but not found in their list,
+        // you might want to add a specific prompt here.
+        // For simplicity, we'll just rely on the general "empty" alert above if no crops exist.
+        // If 'Corn (Field 2)' is an *expected* crop for all farmers, you might add:
+        // $generated_alerts[] = [
+        //     'type' => 'info',
+        //     'message' => 'Consider adding a planting status for <strong class="text-dark">Corn (Field 2)</strong> if you are cultivating it.'
+        // ];
+    }
+
+
+    return $generated_alerts;
+}
+
 
 // --- Handle Form Submission ---
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $crop_identifier = $_POST['cropSelect'] ?? '';
-    $planting_status_val = $_POST['plantingStatus'] ?? ''; // Renamed to avoid conflict with planting_status in the loop
+    $planting_status_val = $_POST['plantingStatus'] ?? '';
     $photo_path = NULL; // Default to NULL
 
     // Basic validation
@@ -79,9 +135,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     } else {
                         if (move_uploaded_file($_FILES["photoUpload"]["tmp_name"], $target_file)) {
                             $photo_path = $target_file;
-                            if (empty($error_message)) { // Don't overwrite existing error
-                                $success_message = "The file ". htmlspecialchars( basename( $_FILES["photoUpload"]["name"])). " has been uploaded.";
-                            }
+                            // Success message for file upload can be combined with status update message
                         } else {
                             $error_message = "Sorry, there was an error uploading your file.";
                         }
@@ -93,9 +147,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
 
         // Prepare to insert or update the database
-        // We'll upsert (update if exists, insert if not) based on user_id and crop_identifier
-        // Add a UNIQUE constraint to (user_id, crop_identifier) in your SQL table if you intend to use ON DUPLICATE KEY UPDATE.
-        // For now, let's assume one entry per user per crop_identifier.
         $stmt = $conn->prepare("INSERT INTO planting_status (user_id, crop_identifier, status, photo_path)
                                 VALUES (?, ?, ?, ?)
                                 ON DUPLICATE KEY UPDATE status = VALUES(status), photo_path = VALUES(photo_path), update_date = CURRENT_TIMESTAMP");
@@ -103,8 +154,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if ($stmt) {
             $stmt->bind_param("isss", $user_id, $crop_identifier, $planting_status_val, $photo_path);
             if ($stmt->execute()) {
-                if (empty($error_message)) { // Only show success if no file upload error
+                if (empty($error_message)) { // Only show success if no prior error
                     $success_message = "Planting status updated successfully for " . htmlspecialchars($crop_identifier) . ".";
+                    if ($photo_path) {
+                        $success_message .= " Your photo has also been uploaded.";
+                    }
+                    // IMPORTANT: Re-fetch statuses and re-generate alerts immediately after a successful update
+                    $user_planting_statuses = fetchUserPlantingStatuses($conn, $user_id);
+                    $alerts = generateAlerts($user_planting_statuses);
                 }
             } else {
                 $error_message = "Error updating planting status: " . $stmt->error;
@@ -116,55 +173,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 }
 
-// --- Fetch User's Current Planting Statuses (for displaying in the form or elsewhere) ---
-$user_planting_statuses = [];
-$stmt = $conn->prepare("SELECT crop_identifier, status, photo_path, update_date FROM planting_status WHERE user_id = ? ORDER BY update_date DESC");
-if ($stmt) {
-    $stmt->bind_param("i", $user_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    while ($row = $result->fetch_assoc()) {
-        $user_planting_statuses[] = $row;
-    }
-    $stmt->close();
-} else {
-    error_log("Failed to prepare statement for fetching user planting statuses: " . $conn->error);
+// --- Initial Fetch for page load (if not already fetched by form submission) ---
+if (empty($user_planting_statuses)) { // Only fetch if not already updated by POST
+    $user_planting_statuses = fetchUserPlantingStatuses($conn, $user_id);
 }
 
-// --- Dynamic Alerts/Reminders (Example) ---
-// This part is for demonstration. In a real system, alerts would be more sophisticated.
-// For now, let's just mimic the "Action Required" for a specific crop if its status is "Not Planted"
-// or if it hasn't been updated recently.
-// For this example, let's say an alert is needed if 'Corn (Field 2)' is 'Not Planted' or has no recent update.
+// --- Generate Alerts for initial page load or if form submission didn't update it ---
+if (empty($alerts) && $_SERVER["REQUEST_METHOD"] != "POST") { // Only generate if not already updated by POST
+    $alerts = generateAlerts($user_planting_statuses);
+}
 
-$corn_field2_status_found = false;
-foreach ($user_planting_statuses as $status_item) {
-    if ($status_item['crop_identifier'] == 'Corn (Field 2)') {
-        $corn_field2_status_found = true;
-        if ($status_item['status'] == 'Not Planted') {
-            $alerts[] = [
-                'type' => 'warning',
-                'message' => 'Please update the planting status for your <strong class="text-dark">Corn crop (Field 2)</strong>. It is currently marked as "Not Planted".'
-            ];
-        }
-        // You could also add a logic for "not updated in X days"
-        // $last_update_timestamp = strtotime($status_item['update_date']);
-        // if (time() - $last_update_timestamp > (7 * 24 * 60 * 60)) { // 7 days
-        //     $alerts[] = [
-        //         'type' => 'warning',
-        //         'message' => 'Your <strong class="text-dark">Corn crop (Field 2)</strong> hasn\'t been updated in over a week.'
-        //     ];
-        // }
-        break;
-    }
-}
-if (!$corn_field2_status_found) {
-    // If Corn (Field 2) has no entry at all, prompt them to plant it.
-    $alerts[] = [
-        'type' => 'warning',
-        'message' => 'You haven\'t recorded planting status. Please update it.'
-    ];
-}
 
 $conn->close(); // Close the connection after all database operations
 ?>
@@ -534,7 +552,7 @@ $conn->close(); // Close the connection after all database operations
     <!-- Content -->
     <main>
         <div class="container">
-            <h2 class="page-title"></i>Planting Status</h2>
+            <h2 class="page-title"><i class="fas fa-leaf me-2"></i>Planting Status</h2>
             <p class="text-muted mb-4">Update your crop's planting progress and check for alerts.</p>
 
             <?php if ($success_message): ?>
@@ -557,12 +575,20 @@ $conn->close(); // Close the connection after all database operations
                             <h5 class="card-title"><i class="fas fa-bell me-2"></i>Reminders & Alerts</h5>
                             <?php if (!empty($alerts)): ?>
                                 <?php foreach ($alerts as $alert): ?>
-                                    <div class="alert-custom-warning mb-3" role="alert">
-                                        <i class="fas fa-exclamation-triangle"></i>
-                                        <div>
-                                            <h6 class="alert-heading mb-1">Action Required!</h6>
-                                            <?php echo $alert['message']; ?>
-                                        </div>
+                                    <div class="alert-custom-<?php echo htmlspecialchars($alert['type']); ?> mb-3" role="alert">
+                                        <?php if ($alert['type'] == 'warning'): ?>
+                                            <i class="fas fa-exclamation-triangle"></i>
+                                            <div>
+                                                <h6 class="alert-heading mb-1">Action Required!</h6>
+                                                <?php echo $alert['message']; ?>
+                                            </div>
+                                        <?php elseif ($alert['type'] == 'info'): ?>
+                                            <i class="fas fa-info-circle me-2"></i>
+                                            <div>
+                                                <h6 class="alert-heading mb-1">Information:</h6>
+                                                <?php echo $alert['message']; ?>
+                                            </div>
+                                        <?php endif; ?>
                                     </div>
                                 <?php endforeach; ?>
                             <?php else: ?>
@@ -645,18 +671,5 @@ $conn->close(); // Close the connection after all database operations
 
     <!-- Bootstrap Script -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // No longer needed as there's no dropdown to keep expanded
-        // document.addEventListener('DOMContentLoaded', function() {
-        //     var cropMonitoringSubmenu = document.getElementById('cropMonitoringSubmenu');
-        //     var activeSublink = cropMonitoringSubmenu.querySelector('.nav-link.active');
-        //     if (activeSublink) {
-        //         var parentCollapse = activeSublink.closest('.collapse');
-        //         if (parentCollapse) {
-        //             new bootstrap.Collapse(parentCollapse, { toggle: false }).show();
-        //         }
-        //     }
-        // });
-    </script>
 </body>
 </html>

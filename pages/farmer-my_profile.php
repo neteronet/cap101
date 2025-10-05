@@ -1,46 +1,32 @@
 <?php
-session_start(); // Start the session at the very beginning of the script
+session_start();
+
+include '../includes/connection.php';
 
 // Check if the user is logged in. If not, redirect to the login page.
-if (!isset($_SESSION['user_id'])) {
+if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
     header("location: farmers-login.php");
     exit();
 }
 
-// Initialize variables to hold fetched data
-$display_name = 'Farmer'; // Default name for the header
-$farmer_data = null;     // Will hold all farmer profile data
+$user_id = $_SESSION['user_id'];
+$display_name = 'Farmer'; // Default fallback
 
-$servername = "localhost";
-$db_username = "root"; // Your database username
-$db_password = "";     // Your database password
-$dbname = "cap101"; // Your database name
-
-// Create connection
-$conn = new mysqli($servername, $db_username, $db_password, $dbname);
-
-// Check connection
-if ($conn->connect_error) {
-    error_log("Database connection failed: " . $conn->connect_error);
-    // In a real application, you might redirect to a friendly error page
-    die("A database error occurred. Please try again later.");
-}
-
-// --- 1. Fetch user's display name for the header ---
-if (isset($_SESSION['user_id'])) {
-    $stmt_user = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
-    if ($stmt_user) {
-        $stmt_user->bind_param("i", $_SESSION['user_id']);
-        $stmt_user->execute();
-        $stmt_user->bind_result($fetched_db_name);
-        $stmt_user->fetch();
-        if ($fetched_db_name) {
-            $display_name = htmlspecialchars($fetched_db_name);
-        }
-        $stmt_user->close();
-    } else {
-        error_log("Failed to prepare user name statement: " . $conn->error);
+// --- IMPROVED NAME FETCHING ---
+// Always try to fetch the name from the database for accuracy.
+// This ensures that if the session name is outdated or not set, the DB name is used.
+$stmt_name = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
+if ($stmt_name) {
+    $stmt_name->bind_param("i", $user_id);
+    $stmt_name->execute();
+    $stmt_name->bind_result($db_name);
+    $stmt_name->fetch();
+    if ($db_name) {
+        $display_name = htmlspecialchars($db_name); // Sanitize immediately
     }
+    $stmt_name->close();
+} else {
+    error_log("Failed to prepare statement for user name: " . $conn->error);
 }
 
 // --- 2. Fetch farmer's profile data ---
@@ -67,7 +53,7 @@ if (isset($_SESSION['user_id'])) {
                 $farmer_data['land_details_decoded'] = []; // Fallback to empty array on error
             }
         } else if ($farmer_data) {
-             $farmer_data['land_details_decoded'] = []; // Initialize if no land_details or empty string
+            $farmer_data['land_details_decoded'] = []; // Initialize if no land_details or empty string
         }
     } else {
         error_log("Failed to prepare farmer data statement: " . $conn->error);
@@ -96,8 +82,8 @@ if (!$farmer_data) {
 
 // Construct full name for display in the profile body
 $full_name_profile = htmlspecialchars($farmer_data['first_name'] . ' ' .
-                       (!empty($farmer_data['middle_name']) ? substr($farmer_data['middle_name'], 0, 1) . '. ' : '') .
-                       $farmer_data['last_name']);
+    (!empty($farmer_data['middle_name']) ? substr($farmer_data['middle_name'], 0, 1) . '. ' : '') .
+    $farmer_data['last_name']);
 
 // Use the fetched age, gender, civil_status, and crop directly
 $age = htmlspecialchars($farmer_data['age'] ?? 'N/A');
@@ -322,13 +308,46 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
         </a>
 
         <ul class="nav flex-column">
-            <li class="nav-item"><a href="farmer-dashboard.php" class="nav-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
-            <li class="nav-item"><a href="farmer-my_profile.php" class="nav-link active"><i class="fas fa-user-circle"></i> My Profile</a></li>
-            <li class="nav-item"><a href="farmer-subsidy_status.php" class="nav-link"><i class="fas fa-hand-holding-usd"></i> Subsidy Status</a></li>
-            <li class="nav-item"><a href="farmer-announcement.php" class="nav-link"><i class="fas fa-bullhorn"></i> Announcements</a></li>
-            <li class="nav-item"><a href="farmer-apply_for_assistance.php" class="nav-link"><i class="fas fa-file-invoice"></i> Apply for Assistance</a></li>
-            <li class="nav-item"><a href="farmer-planting_status.php" class="nav-link"><i class="fas fa-leaf"></i> Planting Status</a></li>
-            <li class="nav-item"><a href="farmer-progress_tracking.php" class="nav-link"><i class="fas fa-chart-line"></i> Progress Tracking</a></li>
+            <li class="nav-item">
+                <a href="farmer-dashboard.php" class="nav-link">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="farmer-my_profile.php" class="nav-link active">
+                    <i class="fas fa-user-circle"></i> My Profile
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="farmer-subsidy_status.php" class="nav-link">
+                    <i class="fas fa-hand-holding-usd"></i> Subsidy Status
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="farmer-announcement.php" class="nav-link">
+                    <i class="fas fa-bullhorn"></i> Announcements
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="farmer-apply_for_assistance.php" class="nav-link">
+                    <i class="fas fa-file-invoice"></i> Apply for Assistance
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="farmer-planting_status.php" class="nav-link">
+                    <i class="fas fa-leaf"></i> Planting Status
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="farmer-progress_tracking.php" class="nav-link">
+                    <i class="fas fa-chart-line"></i> Progress Tracking
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="farmer-history_log.php" class="nav-link">
+                    <i class="fas fa-chart-line"></i> History Log
+                </a>
+            </li>
         </ul>
     </nav>
 
@@ -400,4 +419,4 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 
-</html> 
+</html>

@@ -1,40 +1,28 @@
 <?php
 session_start(); // Start the session at the very beginning of the script
 
-// Check if the user is logged in. If not, redirect to the login page.
-// Adjust 'farmers-login.php' to your actual login page filename and path if different.
-if (!isset($_SESSION['user_id'])) {
+include '../includes/connection.php'; // Ensure your connection file is correctly included
+
+if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
     header("location: farmers-login.php");
     exit();
 }
 
-// Retrieve the user's name from the session.
-$display_name = $_SESSION['name'] ?? 'Farmer'; // Fallback to 'Farmer' if not set
+$user_id = $_SESSION['user_id'];
+$display_name = 'Farmer'; // Default fallback
 
-$servername = "localhost";
-$db_username = "root"; // Your database username
-$db_password = "";     // Your database password
-$dbname = "cap101"; // Your database name
-
-// Create database connection
-$conn = new mysqli($servername, $db_username, $db_password, $dbname);
-
-// Check connection
-if ($conn->connect_error) {
-    error_log("Database connection failed: " . $conn->connect_error);
-    // You might want to redirect to an error page or show a friendly message
-    die("Connection failed: " . $conn->connect_error); // For debugging, remove in production
-} else {
-    // Fetch user's name from DB if available
-    $stmt = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
-    $stmt->bind_param("i", $_SESSION['user_id']);
-    $stmt->execute();
-    $stmt->bind_result($fetched_db_name);
-    $stmt->fetch();
-    if ($fetched_db_name) {
-        $display_name = $fetched_db_name; // Use the name fetched from DB
+$stmt_name = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
+if ($stmt_name) {
+    $stmt_name->bind_param("i", $user_id);
+    $stmt_name->execute();
+    $stmt_name->bind_result($db_name);
+    $stmt_name->fetch();
+    if ($db_name) {
+        $display_name = htmlspecialchars($db_name); // Sanitize immediately
     }
-    $stmt->close();
+    $stmt_name->close();
+} else {
+    error_log("Failed to prepare statement for user name: " . $conn->error);
 }
 
 // --- Fetch Announcements from the Database ---

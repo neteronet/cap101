@@ -1,44 +1,44 @@
 <?php
 session_start();
 
+include '../includes/connection.php'; // Ensure your connection file is correctly included
+
 // Initialize message variables
 $message = '';
 $message_type = '';
 
 // Check if the user is logged in. If not, redirect to the login page.
-if (!isset($_SESSION['user_id'])) {
+if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
     header("location: farmers-login.php");
     exit();
 }
 
-// Database connection details
-$servername = "localhost";
-$db_username = "root"; // Your database username
-$db_password = "";     // Your database password
-$dbname = "cap101"; // Your database name
-
-// Create database connection
-$conn = new mysqli($servername, $db_username, $db_password, $dbname);
-
-// Check connection
-if ($conn->connect_error) {
-    error_log("Database connection failed: " . $conn->connect_error);
-    die("Database connection failed. Please try again later.");
-}
-
-// Retrieve the user's name from the session or database.
-$display_name = $_SESSION['name'] ?? 'Farmer'; // Fallback
 $user_id = $_SESSION['user_id'];
+$display_name = 'Farmer'; // Default fallback
 
-$stmt = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
-$stmt->bind_param("i", $user_id);
-$stmt->execute();
-$stmt->bind_result($fetched_db_name);
-$stmt->fetch();
-if ($fetched_db_name) {
-    $display_name = $fetched_db_name; // Use the name fetched from DB
+// --- IMPROVED NAME FETCHING ---
+// Always try to fetch the name from the database for accuracy.
+// This ensures that if the session name is outdated or not set, the DB name is used.
+$stmt_name = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
+if ($stmt_name) {
+    $stmt_name->bind_param("i", $user_id);
+    $stmt_name->execute();
+    $stmt_name->bind_result($db_name);
+    $stmt_name->fetch();
+    if ($db_name) {
+        $display_name = htmlspecialchars($db_name); // Sanitize immediately
+    }
+    $stmt_name->close();
+} else {
+    error_log("Failed to prepare statement for user name: " . $conn->error);
 }
-$stmt->close();
+
+// Initialize form field variables to null for initial form display
+$assistanceType = null;
+$seedType = null;
+$seedQuantity = null;
+$engineType = null;
+$remarks = null;
 
 // Handle form submission
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -46,18 +46,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $assistanceType = filter_input(INPUT_POST, 'assistanceType', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
     $remarks = filter_input(INPUT_POST, 'remarks', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
 
-    // Initialize specific fields
-    $cropType = null; // Removed from form, can be null or derived
-    $seedType = null;
-    $seedQuantity = null; // Stored as string, e.g., "10kg"
-    $engineType = null;
-
     // Validate main assistance type
     if (empty($assistanceType)) {
         $message = "Please select a Type of Assistance.";
         $message_type = "danger";
     } else {
-        // Handle specific assistance types
+        // Handle specific assistance types and their required fields
         switch ($assistanceType) {
             case 'Seeds':
                 $seedType = filter_input(INPUT_POST, 'seedType', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
@@ -76,7 +70,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 break;
             case 'Fertilizer':
             case 'Cash Assistance':
-                // These types don't require additional specific fields for now
+                // These types don't require additional specific fields for now, so they remain null
                 break;
             default:
                 $message = "Invalid assistance type selected.";
@@ -88,28 +82,35 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if (empty($message)) {
             $status = 'Pending'; // Default status for new applications
 
+            // Prepare the SQL statement
             $insert_stmt = $conn->prepare("INSERT INTO assistance_applications (user_id, assistance_type, seed_type, seed_quantity, engine_type, remarks, status, application_date) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
-            // The 's' in "issssss" stands for string. Adjust based on your actual data types if needed.
-            // i = integer for user_id
-            // s = string for assistance_type
-            // s = string for seed_type
-            // s = string for seed_quantity
-            // s = string for engine_type
-            // s = string for remarks
-            // s = string for status
-            $insert_stmt->bind_param("issssss", $user_id, $assistanceType, $seedType, $seedQuantity, $engineType, $remarks, $status);
 
-            if ($insert_stmt->execute()) {
-                $message = "Your assistance request has been submitted successfully!";
-                $message_type = "success";
-                // Clear POST data to prevent re-submission on refresh
-                $_POST = array();
-            } else {
-                error_log("Error submitting request for user $user_id: " . $insert_stmt->error);
-                $message = "Error submitting your request. Please try again: " . $insert_stmt->error;
+            if ($insert_stmt === false) {
+                // Handle prepare error
+                error_log("Failed to prepare statement: " . $conn->error);
+                $message = "Database error: Could not prepare request. Please try again.";
                 $message_type = "danger";
+            } else {
+                // Bind parameters
+                // i = integer (for user_id)
+                // ssssss = strings (for assistance_type, seed_type, seed_quantity, engine_type, remarks, status)
+                $insert_stmt->bind_param("issssss", $user_id, $assistanceType, $seedType, $seedQuantity, $engineType, $remarks, $status);
+
+                // Execute the statement
+                if ($insert_stmt->execute()) {
+                    $message = "Your assistance request has been submitted successfully!";
+                    $message_type = "success";
+                    // Clear POST data to prevent re-submission on refresh and reset form
+                    $_POST = array();
+                    // Clear the values of dynamic fields after successful submission for a clean form
+                    $assistanceType = $seedType = $seedQuantity = $engineType = $remarks = null;
+                } else {
+                    error_log("Error submitting request for user $user_id: " . $insert_stmt->error);
+                    $message = "Error submitting your request. Please try again: " . $insert_stmt->error;
+                    $message_type = "danger";
+                }
+                $insert_stmt->close();
             }
-            $insert_stmt->close();
         }
     }
 }
@@ -426,7 +427,7 @@ if ($conn) {
     <main>
         <div class="container">
             <h1 class="page-title">
-                </i> Apply for Assistance
+                <i class="fas fa-file-invoice"></i> Apply for Assistance
             </h1>
 
             <?php if (!empty($message)): ?>
@@ -458,26 +459,26 @@ if ($conn) {
                             </label>
                             <select class="form-select" id="assistanceType" name="assistanceType" required>
                                 <option value="">-- Select Assistance --</option>
-                                <option value="Seeds" <?php echo (isset($_POST['assistanceType']) && $_POST['assistanceType'] == 'Seeds') ? 'selected' : ''; ?>>Seeds</option>
-                                <option value="Fertilizer" <?php echo (isset($_POST['assistanceType']) && $_POST['assistanceType'] == 'Fertilizer') ? 'selected' : ''; ?>>Fertilizer</option>
-                                <option value="Fuel" <?php echo (isset($_POST['assistanceType']) && $_POST['assistanceType'] == 'Fuel') ? 'selected' : ''; ?>>Fuel</option>
-                                <option value="Cash Assistance" <?php echo (isset($_POST['assistanceType']) && $_POST['assistanceType'] == 'Cash Assistance') ? 'selected' : ''; ?>>Cash Assistance</option>
+                                <option value="Seeds" <?php echo ($assistanceType == 'Seeds') ? 'selected' : ''; ?>>Seeds</option>
+                                <option value="Fertilizer" <?php echo ($assistanceType == 'Fertilizer') ? 'selected' : ''; ?>>Fertilizer</option>
+                                <option value="Fuel" <?php echo ($assistanceType == 'Fuel') ? 'selected' : ''; ?>>Fuel</option>
+                                <option value="Cash Assistance" <?php echo ($assistanceType == 'Cash Assistance') ? 'selected' : ''; ?>>Cash Assistance</option>
                             </select>
                         </div>
 
                         <!-- Dynamic Seed Details Section -->
-                        <div id="seedDetails" class="mb-4" style="display: <?php echo (isset($_POST['assistanceType']) && $_POST['assistanceType'] == 'Seeds') ? 'block' : 'none'; ?>;">
+                        <div id="seedDetails" class="mb-4" style="display: <?php echo ($assistanceType == 'Seeds') ? 'block' : 'none'; ?>;">
                             <div class="mb-4">
                                 <label for="seedType" class="form-label">
                                     <i class="fas fa-seedling"></i>Seed Type
                                 </label>
                                 <select class="form-select" id="seedType" name="seedType">
                                     <option value="">-- Select Seed Type --</option>
-                                    <option value="Hybrid Rice Seeds" <?php echo (isset($_POST['seedType']) && $_POST['seedType'] == 'Hybrid Rice Seeds') ? 'selected' : ''; ?>>Hybrid Rice Seeds</option>
-                                    <option value="Inbred Rice Seeds" <?php echo (isset($_POST['seedType']) && $_POST['seedType'] == 'Inbred Rice Seeds') ? 'selected' : ''; ?>>Inbred Rice Seeds</option>
-                                    <option value="Hybrid Corn Seeds" <?php echo (isset($_POST['seedType']) && $_POST['seedType'] == 'Hybrid Corn Seeds') ? 'selected' : ''; ?>>Hybrid Corn Seeds</option>
-                                    <option value="Vegetable Seeds (Assorted)" <?php echo (isset($_POST['seedType']) && $_POST['seedType'] == 'Vegetable Seeds (Assorted)') ? 'selected' : ''; ?>>Vegetable Seeds (Assorted)</option>
-                                    <option value="Other" <?php echo (isset($_POST['seedType']) && $_POST['seedType'] == 'Other') ? 'selected' : ''; ?>>Other</option>
+                                    <option value="Hybrid Rice Seeds" <?php echo ($seedType == 'Hybrid Rice Seeds') ? 'selected' : ''; ?>>Hybrid Rice Seeds</option>
+                                    <option value="Inbred Rice Seeds" <?php echo ($seedType == 'Inbred Rice Seeds') ? 'selected' : ''; ?>>Inbred Rice Seeds</option>
+                                    <option value="Hybrid Corn Seeds" <?php echo ($seedType == 'Hybrid Corn Seeds') ? 'selected' : ''; ?>>Hybrid Corn Seeds</option>
+                                    <option value="Vegetable Seeds (Assorted)" <?php echo ($seedType == 'Vegetable Seeds (Assorted)') ? 'selected' : ''; ?>>Vegetable Seeds (Assorted)</option>
+                                    <option value="Other" <?php echo ($seedType == 'Other') ? 'selected' : ''; ?>>Other</option>
                                 </select>
                             </div>
                             <div class="mb-4">
@@ -486,29 +487,29 @@ if ($conn) {
                                 </label>
                                 <select class="form-select" id="seedQuantity" name="seedQuantity">
                                     <option value="">-- Select Quantity --</option>
-                                    <option value="10kg" <?php echo (isset($_POST['seedQuantity']) && $_POST['seedQuantity'] == '10kg') ? 'selected' : ''; ?>>10 kg</option>
-                                    <option value="20kg" <?php echo (isset($_POST['seedQuantity']) && $_POST['seedQuantity'] == '20kg') ? 'selected' : ''; ?>>20 kg</option>
-                                    <option value="25kg" <?php echo (isset($_POST['seedQuantity']) && $_POST['seedQuantity'] == '25kg') ? 'selected' : ''; ?>>25 kg</option>
-                                    <option value="50kg" <?php echo (isset($_POST['seedQuantity']) && $_POST['seedQuantity'] == '50kg') ? 'selected' : ''; ?>>50 kg</option>
-                                    <option value="100kg" <?php echo (isset($_POST['seedQuantity']) && $_POST['seedQuantity'] == '100kg') ? 'selected' : ''; ?>>100 kg</option>
+                                    <option value="10kg" <?php echo ($seedQuantity == '10kg') ? 'selected' : ''; ?>>10 kg</option>
+                                    <option value="20kg" <?php echo ($seedQuantity == '20kg') ? 'selected' : ''; ?>>20 kg</option>
+                                    <option value="25kg" <?php echo ($seedQuantity == '25kg') ? 'selected' : ''; ?>>25 kg</option>
+                                    <option value="50kg" <?php echo ($seedQuantity == '50kg') ? 'selected' : ''; ?>>50 kg</option>
+                                    <option value="100kg" <?php echo ($seedQuantity == '100kg') ? 'selected' : ''; ?>>100 kg</option>
                                 </select>
                             </div>
                         </div>
                         <!-- End Dynamic Seed Details Section -->
 
                         <!-- Dynamic Engine Details Section -->
-                        <div id="engineDetails" class="mb-4" style="display: <?php echo (isset($_POST['assistanceType']) && $_POST['assistanceType'] == 'Fuel') ? 'block' : 'none'; ?>;">
+                        <div id="engineDetails" class="mb-4" style="display: <?php echo ($assistanceType == 'Fuel') ? 'block' : 'none'; ?>;">
                             <label for="engineType" class="form-label">
                                 <i class="fas fa-tractor"></i>Engine Type
                             </label>
                             <select class="form-select" id="engineType" name="engineType">
                                 <option value="">-- Select Engine Type --</option>
-                                <option value="Tractor" <?php echo (isset($_POST['engineType']) && $_POST['engineType'] == 'Tractor') ? 'selected' : ''; ?>>Tractor</option>
-                                <option value="Water Pump" <?php echo (isset($_POST['engineType']) && $_POST['engineType'] == 'Water Pump') ? 'selected' : ''; ?>>Water Pump</option>
-                                <option value="Hand Tractor" <?php echo (isset($_POST['engineType']) && $_POST['engineType'] == 'Hand Tractor') ? 'selected' : ''; ?>>Hand Tractor</option>
-                                <option value="Generator" <?php echo (isset($_POST['engineType']) && $_POST['engineType'] == 'Generator') ? 'selected' : ''; ?>>Generator</option>
-                                <option value="Harvester" <?php echo (isset($_POST['engineType']) && $_POST['engineType'] == 'Harvester') ? 'selected' : ''; ?>>Harvester</option>
-                                <option value="Other" <?php echo (isset($_POST['engineType']) && $_POST['engineType'] == 'Other') ? 'selected' : ''; ?>>Other</option>
+                                <option value="Tractor" <?php echo ($engineType == 'Tractor') ? 'selected' : ''; ?>>Tractor</option>
+                                <option value="Water Pump" <?php echo ($engineType == 'Water Pump') ? 'selected' : ''; ?>>Water Pump</option>
+                                <option value="Hand Tractor" <?php echo ($engineType == 'Hand Tractor') ? 'selected' : ''; ?>>Hand Tractor</option>
+                                <option value="Generator" <?php echo ($engineType == 'Generator') ? 'selected' : ''; ?>>Generator</option>
+                                <option value="Harvester" <?php echo ($engineType == 'Harvester') ? 'selected' : ''; ?>>Harvester</option>
+                                <option value="Other" <?php echo ($engineType == 'Other') ? 'selected' : ''; ?>>Other</option>
                             </select>
                         </div>
                         <!-- End Dynamic Engine Details Section -->
@@ -517,7 +518,7 @@ if ($conn) {
                             <label for="remarks" class="form-label">
                                 <i class="fas fa-comment-dots"></i>Remarks / Additional Details
                             </label>
-                            <textarea class="form-control" id="remarks" name="remarks" rows="5" placeholder="Explain why you need this assistance, how it will be used, and any other relevant information."><?php echo htmlspecialchars($_POST['remarks'] ?? ''); ?></textarea>
+                            <textarea class="form-control" id="remarks" name="remarks" rows="5" placeholder="Explain why you need this assistance, how it will be used, and any other relevant information."><?php echo htmlspecialchars($remarks ?? ''); ?></textarea>
                             <small class="form-text text-muted">Provide a clear explanation to support your request.</small>
                         </div>
 
