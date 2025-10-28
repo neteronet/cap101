@@ -1,159 +1,152 @@
 <?php
-session_start(); // Start the session at the very beginning of the script
+error_reporting(E_ALL); // Report all errors
+ini_set('display_errors', 1); // Display errors for debugging
 
-// Check if the user is logged in. If not, redirect to the login page.
-if (!isset($_SESSION['user_id'])) {
+session_start();
+
+include '../includes/connection.php'; // Ensure this path is correct
+
+// Redirect if user_id is not set or not an integer
+if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
     header("location: municipal-login.php");
     exit();
 }
- 
-// Retrieve the user's name from the session.
-$display_name = $_SESSION['name'] ?? 'Mao'; // Fallback to 'Farmer' if not set
 
-$servername = "localhost";
-$db_username = "root"; // Your database username
-$db_password = "";     // Your database password
-$dbname = "cap101"; // Your database name
+$user_id = $_SESSION['user_id'];
+$display_name = 'Mao'; // Default fallback
 
-$conn = new mysqli($servername, $db_username, $db_password, $dbname);
-
-if ($conn->connect_error) {
-    error_log("Database connection failed: " . $conn->connect_error);
-    // You might want to redirect to an error page or show a friendly message
-    // For now, we'll just exit to prevent further errors
-    exit("Database connection failed. Please try again later.");
+// --- IMPROVED NAME FETCHING ---
+// Always try to fetch the name from the database for accuracy.
+// This ensures that if the session name is outdated or not set, the DB name is used.
+$stmt_name = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
+if ($stmt_name) {
+    $stmt_name->bind_param("i", $user_id);
+    $stmt_name->execute();
+    $stmt_name->bind_result($db_name);
+    $stmt_name->fetch();
+    if ($db_name) {
+        $display_name = htmlspecialchars($db_name); // Sanitize immediately
+    }
+    $stmt_name->close();
 } else {
-    // Fetch user's name from DB for display
-    $stmt = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
-    if ($stmt === false) {
-        error_log("SQL Error for fetching user name: " . $conn->error);
-    } else {
-        $stmt->bind_param("i", $_SESSION['user_id']);
-        $stmt->execute();
-        $stmt->bind_result($fetched_db_name);
-        $stmt->fetch();
-        if ($fetched_db_name) {
-            $display_name = $fetched_db_name; // Use the name fetched from DB
-        }
-        $stmt->close();
-    }
-
-
-    // --- Fetch Farmers Count ---
-    $farmersCount = 0; // Initialize with 0
-    $countFarmersStmt = $conn->prepare("SELECT COUNT(farmer_id) AS total_farmers FROM farmers");
-    if ($countFarmersStmt === false) {
-        error_log("SQL Error for Farmers Count: " . $conn->error);
-    } else {
-        $countFarmersStmt->execute();
-        $countFarmersStmt->bind_result($totalFarmers);
-        $countFarmersStmt->fetch();
-        if ($totalFarmers !== null) {
-            $farmersCount = $totalFarmers;
-        }
-        $countFarmersStmt->close();
-    }
-
-    // --- Fetch Total Farms Count (from crop_monitoring table) ---
-    $farmsCount = 0; // Initialize with 0
-    $countFarmsStmt = $conn->prepare("SELECT COUNT(id) AS total_farms FROM planting_status");
-    if ($countFarmsStmt === false) {
-        error_log("SQL Error for Farms Count: " . $conn->error);
-    } else {
-        $countFarmsStmt->execute();
-        $countFarmsStmt->bind_result($totalFarms);
-        $countFarmsStmt->fetch();
-        if ($totalFarms !== null) {
-            $farmsCount = $totalFarms;
-        }
-        $countFarmsStmt->close();
-    }
-
-    // --- Fetch Total Subsidy Requests ---
-    $subsidyRequestsCount = 0; // Initialize
-    $countSubsidyRequestsStmt = $conn->prepare("SELECT COUNT(application_id) AS total_requests FROM assistance_applications");
-    if ($countSubsidyRequestsStmt === false) {
-        error_log("SQL Error for Subsidy Requests Count: " . $conn->error);
-    } else {
-        $countSubsidyRequestsStmt->execute();
-        $countSubsidyRequestsStmt->bind_result($totalSubsidyRequests);
-        $countSubsidyRequestsStmt->fetch();
-        if ($totalSubsidyRequests !== null) {
-            $subsidyRequestsCount = $totalSubsidyRequests;
-        }
-        $countSubsidyRequestsStmt->close();
-    }
-
-    // --- Fetch Pending Verifications (Subsidy Requests with status 'Pending') ---
-    $pendingVerificationsCount = 0; // Initialize
-    $countPendingVerificationsStmt = $conn->prepare("SELECT COUNT(application_id) AS total_pending FROM assistance_applications WHERE status = 'Pending'");
-    if ($countPendingVerificationsStmt === false) {
-        error_log("SQL Error for Pending Verifications Count: " . $conn->error);
-    } else {
-        $countPendingVerificationsStmt->execute();
-        $countPendingVerificationsStmt->bind_result($totalPendingVerifications);
-        $countPendingVerificationsStmt->fetch();
-        if ($totalPendingVerifications !== null) {
-            $pendingVerificationsCount = $totalPendingVerifications;
-        }
-        $countPendingVerificationsStmt->close();
-    }
-
-    // --- Fetch Crop Monitoring Summary ---
-    $cropSummary = []; // Initialize as an empty array
-    $fetchCropSummaryStmt = $conn->prepare("SELECT status, crop_type, COUNT(id) AS count FROM planting_status GROUP BY status, crop_type ORDER BY status, crop_type");
-    if ($fetchCropSummaryStmt === false) {
-        error_log("SQL Error for Crop Monitoring Summary: " . $conn->error);
-    } else {
-        $fetchCropSummaryStmt->execute();
-        $result = $fetchCropSummaryStmt->get_result();
-        while ($row = $result->fetch_assoc()) {
-            $status = $row['status'];
-            $cropType = $row['crop_type'];
-            $count = $row['count'];
-
-            if (!isset($cropSummary[$status])) {
-                $cropSummary[$status] = [];
-            }
-            $cropSummary[$status][$cropType] = $count;
-        }
-        $fetchCropSummaryStmt->close();
-    }
-    // --- End Fetch Crop Monitoring Summary ---
-
-
-    // --- Fetch Recent Subsidy Activity (Latest 5, combining approved/rejected and pending for display) ---
-    $recentSubsidyActivity = [];
-    $fetchRecentSubsidyStmt = $conn->prepare("
-        SELECT
-            aa.status,
-            aa.assistance_type,
-            aa.seed_type,
-            aa.seed_quantity,
-            aa.engine_type,
-            f.name AS farmer_name,
-            aa.qr_code_data
-        FROM assistance_applications aa
-        JOIN farmers f ON aa.farmer_user_id = f.farmer_id
-        ORDER BY aa.application_date DESC
-        LIMIT 5
-    ");
-    if ($fetchRecentSubsidyStmt === false) {
-        error_log("SQL Error for Recent Subsidy Activity: " . $conn->error);
-    } else {
-        $fetchRecentSubsidyStmt->execute();
-        $result = $fetchRecentSubsidyStmt->get_result();
-        while ($row = $result->fetch_assoc()) {
-            $recentSubsidyActivity[] = $row;
-        }
-        $fetchRecentSubsidyStmt->close();
-    }
-
-
-    $conn->close();
+    error_log("Failed to prepare statement for user name: " . $conn->error);
 }
 
+// --- Fetch Farmers Count ---
+$farmersCount = 0; // Initialize with 0
+$countFarmersStmt = $conn->prepare("SELECT COUNT(farmer_id) AS total_farmers FROM farmers");
+if ($countFarmersStmt === false) {
+    error_log("SQL Error for Farmers Count: " . $conn->error);
+} else {
+    $countFarmersStmt->execute();
+    $countFarmersStmt->bind_result($totalFarmers);
+    $countFarmersStmt->fetch();
+    if ($totalFarmers !== null) {
+        $farmersCount = $totalFarmers;
+    }
+    $countFarmersStmt->close();
+}
+
+// --- Fetch Total Farms Count (from crop_monitoring table) ---
+$farmsCount = 0; // Initialize with 0
+$countFarmsStmt = $conn->prepare("SELECT COUNT(id) AS total_farms FROM planting_status");
+if ($countFarmsStmt === false) {
+    error_log("SQL Error for Farms Count: " . $conn->error);
+} else {
+    $countFarmsStmt->execute();
+    $countFarmsStmt->bind_result($totalFarms);
+    $countFarmsStmt->fetch();
+    if ($totalFarms !== null) {
+        $farmsCount = $totalFarms;
+    }
+    $countFarmsStmt->close();
+}
+
+// --- Fetch Total Subsidy Requests ---
+$subsidyRequestsCount = 0; // Initialize
+$countSubsidyRequestsStmt = $conn->prepare("SELECT COUNT(application_id) AS total_requests FROM assistance_applications");
+if ($countSubsidyRequestsStmt === false) {
+    error_log("SQL Error for Subsidy Requests Count: " . $conn->error);
+} else {
+    $countSubsidyRequestsStmt->execute();
+    $countSubsidyRequestsStmt->bind_result($totalSubsidyRequests);
+    $countSubsidyRequestsStmt->fetch();
+    if ($totalSubsidyRequests !== null) {
+        $subsidyRequestsCount = $totalSubsidyRequests;
+    }
+    $countSubsidyRequestsStmt->close();
+}
+
+// --- Fetch Pending Verifications (Subsidy Requests with status 'Pending') ---
+$pendingVerificationsCount = 0; // Initialize
+$countPendingVerificationsStmt = $conn->prepare("SELECT COUNT(application_id) AS total_pending FROM assistance_applications WHERE status = 'Pending'");
+if ($countPendingVerificationsStmt === false) {
+    error_log("SQL Error for Pending Verifications Count: " . $conn->error);
+} else {
+    $countPendingVerificationsStmt->execute();
+    $countPendingVerificationsStmt->bind_result($totalPendingVerifications);
+    $countPendingVerificationsStmt->fetch();
+    if ($totalPendingVerifications !== null) {
+        $pendingVerificationsCount = $totalPendingVerifications;
+    }
+    $countPendingVerificationsStmt->close();
+}
+
+// --- Fetch Crop Monitoring Summary ---
+$cropSummary = []; // Initialize as an empty array
+$fetchCropSummaryStmt = $conn->prepare("SELECT status, crop_type, COUNT(id) AS count FROM planting_status GROUP BY status, crop_type ORDER BY status, crop_type");
+if ($fetchCropSummaryStmt === false) {
+    error_log("SQL Error for Crop Monitoring Summary: " . $conn->error);
+} else {
+    $fetchCropSummaryStmt->execute();
+    $result = $fetchCropSummaryStmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $status = $row['status'];
+        $cropType = $row['crop_type'];
+        $count = $row['count'];
+
+        if (!isset($cropSummary[$status])) {
+            $cropSummary[$status] = [];
+        }
+        $cropSummary[$status][$cropType] = $count;
+    }
+    $fetchCropSummaryStmt->close();
+}
+// --- End Fetch Crop Monitoring Summary ---
+
+
+// --- Fetch Recent Subsidy Activity (Latest 5, combining approved/rejected and pending for display) ---
+$recentSubsidyActivity = [];
+$fetchRecentSubsidyStmt = $conn->prepare("
+    SELECT
+        aa.status,
+        aa.assistance_type,
+        aa.seed_type,
+        aa.seed_quantity,
+        aa.engine_type,
+        f.name AS farmer_name,
+        aa.qr_code_data
+    FROM assistance_applications aa
+    JOIN farmers f ON aa.farmer_user_id = f.farmer_id
+    ORDER BY aa.application_date DESC
+    LIMIT 5
+");
+if ($fetchRecentSubsidyStmt === false) {
+    error_log("SQL Error for Recent Subsidy Activity: " . $conn->error);
+} else {
+    $fetchRecentSubsidyStmt->execute();
+    $result = $fetchRecentSubsidyStmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $recentSubsidyActivity[] = $row;
+    }
+    $fetchRecentSubsidyStmt->close();
+}
+
+
+$conn->close(); // Close the database connection here, after all queries.
+
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>

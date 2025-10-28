@@ -1,32 +1,28 @@
 <?php
 session_start();
 
-if (!isset($_SESSION['user_id'])) {
+include '../includes/connection.php'; // Ensure this path is correct
+
+if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
     header("location: municipal-login.php");
     exit();
 }
 
-$display_name = $_SESSION['name'] ?? 'Mao';
+$user_id = $_SESSION['user_id'];
+$display_name = 'Mao'; // Default fallback
 
-$servername = "localhost";
-$db_username = "root";
-$db_password = "";
-$dbname = "cap101";
-
-$conn = new mysqli($servername, $db_username, $db_password, $dbname);
-
-if ($conn->connect_error) {
-    error_log("Database connection failed: " . $conn->connect_error);
-} else {
-    $stmt = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
-    $stmt->bind_param("i", $_SESSION['user_id']);
-    $stmt->execute();
-    $stmt->bind_result($fetched_db_name);
-    $stmt->fetch();
-    if ($fetched_db_name) {
-        $display_name = $fetched_db_name;
+$stmt_name = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
+if ($stmt_name) {
+    $stmt_name->bind_param("i", $user_id);
+    $stmt_name->execute();
+    $stmt_name->bind_result($db_name);
+    $stmt_name->fetch();
+    if ($db_name) {
+        $display_name = htmlspecialchars($db_name); // Sanitize immediately
     }
-    $stmt->close();
+    $stmt_name->close();
+} else {
+    error_log("Failed to prepare statement for user name: " . $conn->error);
 }
 
 // Data fetching for Crop Performance by Type chart

@@ -1,39 +1,32 @@
 <?php
-session_start(); // Start the session at the very beginning of the script
+session_start();
 
-// Check if the user is logged in. If not, redirect to the login page.
-if (!isset($_SESSION['user_id'])) {
+include '../includes/connection.php'; // Ensure this path is correct
+
+// Redirect if user_id is not set or not an integer
+if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
     header("location: municipal-login.php");
     exit();
 }
 
-// Database connection details
-$servername = "localhost";
-$db_username = "root"; // Your database username
-$db_password = "";     // Your database password
-$dbname = "cap101"; // Your database name
+$user_id = $_SESSION['user_id'];
+$display_name = 'Mao'; // Default fallback
 
-// Create database connection
-$conn = new mysqli($servername, $db_username, $db_password, $dbname);
-
-// Check connection
-if ($conn->connect_error) {
-    error_log("Database connection failed: " . $conn->connect_error);
-    die("Connection failed: " . $conn->connect_error);
-}
-
-// Retrieve the user's name from the session or database
-$display_name = 'Mao'; // Fallback name
-if (isset($_SESSION['user_id'])) {
-    $stmt = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
-    $stmt->bind_param("i", $_SESSION['user_id']);
-    $stmt->execute();
-    $stmt->bind_result($fetched_db_name);
-    $stmt->fetch();
-    if ($fetched_db_name) {
-        $display_name = $fetched_db_name; // Use the name fetched from DB
+// --- IMPROVED NAME FETCHING ---
+// Always try to fetch the name from the database for accuracy.
+// This ensures that if the session name is outdated or not set, the DB name is used.
+$stmt_name = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
+if ($stmt_name) {
+    $stmt_name->bind_param("i", $user_id);
+    $stmt_name->execute();
+    $stmt_name->bind_result($db_name);
+    $stmt_name->fetch();
+    if ($db_name) {
+        $display_name = htmlspecialchars($db_name); // Sanitize immediately
     }
-    $stmt->close();
+    $stmt_name->close();
+} else {
+    error_log("Failed to prepare statement for user name: " . $conn->error);
 }
 
 // Fetch crop monitoring data, including photo_path
