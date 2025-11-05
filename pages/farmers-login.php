@@ -1,39 +1,36 @@
 <?php
 session_start();
 
-include '../includes/connection.php'; 
+include '../includes/connection.php'; // Ensure this path is correct
 
-$error = '';    
+$error = '';
 
 if (isset($_POST['login'])) {
-    $email = $_POST['username']; // Changed from username to email as per your form
-    $password = $_POST['password'];
+    $username_input = $_POST['username'];
+    $password_input = $_POST['password'];
 
-    // Prepare a select statement - NOW INCLUDING USER_TYPE FOR FARMERS
-    $stmt = $conn->prepare("SELECT user_id, username, password_hash, user_type FROM users WHERE email = ? AND user_type = 'farmer'");
-    $stmt->bind_param("s", $email);
+    $stmt = $conn->prepare("SELECT user_id, username, password_hash, user_type FROM users WHERE username = ? AND user_type = 'farmer'");
+    $stmt->bind_param("s", $username_input);
     $stmt->execute();
     $stmt->store_result();
 
     if ($stmt->num_rows == 1) {
-        $stmt->bind_result($user_id, $db_username, $password_hash, $user_type);
+        // Bind results to variables
+        $stmt->bind_result($user_id, $username_from_db, $password_hash_from_db, $user_type_from_db);
         $stmt->fetch();
 
-        // Verify the password hash
-        if (hash('sha256', $password) === $password_hash) {
+        if (hash('sha256', $password_input) === $password_hash_from_db) {
             $_SESSION['user_id'] = $user_id;
-            $_SESSION['username'] = $db_username;
-            $_SESSION['user_type'] = $user_type;
+            $_SESSION['username'] = $username_from_db;
+            $_SESSION['user_type'] = $user_type_from_db;
 
-            // Redirect to farmer dashboard
-            header("location: farmer-dashboard.php"); 
+            header("location: farmer-dashboard.php");
             exit();
         } else {
-            $error = "Invalid email or password.";
+            $error = "Invalid username or password.";
         }
     } else {
-        // Updated error message to indicate user_type restriction
-        $error = "Invalid email or password or you are not authorized to login here as a farmer.";
+        $error = "Invalid username or password, or you are not authorized to log in as a Municipal Agricultural Officer.";
     }
     $stmt->close();
 }
@@ -161,7 +158,7 @@ $conn->close();
             <div class="form-floating mb-3">
                 <input type="email" class="form-control" id="floatingInput" name="username"
                     placeholder="name@example.com" required>
-                <label for="floatingInput">Email address</label>
+                <label for="floatingInput">Username</label>
             </div>
 
             <div class="form-floating mb-4">

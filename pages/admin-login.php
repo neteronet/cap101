@@ -1,25 +1,42 @@
 <?php
-    include "../includes/connection.php";  
+session_start();
 
-    if(isset($_POST['login']) ) {
-        $username = $_POST['username'];
-        $password = $_POST['password'];
+include '../includes/connection.php';
 
-        $sql = "SELECT * FROM adminlogin WHERE username = '$username' and password = '$password'";
-        $result = mysqli_query($conn, $sql);
-        $row = mysqli_fetch_array($result, MYSQLI_ASSOC);
-        $count = mysqli_num_rows($result);
+$error = '';
 
-        if($count == 1) {
-            header("Location: admin-provincialAgriDashboard.php");
+if (isset($_POST['login'])) {
+    $username_input = $_POST['username']; // Use a distinct variable name for input
+    $password_input = $_POST['password']; // Use a distinct variable name for input
+
+    $stmt = $conn->prepare("SELECT user_id, username, password_hash, user_type FROM users WHERE username = ? AND user_type = 'admin'");
+    $stmt->bind_param("s", $username_input); // Bind the input username
+    $stmt->execute();
+    $stmt->store_result();
+
+    if ($stmt->num_rows == 1) {
+        // Bind results to variables - ensure order matches SELECT statement
+        $stmt->bind_result($user_id, $username_from_db, $password_from_db, $user_type_from_db);
+        $stmt->fetch();
+
+        // Verify the password hash (assuming SHA256 is used for storage)
+        if (hash('sha256', $password_input) === $password_from_db) {
+            $_SESSION['user_id'] = $user_id;
+            $_SESSION['username'] = $username_from_db;
+            $_SESSION['user_type'] = $user_type_from_db;
+
+            header("location: admin-dashboard.php");
+            exit();
+        } else {
+            $error = "Invalid username or password.";
         }
-        else {
-            echo '<script>
-                window.location.href = "admin-login.php";
-                alert("Login failed. Invalid Email or Password!!!")
-            </script>';
-        }   
+    } else {
+        // Updated error message for MAO login context
+        $error = "Invalid username or password, or you are not authorized to log in as a Admin.";
     }
+    $stmt->close();
+}
+$conn->close();
 ?>
 
 <!DOCTYPE html>
@@ -28,64 +45,142 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>System Admin Log-In Page</title>
+    <title>Admin Login</title>
 
-    <link rel="stylesheet" href="../css/style.css">
     <!-- BOOTSTRAP -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet"
         integrity="sha384-LN+7fdVzj6u52u30Kp6M/trliBMCMKTyK833zpbD+pXdCLuTusPj697FH4R/5mcr" crossorigin="anonymous">
-    
+
     <!-- FONT -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&family=Roboto:wght@400;500;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap"
         rel="stylesheet">
 
     <!-- icon -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
         crossorigin="anonymous" referrerpolicy="no-referrer">
+
+    <style>
+        body {
+            font-family: "Poppins", sans-serif;
+            background: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .login-container {
+            background-color: #fff;
+            padding: 2.5rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            max-width: 450px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .login-container .logo {
+            width: 120px;
+            height: auto;
+            margin-bottom: 1.5rem;
+        }
+
+        .login-container h1 {
+            color: #19860f;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            font-size: 1.8rem;
+        }
+
+        .form-floating .form-control {
+            border-radius: 0.5rem;
+            border: 1px solid #ced4da;
+            padding: 1rem 1.25rem;
+            height: auto;
+        }
+
+        .form-floating label {
+            padding: 1rem 1.25rem;
+            color: #6c757d;
+        }
+
+        .form-floating .form-control:focus {
+            border-color: #19860f;
+            box-shadow: 0 0 0 0.25rem rgba(25, 134, 15, 0.25);
+        }
+
+        .btn-primary {
+            background-color: #19860f;
+            border-color: #19860f;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+        }
+
+        .btn-primary:hover {
+            background-color: #146c0b;
+            border-color: #146c0b;
+        }
+
+        .back-to-home {
+            color: #19860f;
+            font-weight: 500;
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .back-to-home:hover {
+            color: #146c0b;
+            text-decoration: underline;
+        }
+
+        .error-message {
+            color: red;
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+        }
+    </style>
 </head>
 
-<body class="bg-body-tertiary d-flex flex-column min-vh-100">
-    <!-- MAIN CONTENT -->
+<body>
+    <main class="login-container">
+        <form class="w-100" method="POST">
+            <img class="logo" src="../photos/Department_of_Agriculture_of_the_Philippines.png" alt="Official Seal">
+            <h1 class="mb-4">ADMIN LOGIN</h1>
 
-    <main class="flex-fill d-flex justify-content-center align-items-center py-5">
-        <form class="form-login w-100 m-auto" method="POST">
-            <div class="text-center mb-4">
-                <img class="mb-3" src="../photos/Department_of_Agriculture_of_the_Philippines.png" alt="" width="150px" height="149px">
-                <h1 class="h4 mb-1 fw-semibold">SYSTEM ADMIN LOGIN</h1>
-            </div>
-
-            <div class="form-floating mb-3">
-                <input type="email" class="form-control" id="floatingInput" name="username" placeholder="name@example.com" required>
-                <label for="floatingInput">Email</label>
-            </div>
+            <?php if (!empty($error)) : ?>
+                <div class="error-message"><?php echo htmlspecialchars($error); ?></div>
+            <?php endif; ?>
 
             <div class="form-floating mb-3">
-                <input type="password" class="form-control" id="floatingPassword" name="password" placeholder="Password" required>
+                <input type="email" class="form-control" id="floatingInput" name="username"
+                    placeholder="name@example.com" required>
+                <label for="floatingInput">Email address</label>
+            </div>
+
+            <div class="form-floating mb-4">
+                <input type="password" class="form-control" id="floatingPassword" name="password" placeholder="Password"
+                    required>
                 <label for="floatingPassword">Password</label>
             </div>
 
-            <button class="btn btn-primary w-100 py-2" type="submit" name="login">Login</button>
+            <button class="btn btn-primary w-100 mb-3" type="submit" name="login">Login</button>
+
+            <a href="../index.php" class="back-to-home">
+                <i class="fas fa-arrow-left me-2"></i>Back to Home
+            </a>
         </form>
     </main>
-
-    <!-- FOOTER -->
-    <footer class="text-bg-primary text-white py-2 mt-auto">
-        <div class="container">
-            <div class="row justify-content-between">
-                <div class="col-12 col-md-6"></div>
-                <div class="col-12 col-md-6 text-md-end text-center">
-                    <p class="mb-0">&copy; BSIT-4. All Rights Reserved.</p>
-                </div>
-            </div>
-        </div>
-    </footer>
 
     <!-- BOOTSTRAP JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-ndDqU0Gzau9qJ1lfW4pNLlhNTkCfHzAVBReH9diLvGRem5+R9g2FzA8ZGN954O5Q"
         crossorigin="anonymous"></script>
 </body>
+
 </html>

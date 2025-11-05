@@ -1,17 +1,32 @@
 <?php
 session_start();
-// Database connection
-$servername = "localhost";
-$username = "root"; // Replace with your database username
-$password = "";     // Replace with your database password
-$dbname = "cap101";
 
-// Create connection
-$conn = new mysqli($servername, $username, $password, $dbname);
+include '../includes/connection.php'; // Ensure this path is correct
 
-// Check connection
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
+// Redirect if user_id is not set or not an integer
+if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
+    header("location: municipal-login.php");
+    exit();
+}
+
+$user_id = $_SESSION['user_id'];
+$display_name = 'Mao'; // Default fallback
+
+// --- IMPROVED NAME FETCHING ---
+// Always try to fetch the name from the database for accuracy.
+// This ensures that if the session name is outdated or not set, the DB name is used.
+$stmt_name = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
+if ($stmt_name) {
+    $stmt_name->bind_param("i", $user_id);
+    $stmt_name->execute();
+    $stmt_name->bind_result($db_name);
+    $stmt_name->fetch();
+    if ($db_name) {
+        $display_name = htmlspecialchars($db_name); // Sanitize immediately
+    }
+    $stmt_name->close();
+} else {
+    error_log("Failed to prepare statement for user name: " . $conn->error);
 }
 
 $announcement = null; // Initialize announcement data

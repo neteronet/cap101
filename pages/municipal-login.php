@@ -1,43 +1,39 @@
 <?php
 session_start();
 
-// Include the database connection file
-include '../includes/connection.php'; // Make sure the path is correct
+include '../includes/connection.php'; // Ensure this path is correct
 
-$error = '';    
+$error = '';
 
 if (isset($_POST['login'])) {
-    $email = $_POST['username']; 
-    $password = $_POST['password'];
+    $username_input = $_POST['username'];
+    $password_input = $_POST['password'];
 
-    // Prepare a select statement
-    $stmt = $conn->prepare("SELECT user_id, username, password_hash, user_type FROM users WHERE email = ? AND user_type = 'mao'");
-    $stmt->bind_param("s", $email);
+    $stmt = $conn->prepare("SELECT user_id, username, password_hash, user_type FROM users WHERE username = ? AND user_type = 'mao'");
+    $stmt->bind_param("s", $username_input);
     $stmt->execute();
     $stmt->store_result();
 
     if ($stmt->num_rows == 1) {
-        $stmt->bind_result($user_id, $db_username, $password_hash, $user_type);
+        // Bind results to variables
+        $stmt->bind_result($user_id, $username_from_db, $password_hash_from_db, $user_type_from_db);
         $stmt->fetch();
 
-        // Verify the password hash using SHA256
-        if (hash('sha256', $password) === $password_hash) {
+        if (hash('sha256', $password_input) === $password_hash_from_db) {
             $_SESSION['user_id'] = $user_id;
-            $_SESSION['username'] = $db_username;
-            $_SESSION['user_type'] = $user_type;
+            $_SESSION['username'] = $username_from_db;
+            $_SESSION['user_type'] = $user_type_from_db;
 
-            // Redirect to the municipal agriculturist dashboard
-            header("location: municipal-dashboard.php"); // Assuming this is your dashboard for MAO
+            header("location: municipal-dashboard.php");
             exit();
         } else {
-            $error = "Invalid email or password.";
+            $error = "Invalid username or password.";
         }
     } else {
-        $error = "Invalid email or password or you are not authorized to login here.";
+        $error = "Invalid username or password, or you are not authorized to log in as a Municipal Agricultural Officer.";
     }
     $stmt->close();
 }
-// Close the connection when done with the script
 $conn->close();
 ?>
 
@@ -47,7 +43,7 @@ $conn->close();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Municipal Agriculturist Login</title>
+    <title>Municipal Login</title>
 
     <!-- BOOTSTRAP -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet"
@@ -67,7 +63,7 @@ $conn->close();
     <style>
         body {
             font-family: "Poppins", sans-serif;
-            background: #f0f2f5; /* Light gray background */
+            background: #f0f2f5;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -92,7 +88,7 @@ $conn->close();
         }
 
         .login-container h1 {
-            color: #19860f; /* Green for the title */
+            color: #19860f;
             font-weight: 700;
             margin-bottom: 1.5rem;
             font-size: 1.8rem;
@@ -153,21 +149,21 @@ $conn->close();
     <main class="login-container">
         <form class="w-100" method="POST">
             <img class="logo" src="../photos/Department_of_Agriculture_of_the_Philippines.png" alt="Official Seal">
-            <h1 class="mb-4">MUNICIPAL AGRICULTURIST LOGIN</h1>
+            <h1 class="mb-4">MUNICIPAL LOGIN</h1>
 
             <?php if (!empty($error)) : ?>
                 <div class="error-message"><?php echo htmlspecialchars($error); ?></div>
             <?php endif; ?>
 
             <div class="form-floating mb-3">
-                <input type="email" class="form-control" id="floatingInput" name="username"
-                    placeholder="name@example.com" required>
-                <label for="floatingInput">Email address</label>
+                <input type="text" class="form-control" id="floatingInput" name="username"
+                    placeholder="Enter your username" required>
+                <label for="floatingInput">Username</label>
             </div>
 
             <div class="form-floating mb-4">
-                <input type="password" class="form-control" id="floatingPassword" name="password" placeholder="Password"
-                    required>
+                <input type="password" class="form-control" id="floatingPassword" name="password"
+                    placeholder="Password" required>
                 <label for="floatingPassword">Password</label>
             </div>
 
