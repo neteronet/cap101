@@ -2,7 +2,15 @@
 session_start();
 include '../includes/connection.php';
 
-// Check if the user is logged in and is an admin
+// --- IMPROVEMENT 1: Robust Connection Check ---
+if (!isset($conn) || $conn->connect_error) {
+    error_log("Database connection failed: " . ($conn->connect_error ?? "Connection object not set"));
+    // Redirect or show a maintenance page
+    header("location: database_error.php"); 
+    exit();
+}
+
+// --- Check if the user is logged in ---
 if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
     header("location: admin-login.php");
     exit();
@@ -10,26 +18,53 @@ if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
 
 $user_id = $_SESSION['user_id'];
 $display_name = 'Admin'; // Default fallback
+$is_admin = false; // Flag for explicit admin check
 
-// Fetch admin's name
-$stmt_name = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
+// Fetch admin's name AND user_type (IMPROVEMENT 2: Fetch user_type for security)
+$stmt_name = $conn->prepare("SELECT name, user_type FROM users WHERE user_id = ?");
 if ($stmt_name) {
     $stmt_name->bind_param("i", $user_id);
     $stmt_name->execute();
-    $stmt_name->bind_result($db_name);
+    $stmt_name->bind_result($db_name, $db_user_type);
     $stmt_name->fetch();
-    if ($db_name) {
-        $display_name = htmlspecialchars($db_name); // Sanitize immediately
-    }
     $stmt_name->close();
+
+    if ($db_name) {
+        $display_name = htmlspecialchars($db_name);
+    }
+
+    // --- IMPROVEMENT 3: Explicit Admin Authorization Check ---
+    if ($db_user_type === 'admin') {
+        $is_admin = true;
+    } else {
+        // If not admin, destroy session and redirect
+        session_destroy();
+        header("location: admin-login.php");
+        exit();
+    }
 } else {
-    error_log("Failed to prepare statement for user name: " . $conn->error);
+    error_log("Failed to prepare statement for user name/type: " . $conn->error);
 }
 
+// --- IMPROVEMENT 4: Handle PRG Pattern for Session Messages ---
 $message = '';
-$message_type = ''; // 'success' or 'danger'
+$message_type = ''; 
+if (isset($_SESSION['message'])) {
+    $message = $_SESSION['message'];
+    $message_type = $_SESSION['message_type'];
+    // Clear the session messages so they don't reappear on refresh
+    unset($_SESSION['message']);
+    unset($_SESSION['message_type']);
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Security check - already done above, but good to be defensive
+    if (!$is_admin) {
+        // Should not happen, but safe to check again
+        header("location: admin-login.php");
+        exit();
+    }
+
     $username = trim($_POST['username']);
     $password = $_POST['password'];
     $name = trim($_POST['name']);
@@ -52,18 +87,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = "Username already exists. Please choose a different one.";
             $message_type = 'danger';
         } else {
-            // Hash the password using SHA256 as requested
-            // Note: password_hash() with PASSWORD_DEFAULT is generally more secure for new applications
-            // but this modification uses SHA256 as specifically requested.
+            // Hash the password using SHA256 as requested (Note: password_hash() is recommended)
             $password_hash = hash('sha256', $password);
 
-            // Insert new user into the database
-            $stmt_insert = $conn->prepare("INSERT INTO users (username, password_hash, name, user_type) VALUES (?, ?, ?, ?)");
+            // --- Generate unique code ---
+            $characters = '123456789abcdefghijklmnopqrstuvwxyz';
+            $charactersLength = strlen($characters);
+            $code_length = 8; // adjust length as needed
+
+            do {
+                $generated_code = '';
+                for ($i = 0; $i < $code_length; $i++) {
+                    $generated_code .= $characters[random_int(0, $charactersLength - 1)];
+                }
+
+                // Check for uniqueness in the database
+                $stmt_code_check = $conn->prepare("SELECT user_id FROM users WHERE generated_code = ?");
+                $stmt_code_check->bind_param("s", $generated_code);
+                $stmt_code_check->execute();
+                $stmt_code_check->store_result();
+                $code_exists = $stmt_code_check->num_rows > 0;
+                $stmt_code_check->close();
+            } while ($code_exists);
+            // --- End unique code generation ---
+
+            // Insert new user into the database, including generated_code
+            $stmt_insert = $conn->prepare("INSERT INTO users (username, password_hash, name, user_type, generated_code) VALUES (?, ?, ?, ?, ?)");
             if ($stmt_insert) {
-                $stmt_insert->bind_param("ssss", $username, $password_hash, $name, $user_type_new);
+                $stmt_insert->bind_param("sssss", $username, $password_hash, $name, $user_type_new, $generated_code);
                 if ($stmt_insert->execute()) {
-                    $message = "User '{$name}' added successfully as '{$user_type_new}'.";
-                    $message_type = 'success';
+                    // --- PRG Redirect on Success ---
+                    $_SESSION['message'] = "User '" . htmlspecialchars($name) . "' added successfully as '" . htmlspecialchars($user_type_new) . "'. Code: " . $generated_code;
+                    $_SESSION['message_type'] = 'success';
+                    $stmt_insert->close();
+                    $stmt_check->close();
+                    $conn->close();
+                    header("location: admin-add_user.php"); 
+                    exit();
                 } else {
                     $message = "Error adding user: " . $stmt_insert->error;
                     $message_type = 'danger';
