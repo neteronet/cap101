@@ -3,7 +3,15 @@ session_start();
 
 include '../includes/connection.php';
 
-// Check if the user is logged in. If not, redirect to the login page.
+// --- IMPROVEMENT 1: Robust Connection Check ---
+if (!isset($conn) || $conn->connect_error) {
+    error_log("Database connection failed: " . ($conn->connect_error ?? "Connection object not set"));
+    // Redirect to login on critical error
+    header("location: farmers-login.php");
+    exit();
+}
+
+// --- Check if the user is logged in ---
 if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
     header("location: farmers-login.php");
     exit();
@@ -11,22 +19,37 @@ if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
 
 $user_id = $_SESSION['user_id'];
 $display_name = 'Farmer'; // Default fallback
+$farmer_id_display = "FRM-" . str_pad($user_id, 9, '0', STR_PAD_LEFT);
+$is_farmer = false; // Flag for explicit farmer check
 
-// --- IMPROVED NAME FETCHING ---
-// Always try to fetch the name from the database for accuracy.
-// This ensures that if the session name is outdated or not set, the DB name is used.
-$stmt_name = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
+// --- IMPROVEMENT 2 & 3: Fetch Name AND User Type for Security Check ---
+$stmt_name = $conn->prepare("SELECT name, user_type FROM users WHERE user_id = ?");
 if ($stmt_name) {
     $stmt_name->bind_param("i", $user_id);
     $stmt_name->execute();
-    $stmt_name->bind_result($db_name);
+    $stmt_name->bind_result($db_name, $db_user_type);
     $stmt_name->fetch();
-    if ($db_name) {
-        $display_name = htmlspecialchars($db_name); // Sanitize immediately
-    }
     $stmt_name->close();
+
+    if ($db_name) {
+        $display_name = htmlspecialchars($db_name);
+    }
+
+    // --- Explicit Farmer Authorization Check ---
+    if ($db_user_type === 'farmer') {
+        $is_farmer = true;
+    } else {
+        // If not a farmer, destroy session and redirect
+        session_destroy();
+        header("location: farmers-login.php");
+        exit();
+    }
 } else {
-    error_log("Failed to prepare statement for user name: " . $conn->error);
+    error_log("Failed to prepare statement for user name/type: " . $conn->error);
+    // Treat preparation failure as a security risk/critical error
+    session_destroy();
+    header("location: farmers-login.php");
+    exit();
 }
 
 // --- 2. Fetch farmer's profile data ---
@@ -306,48 +329,14 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
             <img src="../photos/Department_of_Agriculture_of_the_Philippines.png" alt="Province of Antique" />
             <div>Province of Antique</div>
         </a>
-
         <ul class="nav flex-column">
-            <li class="nav-item">
-                <a href="farmer-dashboard.php" class="nav-link">
-                    <i class="fas fa-tachometer-alt"></i> Dashboard
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="farmer-my_profile.php" class="nav-link active">
-                    <i class="fas fa-user-circle"></i> My Profile
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="farmer-subsidy_status.php" class="nav-link">
-                    <i class="fas fa-hand-holding-usd"></i> Subsidy Status
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="farmer-announcement.php" class="nav-link">
-                    <i class="fas fa-bullhorn"></i> Announcements
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="farmer-apply_for_assistance.php" class="nav-link">
-                    <i class="fas fa-file-invoice"></i> Apply for Assistance
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="farmer-planting_status.php" class="nav-link">
-                    <i class="fas fa-leaf"></i> Planting Status
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="farmer-progress_tracking.php" class="nav-link">
-                    <i class="fas fa-chart-line"></i> Progress Tracking
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="farmer-history_log.php" class="nav-link">
-                    <i class="fas fa-chart-line"></i> History Log
-                </a>
-            </li>
+            <li class="nav-item"><a href="farmer-dashboard.php" class="nav-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+            <li class="nav-item"><a href="farmer-my_profile.php" class="nav-link active"><i class="fas fa-user-circle"></i> My Profile</a></li>
+            <!-- Highlighted as the central page for both status and application -->
+            <li class="nav-item"><a href="farmer-apply_for_assistance.php" class="nav-link"><i class="fas fa-hand-holding-usd"></i>Apply for Assistance</a></li>
+            <li class="nav-item"><a href="farmer-announcement.php" class="nav-link"><i class="fas fa-bullhorn"></i> Announcements</a></li>
+            <li class="nav-item"><a href="farmer-planting_status.php" class="nav-link"><i class="fas fa-leaf"></i> Planting Status</a></li>
+            <li class="nav-item"><a href="farmer-progress_tracking.php" class="nav-link"><i class="fas fa-chart-line"></i> Progress Tracking</a></li>
         </ul>
     </nav>
 
@@ -362,8 +351,6 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
     <!-- Main Content -->
     <main>
         <div class="container">
-            <h1 class="page-title">My Profile</h1>
-
             <div class="card mb-4">
                 <div class="card-body">
                     <div class="profile-header">

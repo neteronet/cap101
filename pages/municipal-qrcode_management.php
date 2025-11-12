@@ -3,28 +3,85 @@ session_start();
 
 include '../includes/connection.php'; // Ensure this path is correct
 
+// --- IMPROVEMENT 1: Robust Connection Check ---
+if (!isset($conn) || $conn->connect_error) {
+    error_log("Database connection failed: " . ($conn->connect_error ?? "Connection object not set"));
+    // Redirect to login on critical error
+    header("location: municipal-login.php");
+    exit();
+}
+
+// Redirect if user_id is not set or not an integer
 if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
     header("location: municipal-login.php");
     exit();
 }
 
 $user_id = $_SESSION['user_id'];
-$display_name = 'Mao'; // Default fallback
+$display_name = 'MAO User'; // Better default fallback
+$is_mao = false; // Flag for explicit MAO check
 
-$stmt_name = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
+// --- IMPROVEMENT 2 & 3: Fetch Name AND User Type for Security Check ---
+$stmt_name = $conn->prepare("SELECT name, user_type FROM users WHERE user_id = ?");
 if ($stmt_name) {
     $stmt_name->bind_param("i", $user_id);
     $stmt_name->execute();
-    $stmt_name->bind_result($db_name);
+    $stmt_name->bind_result($db_name, $db_user_type);
     $stmt_name->fetch();
+    $stmt_name->close();
+
     if ($db_name) {
         $display_name = htmlspecialchars($db_name); // Sanitize immediately
     }
-    $stmt_name->close();
+
+    // --- Explicit MAO Authorization Check ---
+    if ($db_user_type === 'mao') {
+        $is_mao = true;
+    } else {
+        // If not MAO, destroy session and redirect
+        session_destroy();
+        header("location: municipal-login.php");
+        exit();
+    }
 } else {
-    error_log("Failed to prepare statement for user name: " . $conn->error);
+    error_log("Failed to prepare statement for user name/type: " . $conn->error);
+    // Treat preparation failure as a security risk/critical error
+    session_destroy();
+    header("location: municipal-login.php");
+    exit();
 }
 
+// Fetch initial data for the recent transactions table
+$recent_claims = [];
+$stmt_recent = $conn->prepare("
+    SELECT
+        aa.application_id,
+        aa.claimed_date,
+        aa.user_id,
+        u.name,
+        aa.assistance_type,
+        aa.status
+    FROM assistance_applications aa
+    JOIN users u ON aa.user_id = u.user_id
+    WHERE aa.claimed = 1
+    ORDER BY aa.claimed_date DESC
+    LIMIT 10
+");
+
+if ($stmt_recent) {
+    $stmt_recent->execute();
+    $result = $stmt_recent->get_result();
+    while ($row = $result->fetch_assoc()) {
+        // Format Farmer ID
+        $row['farmer_id_display'] = "FRM-" . str_pad($row['user_id'], 9, '0', STR_PAD_LEFT);
+        $recent_claims[] = $row;
+    }
+    $stmt_recent->close();
+} else {
+    error_log("Failed to prepare recent claims statement: " . $conn->error);
+}
+
+// Close connection after all initial fetches
 if (isset($conn)) {
     $conn->close();
 }
@@ -226,13 +283,12 @@ if (isset($conn)) {
             font-weight: 600;
             color: #fff;
         }
-        .status-claimed { background-color: #28a745; } /* Green */
-        .status-pending { background-color: #ffc107; color: #333; } /* Yellow */
-        .status-not-claimed { background-color: #dc3545; } /* Red */
+        .status-Claimed { background-color: #28a745; } /* Green */
+        .status-Pending { background-color: #ffc107; color: #333; } /* Yellow */
+        .status-Rejected { background-color: #dc3545; } /* Red */
+        .status-Approved { background-color: #0d6efd; } /* Blue (should not appear here, but for completeness) */
     </style>
     <!-- Instascan JS for QR Code scanning -->
-    <!-- You might need to self-host this or use a modern QR scanner library if Instascan is too old/problematic -->
-    <!-- For a more robust solution, consider libraries like html5-qrcode or jsqr -->
     <script src="https://rawgit.com/schmich/instascan-js/master/docs/bundle.js"></script>
 </head>
 <body>
@@ -333,13 +389,16 @@ if (isset($conn)) {
                                 Details of the scanned QR code and options to verify the claim.
                             </p>
                             <form id="verifyClaimForm">
+                                <input type="hidden" id="hiddenFarmerId" name="hiddenFarmerId">
+                                <input type="hidden" id="hiddenApplicationId" name="hiddenApplicationId">
+
                                 <div class="mb-3">
-                                    <label for="farmerId" class="form-label">Farmer ID:</label>
-                                    <input type="text" class="form-control" id="farmerId" readonly>
+                                    <label for="applicationIdDisplay" class="form-label">Application ID:</label>
+                                    <input type="text" class="form-control" id="applicationIdDisplay" readonly>
                                 </div>
                                 <div class="mb-3">
-                                    <label for="subsidyId" class="form-label">Subsidy ID:</label>
-                                    <input type="text" class="form-control" id="subsidyId" readonly>
+                                    <label for="farmerIdDisplay" class="form-label">Farmer ID (FRM-XXXX):</label>
+                                    <input type="text" class="form-control" id="farmerIdDisplay" readonly>
                                 </div>
                                 <div class="mb-3">
                                     <label for="farmerName" class="form-label">Farmer Name:</label>
@@ -371,40 +430,25 @@ if (isset($conn)) {
                                 <table class="table table-hover" id="qr-report-table">
                                     <thead>
                                         <tr>
-                                            <th>Date/Time</th>
+                                            <th>Claim Date/Time</th>
+                                            <th>Application ID</th>
                                             <th>Farmer ID</th>
                                             <th>Farmer Name</th>
-                                            <th>Subsidy ID</th>
                                             <th>Subsidy Type</th>
                                             <th>Status</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <!-- Dynamic rows will be added here via JavaScript/AJAX -->
-                                        <tr>
-                                            <td>2023-10-26 10:30 AM</td>
-                                            <td>FARM-001</td>
-                                            <td>Juan dela Cruz</td>
-                                            <td>SUB-RICE-001</td>
-                                            <td>Rice Seeds</td>
-                                            <td><span class="status-claimed">Claimed</span></td>
-                                        </tr>
-                                        <tr>
-                                            <td>2023-10-25 02:15 PM</td>
-                                            <td>FARM-003</td>
-                                            <td>Maria Clara</td>
-                                            <td>SUB-FERT-002</td>
-                                            <td>Fertilizer</td>
-                                            <td><span class="status-pending">Pending Verification</span></td>
-                                        </tr>
-                                        <tr>
-                                            <td>2023-10-24 09:00 AM</td>
-                                            <td>FARM-002</td>
-                                            <td>Pedro Reyes</td>
-                                            <td>SUB-FUEL-001</td>
-                                            <td>Fuel Subsidy</td>
-                                            <td><span class="status-claimed">Claimed</span></td>
-                                        </tr>
+                                        <?php foreach ($recent_claims as $claim): ?>
+                                            <tr>
+                                                <td><?php echo htmlspecialchars($claim['claimed_date']); ?></td>
+                                                <td><?php echo htmlspecialchars($claim['application_id']); ?></td>
+                                                <td><?php echo htmlspecialchars($claim['farmer_id_display']); ?></td>
+                                                <td><?php echo htmlspecialchars($claim['name']); ?></td>
+                                                <td><?php echo htmlspecialchars($claim['assistance_type']); ?></td>
+                                                <td><span class="status-badge status-Claimed">Claimed</span></td>
+                                            </tr>
+                                        <?php endforeach; ?>
                                     </tbody>
                                 </table>
                             </div>
@@ -419,6 +463,7 @@ if (isset($conn)) {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
+        // DOM Elements
         const video = document.getElementById('preview');
         const startButton = document.getElementById('startButton');
         const stopButton = document.getElementById('stopButton');
@@ -426,20 +471,44 @@ if (isset($conn)) {
         const qrResultDisplay = document.getElementById('qr-result-display');
         const scannedDataSpan = document.getElementById('scannedData');
 
-        const farmerIdInput = document.getElementById('farmerId');
-        const subsidyIdInput = document.getElementById('subsidyId');
+        const hiddenFarmerIdInput = document.getElementById('hiddenFarmerId');
+        const hiddenApplicationIdInput = document.getElementById('hiddenApplicationId');
+        const applicationIdDisplayInput = document.getElementById('applicationIdDisplay');
+        const farmerIdDisplayInput = document.getElementById('farmerIdDisplay');
         const farmerNameInput = document.getElementById('farmerName');
         const subsidyTypeInput = document.getElementById('subsidyType');
         const claimStatusInput = document.getElementById('claimStatus');
         const verifyButton = document.getElementById('verifyButton');
         const verificationMessage = document.getElementById('verificationMessage');
+        const verifyClaimForm = document.getElementById('verifyClaimForm');
 
-        let scanner; // Declare scanner in a broader scope
+        let scanner; // Instascan scanner instance
 
+        // Helper function to reset the verification form
+        function resetVerificationForm(message = '', type = 'danger') {
+            hiddenFarmerIdInput.value = '';
+            hiddenApplicationIdInput.value = '';
+            applicationIdDisplayInput.value = '';
+            farmerIdDisplayInput.value = '';
+            farmerNameInput.value = '';
+            subsidyTypeInput.value = '';
+            claimStatusInput.value = '';
+            verifyButton.disabled = true;
+            verifyButton.textContent = 'Mark as Claimed';
+            verifyButton.classList.remove('btn-secondary');
+            verifyButton.classList.add('btn-theme');
+            verificationMessage.innerHTML = message ? `<div class="alert alert-${type}">${message}</div>` : '';
+        }
+
+        // --- Scanner Control ---
         startButton.addEventListener('click', () => {
             if (scanner) {
                 scanner.stop(); // Stop any existing scanner
             }
+
+            // Reset UI on new scan attempt
+            resetVerificationForm();
+            qrResultDisplay.style.display = 'none';
 
             scanner = new Instascan.Scanner({ video: video, scanPeriod: 5 });
 
@@ -447,8 +516,12 @@ if (isset($conn)) {
                 console.log('Scanned:', content);
                 scannedDataSpan.textContent = content;
                 qrResultDisplay.style.display = 'block';
-                populateVerificationForm(content);
-                scanner.stop(); // Stop scanning after one successful scan
+                
+                // Process the QR code content
+                processQrData(content);
+
+                // Stop scanning after one successful scan
+                if (scanner) scanner.stop(); 
                 video.style.display = 'none';
                 qrScanMessage.style.display = 'block';
                 startButton.style.display = 'block';
@@ -457,7 +530,6 @@ if (isset($conn)) {
 
             Instascan.Camera.getCameras().then(function (cameras) {
                 if (cameras.length > 0) {
-                    // You might want to let the user select a camera if multiple are available
                     scanner.start(cameras[0]);
                     video.style.display = 'block';
                     qrScanMessage.style.display = 'none';
@@ -466,11 +538,13 @@ if (isset($conn)) {
                 } else {
                     alert('No cameras found.');
                     console.error('No cameras found.');
+                    startButton.style.display = 'block';
+                    stopButton.style.display = 'none';
                 }
             }).catch(function (e) {
                 console.error(e);
                 alert('Error accessing camera. Please ensure permissions are granted.');
-                startButton.style.display = 'block'; // Show start button again if error
+                startButton.style.display = 'block'; 
                 stopButton.style.display = 'none';
             });
         });
@@ -484,165 +558,172 @@ if (isset($conn)) {
                 stopButton.style.display = 'none';
             }
         });
+        
+        // --- QR Data Parsing & Fetching ---
 
-        function populateVerificationForm(qrData) {
-            // This is where you would parse the QR data and ideally
-            // make an AJAX call to your server to fetch actual farmer/subsidy details
-            // based on the farmer ID and subsidy ID in the QR code.
-
-            // For demonstration, we'll parse a simple string.
-            // Expected format: "FarmerID:FARM-001, SubsidyID:SUB-RICE-001"
-            const dataParts = qrData.split(',').map(part => part.trim());
-            let farmerID = '';
-            let subsidyID = '';
-
-            dataParts.forEach(part => {
-                if (part.startsWith('FarmerID:')) {
-                    farmerID = part.substring('FarmerID:'.length);
-                } else if (part.startsWith('SubsidyID:')) {
-                    subsidyID = part.substring('SubsidyID:'.length);
+        function parseQrData(qrData) {
+            // Expected format: "app_id:XX&user_id:YY&approved_on:YYYY-MM-DD"
+            const data = {};
+            try {
+                // Use URLSearchParams to correctly parse the '&' separated key:value pairs
+                // First, replace ':' with '=' so URLSearchParams can interpret them as key=value
+                const urlParams = new URLSearchParams(qrData.replace(/:/g, '='));
+                data.application_id = urlParams.get('app_id');
+                data.user_id = urlParams.get('user_id');
+                // approved_on is not strictly needed for the fetch, but good for validation
+                
+                // Validate parsed data
+                if (data.application_id && data.user_id) {
+                    return data;
                 }
-            });
-
-            farmerIdInput.value = farmerID;
-            subsidyIdInput.value = subsidyID;
-
-            // Simulate fetching details from a database
-            // In a real app, this would be an AJAX call
-            if (farmerID && subsidyID) {
-                fetchFarmerAndSubsidyDetails(farmerID, subsidyID);
-            } else {
-                farmerNameInput.value = 'Invalid QR Data';
-                subsidyTypeInput.value = '';
-                claimStatusInput.value = '';
-                verifyButton.disabled = true;
-                verificationMessage.innerHTML = '<div class="alert alert-danger">Invalid QR code data scanned.</div>';
+            } catch (e) {
+                console.error("Error parsing QR data:", e);
             }
+            return null;
         }
 
-        function fetchFarmerAndSubsidyDetails(farmerID, subsidyID) {
-            // This is a placeholder for an AJAX call to your backend (e.g., 'get_subsidy_details.php')
-            // which would query your database.
-
-            // Simulate database response
-            const mockDb = {
-                'FARM-001': { name: 'Juan dela Cruz' },
-                'FARM-002': { name: 'Pedro Reyes' },
-                'FARM-003': { name: 'Maria Clara' }
-            };
-
-            const mockSubsidies = {
-                'SUB-RICE-001': { type: 'Rice Seeds', status: 'Pending' },
-                'SUB-FERT-002': { type: 'Fertilizer', status: 'Approved' },
-                'SUB-FUEL-001': { type: 'Fuel Subsidy', status: 'Claimed' }
-            };
-
-            const farmer = mockDb[farmerID];
-            const subsidy = mockSubsidies[subsidyID];
-
-            if (farmer && subsidy) {
-                farmerNameInput.value = farmer.name;
-                subsidyTypeInput.value = subsidy.type;
-                claimStatusInput.value = subsidy.status;
-                if (subsidy.status !== 'Claimed') {
-                    verifyButton.disabled = false;
-                    verifyButton.textContent = 'Mark as Claimed';
-                    verifyButton.classList.remove('btn-secondary');
-                    verifyButton.classList.add('btn-theme');
-                } else {
-                    verifyButton.disabled = true;
-                    verifyButton.textContent = 'Already Claimed';
-                    verifyButton.classList.remove('btn-theme');
-                    verifyButton.classList.add('btn-secondary');
-                    verificationMessage.innerHTML = '<div class="alert alert-warning">This subsidy has already been claimed.</div>';
-                }
-            } else {
-                farmerNameInput.value = 'Not Found';
-                subsidyTypeInput.value = 'Not Found';
-                claimStatusInput.value = 'N/A';
-                verifyButton.disabled = true;
-                verificationMessage.innerHTML = '<div class="alert alert-danger">Farmer or Subsidy not found in the system.</div>';
-            }
-        }
-
-
-        verifyClaimForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const farmerId = farmerIdInput.value;
-            const subsidyId = subsidyIdInput.value;
-
-            if (!farmerId || !subsidyId || verifyButton.disabled) {
-                verificationMessage.innerHTML = '<div class="alert alert-danger">Cannot process claim. Invalid data or already claimed.</div>';
+        async function processQrData(qrData) {
+            const parsedData = parseQrData(qrData);
+            
+            if (!parsedData) {
+                resetVerificationForm('Invalid QR code data format scanned.');
                 return;
             }
 
-            // In a real application, you'd send an AJAX request to update the subsidy status in the database.
-            // Example:
-            /*
-            fetch('update_subsidy_status.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ farmer_id: farmerId, subsidy_id: subsidyId, status: 'Claimed' })
-            })
-            .then(response => response.json())
-            .then(data => {
+            applicationIdDisplayInput.value = parsedData.application_id;
+            // Display Farmer ID in FRM-XXXXX format
+            farmerIdDisplayInput.value = `FRM-${parsedData.user_id.padStart(9, '0')}`;
+            
+            // Set hidden fields for form submission
+            hiddenApplicationIdInput.value = parsedData.application_id;
+            hiddenFarmerIdInput.value = parsedData.user_id;
+
+            // Fetch details from the server
+            try {
+                // CORRECTED PATH: Assumes the API folder is one level up from the current script.
+                const response = await fetch('api/get_subsidy_details.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `application_id=${parsedData.application_id}&user_id=${parsedData.user_id}`
+                });
+
+                const data = await response.json();
+
+                if (data.success && data.details) {
+                    const details = data.details;
+                    farmerNameInput.value = details.farmer_name;
+                    subsidyTypeInput.value = details.subsidy_type;
+                    claimStatusInput.value = details.current_status;
+
+                    if (details.current_status === 'Approved' && details.is_claimed == 0) {
+                        verifyButton.disabled = false;
+                        verifyButton.textContent = 'Mark as Claimed';
+                        verificationMessage.innerHTML = '<div class="alert alert-info">Verification successful. Proceed to mark as claimed.</div>';
+                    } else if (details.is_claimed == 1) {
+                        // Use a local reset but keep the claimed status for visibility
+                        resetVerificationForm('This subsidy has ALREADY BEEN CLAIMED.', 'warning');
+                        claimStatusInput.value = 'Claimed'; 
+                        verifyButton.textContent = 'Already Claimed';
+                        verifyButton.classList.remove('btn-theme');
+                        verifyButton.classList.add('btn-secondary');
+                    } else if (details.current_status !== 'Approved') {
+                        resetVerificationForm(`Subsidy status is '${details.current_status}'. Only 'Approved' applications can be claimed.`, 'warning');
+                    } else {
+                        // Catch-all for weird states (e.g., claimed = 0 but status is not Approved/Pending/Rejected)
+                        resetVerificationForm('Subsidy status check inconclusive.', 'warning');
+                    }
+                } else {
+                    resetVerificationForm(data.message || 'Error fetching subsidy details from the server.');
+                }
+
+            } catch (error) {
+                console.error('Fetch error:', error);
+                resetVerificationForm('An error occurred while connecting to the server.');
+            }
+        }
+        
+        // --- Claim Submission ---
+
+        verifyClaimForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const appId = hiddenApplicationIdInput.value;
+            const userId = hiddenFarmerIdInput.value;
+            const currentStatus = claimStatusInput.value; // Check current visible status
+
+            if (!appId || !userId || verifyButton.disabled || currentStatus !== 'Approved') {
+                verificationMessage.innerHTML = '<div class="alert alert-danger">Cannot process claim. Invalid data, already claimed, or not approved.</div>';
+                return;
+            }
+
+            // Confirm before submission
+            if (!confirm('Are you sure you want to MARK THIS SUBSIDY AS CLAIMED? This action cannot be undone.')) {
+                return;
+            }
+
+            verificationMessage.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin me-2"></i> Processing claim...</div>';
+            verifyButton.disabled = true; // Disable to prevent double submission
+
+            try {
+                // CORRECTED PATH: Assumes the API folder is one level up from the current script.
+                const response = await fetch('api/update_subsidy_claim.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `application_id=${appId}&user_id=${userId}`
+                });
+                
+                const data = await response.json();
+
                 if (data.success) {
-                    verificationMessage.innerHTML = '<div class="alert alert-success">Subsidy successfully marked as claimed!</div>';
+                    verificationMessage.innerHTML = `<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i> ${data.message}</div>`;
                     claimStatusInput.value = 'Claimed';
-                    verifyButton.disabled = true;
                     verifyButton.textContent = 'Already Claimed';
                     verifyButton.classList.remove('btn-theme');
                     verifyButton.classList.add('btn-secondary');
-                    // Refresh the recent transactions table
-                    addTransactionToTable(farmerId, farmerNameInput.value, subsidyId, subsidyTypeInput.value, 'Claimed');
-                } else {
-                    verificationMessage.innerHTML = `<div class="alert alert-danger">Error claiming subsidy: ${data.message}</div>`;
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                verificationMessage.innerHTML = '<div class="alert alert-danger">An error occurred during verification.</div>';
-            });
-            */
+                    
+                    // Update the recent transactions table dynamically
+                    addTransactionToTable(appId, userId, farmerNameInput.value, subsidyTypeInput.value, 'Claimed');
 
-            // Simulate success
-            verificationMessage.innerHTML = '<div class="alert alert-success">Subsidy successfully marked as claimed!</div>';
-            claimStatusInput.value = 'Claimed';
-            verifyButton.disabled = true;
-            verifyButton.textContent = 'Already Claimed';
-            verifyButton.classList.remove('btn-theme');
-            verifyButton.classList.add('btn-secondary');
-            addTransactionToTable(farmerId, farmerNameInput.value, subsidyId, subsidyTypeInput.value, 'Claimed');
+                } else {
+                    verificationMessage.innerHTML = `<div class="alert alert-danger"><i class="fas fa-times-circle me-2"></i> ${data.message}</div>`;
+                    verifyButton.disabled = false; // Re-enable if it was a claim-specific error
+                }
+            } catch (error) {
+                console.error('Claim submission error:', error);
+                verificationMessage.innerHTML = '<div class="alert alert-danger">An internal server error occurred during verification.</div>';
+                verifyButton.disabled = false;
+            }
         });
 
-        function addTransactionToTable(farmerId, farmerName, subsidyId, subsidyType, status) {
+        // --- Table Update ---
+
+        function addTransactionToTable(appId, userId, farmerName, subsidyType, status) {
             const tableBody = document.querySelector('#qr-report-table tbody');
             const newRow = tableBody.insertRow(0); // Add to the top
 
             const dateTimeCell = newRow.insertCell(0);
-            const farmerIdCell = newRow.insertCell(1);
-            const farmerNameCell = newRow.insertCell(2);
-            const subsidyIdCell = newRow.insertCell(3);
+            const appIdCell = newRow.insertCell(1);
+            const farmerIdCell = newRow.insertCell(2);
+            const farmerNameCell = newRow.insertCell(3);
             const subsidyTypeCell = newRow.insertCell(4);
             const statusCell = newRow.insertCell(5);
 
             const now = new Date();
+            const farmerIdDisplay = `FRM-${String(userId).padStart(9, '0')}`;
+            
             dateTimeCell.textContent = now.toLocaleString();
-            farmerIdCell.textContent = farmerId;
+            appIdCell.textContent = appId;
+            farmerIdCell.textContent = farmerIdDisplay;
             farmerNameCell.textContent = farmerName;
-            subsidyIdCell.textContent = subsidyId;
             subsidyTypeCell.textContent = subsidyType;
-            statusCell.innerHTML = `<span class="status-badge status-${status.toLowerCase().replace(/\s/g, '-')}}">${status}</span>`;
+            statusCell.innerHTML = `<span class="status-badge status-${status}">${status}</span>`;
         }
+        
+        // Initial state
+        document.addEventListener('DOMContentLoaded', () => {
+            resetVerificationForm();
+        });
 
-        // Initial state for the verification form
-        farmerIdInput.value = '';
-        subsidyIdInput.value = '';
-        farmerNameInput.value = '';
-        subsidyTypeInput.value = '';
-        claimStatusInput.value = '';
-        verifyButton.disabled = true;
-        verificationMessage.innerHTML = '';
     </script>
 </body>
 </html>

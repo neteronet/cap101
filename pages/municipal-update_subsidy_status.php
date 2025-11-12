@@ -31,10 +31,6 @@ if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
     exit();
 }
 
-// Optional: Re-verify user_type = 'mao' for maximum security.
-// The main page (municipal-subsidy_management.php) already handles the redirect, 
-// so we'll proceed assuming a valid MAO session, but this is a point for further hardening.
-
 // 4. Read and Decode JSON Input
 $json_data = file_get_contents('php://input');
 $data = json_decode($json_data, true);
@@ -66,9 +62,24 @@ if (!in_array($status, $allowed_statuses)) {
     exit();
 }
 
-// 6. Prepare and Execute SQL Update
-$sql = "UPDATE assistance_applications SET status = ? WHERE application_id = ?";
+// --- MODIFICATION START: Conditional SQL for approval_date ---
 
+// Determine the part of the SQL query that handles the approval_date
+$approval_date_clause = "";
+if ($status === 'Approved') {
+    // Set approval_date to the current time using MySQL's NOW() function
+    $approval_date_clause = ", approval_date = NOW()";
+} else {
+    // Clear the approval_date for Pending/Rejected statuses
+    $approval_date_clause = ", approval_date = NULL";
+}
+
+// Build the final SQL query
+$sql = "UPDATE assistance_applications SET status = ?" . $approval_date_clause . " WHERE application_id = ?";
+
+// --- MODIFICATION END ---
+
+// 6. Prepare and Execute SQL Update
 if ($stmt = $conn->prepare($sql)) {
     // 'si' means bind one string (status) and one integer (application_id)
     $stmt->bind_param("si", $status, $application_id);
@@ -76,7 +87,8 @@ if ($stmt = $conn->prepare($sql)) {
     if ($stmt->execute()) {
         if ($stmt->affected_rows > 0) {
             $response['success'] = true;
-            $response['message'] = "Application ID {$application_id} status updated to '{$status}'.";
+            // Add a more specific message if approved
+            $response['message'] = "Application ID {$application_id} status updated to '{$status}'." . ($status === 'Approved' ? " Approval date recorded." : "");
         } else {
             // This could mean the ID didn't exist or the status was already the new value
             $response['message'] = "Application ID {$application_id} not found or status already '{$status}'.";

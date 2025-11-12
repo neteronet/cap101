@@ -490,9 +490,6 @@ if ($conn && $conn->ping()) {
     <!-- Main Content Area -->
     <main>
         <div class="container">
-            <h1 class="page-title">
-                <i class="fas fa-hand-holding-usd"></i> Assistance Status / Application
-            </h1>
 
             <?php if (!empty($message)): ?>
                 <div class="alert alert-<?php echo $message_type; ?> alert-dismissible fade show" role="alert">
