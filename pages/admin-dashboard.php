@@ -3,30 +3,80 @@ session_start(); // Start the session at the very beginning of the script
 
 include '../includes/connection.php'; // Ensure your connection file is correctly included
 
+// --- IMPROVEMENT 1: Robust Connection Check to prevent crashing on DB failure ---
+if (!isset($conn) || $conn->connect_error) {
+    error_log("Database connection failed: " . ($conn->connect_error ?? "Connection object not set"));
+    // Redirect to a specific error page and stop execution
+    header("location: database_error.php"); 
+    exit();
+}
+
 // Check if the user is logged in. If not, redirect to the login page.
 if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
     header("location: admin-login.php");
     exit();
 }
+if ($_SESSION['user_type'] != 'admin') {
+        header("location: admin-login.php");
+        exit();
+    }
 
 $user_id = $_SESSION['user_id'];
 $display_name = 'Admin'; // Default fallback
+$is_admin = false; // Flag to enforce admin access
 
-$stmt_name = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
+// --- IMPROVEMENT 2: Fetch user name AND user type for security check ---
+$stmt_name = $conn->prepare("SELECT name, user_type FROM users WHERE user_id = ?");
 if ($stmt_name) {
     $stmt_name->bind_param("i", $user_id);
     $stmt_name->execute();
-    $stmt_name->bind_result($db_name);
+    $stmt_name->bind_result($db_name, $db_user_type);
     $stmt_name->fetch();
+    $stmt_name->close();
+
     if ($db_name) {
         $display_name = htmlspecialchars($db_name); // Sanitize immediately
     }
-    $stmt_name->close();
+
+    // --- IMPROVEMENT 3: Explicit Admin Authorization Check ---
+    if ($db_user_type === 'admin') {
+        $is_admin = true;
+    } 
+
 } else {
-    error_log("Failed to prepare statement for user name: " . $conn->error);
+    error_log("Failed to prepare statement for user name/type: " . $conn->error);
 }
 
-$conn->close(); // Close the connection after all database operations
+// Security Check: If the user is not explicitly an 'admin', redirect them out.
+if (!$is_admin) {
+    session_unset();
+    session_destroy();
+    header("location: admin-login.php");
+    exit();
+}
+
+// --- Placeholder for Dashboard Data Fetching (Improvement 4: Data Filtering Concept) ---
+// This is where you would fetch your dashboard data, using a WHERE clause 
+// to ensure you only fetch relevant data (e.g., provincial/admin level data).
+
+// Example: Get count of all Farmers (which Admin can see)
+$farmer_count = 0;
+// Note: If 'farmer' users are linked to 'mao's via a municipal_id, you might 
+// need to adjust the structure or ensure admin can see all farmers across all municipals.
+$stmt_count = $conn->prepare("SELECT COUNT(*) FROM users WHERE user_type = 'farmer'");
+if($stmt_count){
+    $stmt_count->execute();
+    $stmt_count->bind_result($farmer_count);
+    $stmt_count->fetch();
+    $stmt_count->close();
+}
+
+
+// --- Placeholder for other data fetches... ---
+
+// --- IMPROVEMENT 5: Move $conn->close() to the end of the script ---
+// We close the connection only after all data fetching (including the dashboard content) is complete.
+// We keep it at the end of the PHP block for better clarity/structure.
 
 ?>
 
@@ -34,6 +84,7 @@ $conn->close(); // Close the connection after all database operations
 <html lang="en">
 
 <head>
+    <!-- ... (HTML head content remains the same) ... -->
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Admin - Dashboard</title>
@@ -47,8 +98,9 @@ $conn->close(); // Close the connection after all database operations
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
 
-    <!-- Custom Styles -->
+    <!-- Custom Styles (CSS is unchanged) -->
     <style>
+        /* ... (Your CSS styles here) ... */
         body {
             font-family: "Poppins", sans-serif;
             background: #f8f9fa;
@@ -236,6 +288,7 @@ $conn->close(); // Close the connection after all database operations
 
     <!-- Sidebar -->
     <nav class="sidebar">
+        <!-- ... (Sidebar content remains the same) ... -->
         <a href="ProvincialAgriHome.html" class="header-brand">
             <img src="../photos/Department_of_Agriculture_of_the_Philippines.png" alt="Province of Antique" />
             <div>Province of Antique</div>
@@ -243,7 +296,7 @@ $conn->close(); // Close the connection after all database operations
 
         <ul class="nav flex-column">
             <li class="nav-item">
-                <a href="farmer-dashboard.php" class="nav-link active">
+                <a href="admin-dashboard.php" class="nav-link active">
                     <i class="fas fa-tachometer-alt"></i> Dashboard
                 </a>
             </li>
@@ -267,15 +320,71 @@ $conn->close(); // Close the connection after all database operations
 
     <!-- Header -->
     <div class="card-header card-header-custom d-flex justify-content-end align-items-center">
-        <!-- Changed "username" to "name" in the greeting -->
-        <span class="me-3">Hi, <strong><?php echo htmlspecialchars($display_name); ?></strong></span>
+        <span class="me-3">Hi, <strong><?php echo $display_name; ?></strong></span>
         <button class="logout-btn" onclick="location.href='admin-logout.php'">
             <i class="fas fa-sign-out-alt me-1"></i> Logout
         </button>
     </div>
+
+    <!-- Main Content -->
+    <main>
+        <div class="container">
+            <h1 class="page-title">Admin Dashboard</h1>
+
+            <!-- Dashboard Content Cards -->
+            <div class="row">
+                <div class="col-md-4 mb-4">
+                    <div class="card text-white bg-success">
+                        <div class="card-body">
+                            <h5 class="card-title"><i class="fas fa-users me-2"></i> Registered Farmers</h5>
+                            <p class="card-text fs-2">
+                                <?php echo number_format($farmer_count); ?>
+                            </p>
+                            <a href="admin-view_farmers.php" class="text-white small text-decoration-none">View Details <i class="fas fa-arrow-circle-right"></i></a>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Add more cards for MAO count, pending requests, etc. -->
+                <div class="col-md-4 mb-4">
+                    <div class="card text-white bg-warning">
+                        <div class="card-body">
+                            <h5 class="card-title"><i class="fas fa-check-circle me-2"></i> Approved Applications</h5>
+                            <p class="card-text fs-2">0</p>
+                            <a href="#" class="text-white small text-decoration-none">More Info <i class="fas fa-arrow-circle-right"></i></a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4 mb-4">
+                    <div class="card text-white bg-info">
+                        <div class="card-body">
+                            <h5 class="card-title"><i class="fas fa-user-tie me-2"></i> MAO Users</h5>
+                            <p class="card-text fs-2">0</p>
+                            <a href="#" class="text-white small text-decoration-none">Manage Users <i class="fas fa-arrow-circle-right"></i></a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Placeholder for recent activity table -->
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Recent Farmer Registrations</h5>
+                    <p class="text-muted">... Table of recent registrations will go here ...</p>
+                </div>
+            </div>
+        </div>
+    </main>
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 
 </html>
+<?php
+// Close the connection as the very last step after all HTML and data have been generated
+if (isset($conn) && $conn) {
+    $conn->close();
+}
+?>

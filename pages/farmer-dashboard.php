@@ -287,48 +287,14 @@ $conn->close(); // Close the connection after all database operations
             <img src="../photos/Department_of_Agriculture_of_the_Philippines.png" alt="Province of Antique" />
             <div>Province of Antique</div>
         </a>
-
         <ul class="nav flex-column">
-            <li class="nav-item">
-                <a href="farmer-dashboard.php" class="nav-link active">
-                    <i class="fas fa-tachometer-alt"></i> Dashboard
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="farmer-my_profile.php" class="nav-link">
-                    <i class="fas fa-user-circle"></i> My Profile
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="farmer-subsidy_status.php" class="nav-link">
-                    <i class="fas fa-hand-holding-usd"></i> Subsidy Status
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="farmer-announcement.php" class="nav-link">
-                    <i class="fas fa-bullhorn"></i> Announcements
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="farmer-apply_for_assistance.php" class="nav-link">
-                    <i class="fas fa-file-invoice"></i> Apply for Assistance
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="farmer-planting_status.php" class="nav-link">
-                    <i class="fas fa-leaf"></i> Planting Status
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="farmer-progress_tracking.php" class="nav-link">
-                    <i class="fas fa-chart-line"></i> Progress Tracking
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="farmer-history_log.php" class="nav-link">
-                    <i class="fas fa-chart-line"></i> History Log
-                </a>
-            </li>
+            <li class="nav-item"><a href="farmer-dashboard.php" class="nav-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+            <li class="nav-item"><a href="farmer-my_profile.php" class="nav-link"><i class="fas fa-user-circle"></i> My Profile</a></li>
+            <!-- Highlighted as the central page for both status and application -->
+            <li class="nav-item"><a href="#" class="nav-link active"><i class="fas fa-hand-holding-usd"></i>Apply for Assistance</a></li>
+            <li class="nav-item"><a href="farmer-announcement.php" class="nav-link"><i class="fas fa-bullhorn"></i> Announcements</a></li>
+            <li class="nav-item"><a href="farmer-planting_status.php" class="nav-link"><i class="fas fa-leaf"></i> Planting Status</a></li>
+            <li class="nav-item"><a href="farmer-progress_tracking.php" class="nav-link"><i class="fas fa-chart-line"></i> Progress Tracking</a></li>
         </ul>
     </nav>
 

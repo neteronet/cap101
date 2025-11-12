@@ -11,6 +11,10 @@ if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
     header("location: municipal-login.php");
     exit();
 }
+if ($_SESSION['user_type'] != 'mao') {
+        header("location: admin-login.php");
+        exit();
+    }
 
 $user_id = $_SESSION['user_id'];
 $display_name = 'Mao'; // Default fallback

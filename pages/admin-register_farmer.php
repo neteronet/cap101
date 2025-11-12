@@ -2,7 +2,14 @@
 session_start();
 include '../includes/connection.php'; // Ensure this path is correct for your setup
 
-// Check if the user is logged in and is an admin
+// --- IMPROVEMENT 1: Robust Connection Check to prevent crashing on DB failure ---
+if (!isset($conn) || $conn->connect_error) {
+    error_log("Database connection failed: " . ($conn->connect_error ?? "Connection object not set"));
+    header("location: database_error.php"); 
+    exit();
+}
+
+// Check if the user is logged in
 if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
     header("location: admin-login.php");
     exit();
@@ -10,26 +17,57 @@ if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
 
 $admin_user_id = $_SESSION['user_id'];
 $display_name = 'Admin'; // Default fallback
+$is_admin = false; // Flag for explicit admin check
 $message = '';
 $message_type = '';
+$unregistered_users = [];
 
-// Fetch admin's name
-$stmt_admin_name = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
+
+// --- IMPROVEMENT 2: Fetch admin's name AND user type for security check ---
+$stmt_admin_name = $conn->prepare("SELECT name, user_type FROM users WHERE user_id = ?");
 if ($stmt_admin_name) {
     $stmt_admin_name->bind_param("i", $admin_user_id);
     $stmt_admin_name->execute();
-    $stmt_admin_name->bind_result($db_name);
+    $stmt_admin_name->bind_result($db_name, $db_user_type);
     $stmt_admin_name->fetch();
+    $stmt_admin_name->close();
+
     if ($db_name) {
         $display_name = htmlspecialchars($db_name);
     }
-    $stmt_admin_name->close();
+    
+    // Explicit Admin Authorization Check
+    if ($db_user_type === 'admin') {
+        $is_admin = true;
+    } 
 } else {
-    error_log("Failed to prepare statement for admin name: " . $conn->error);
+    error_log("Failed to prepare statement for admin name/type: " . $conn->error);
 }
 
-// Fetch all *unregistered* farmers (users with user_type='farmer' but no entry in 'farmers' table)
-$unregistered_users = [];
+// --- IMPROVEMENT 3: Enforce Admin Access (Prevents MAO/Farmer access) ---
+if (!$is_admin) {
+    session_unset();
+    session_destroy();
+    header("location: admin-login.php");
+    exit();
+}
+
+
+// --- IMPROVEMENT 4: Handle PRG Session Messages for GET request ---
+if (isset($_SESSION['message'])) {
+    $message = $_SESSION['message'];
+    $message_type = $_SESSION['message_type'];
+    unset($_SESSION['message']);
+    unset($_SESSION['message_type']);
+} else if (isset($_GET['msg']) && isset($_GET['type'])) {
+    // Fallback for messages passed via URL (e.g., from admin-show_farmer_qr.php)
+    $message = htmlspecialchars($_GET['msg']);
+    $message_type = htmlspecialchars($_GET['type']);
+}
+
+
+// --- FETCH UNREGISTERED FARMERS (IMPROVEMENT 5: Data Filtering) ---
+// This query is CORRECTLY filtered to show only 'farmer' type users who are NOT in the 'farmers' table.
 $stmt_users = $conn->prepare("
     SELECT 
         u.user_id, 
@@ -59,25 +97,27 @@ if ($stmt_users) {
 
 // --- HANDLE FORM SUBMISSION (REGISTRATION) ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register_farmer_submit_page'])) {
-    $register_user_id = $_POST['register_user_id'] ?? null;
-    $rsbsa_id = $_POST['rsbsa_id'] ?? '';
-    $first_name = $_POST['first_name'] ?? '';
-    $middle_name = $_POST['middle_name'] ?? '';
-    $last_name = $_POST['last_name'] ?? '';
-    $address = $_POST['address'] ?? '';
-    $contact_number = $_POST['contact_number'] ?? '';
-    $land_location = $_POST['land_location'] ?? '';
-    $land_size = $_POST['land_size'] ?? '';
-    $age = $_POST['age'] ?? null;
-    $gender = $_POST['gender'] ?? '';
-    $civil_status = $_POST['civil_status'] ?? '';
-    $crop = $_POST['crop'] ?? '';
+    
+    // --- IMPROVEMENT 6: Input Validation and Sanitization ---
+    $register_user_id = filter_var($_POST['register_user_id'] ?? null, FILTER_VALIDATE_INT);
+    $rsbsa_id       = trim($_POST['rsbsa_id'] ?? '');
+    $first_name     = trim($_POST['first_name'] ?? '');
+    $middle_name    = trim($_POST['middle_name'] ?? '');
+    $last_name      = trim($_POST['last_name'] ?? '');
+    $address        = trim($_POST['address'] ?? '');
+    $contact_number = trim($_POST['contact_number'] ?? '');
+    $land_location  = trim($_POST['land_location'] ?? '');
+    $land_size      = trim($_POST['land_size'] ?? '');
+    $age            = filter_var($_POST['age'] ?? null, FILTER_VALIDATE_INT);
+    $gender         = $_POST['gender'] ?? '';
+    $civil_status   = $_POST['civil_status'] ?? '';
+    $crop           = trim($_POST['crop'] ?? '');
 
-    // Sanitize age to ensure it is integer or null (good practice)
-    $age = filter_var($age, FILTER_VALIDATE_INT) !== false ? (int)$age : null;
-
-
-    if ($register_user_id && is_numeric($register_user_id)) {
+    // Basic required field validation
+    if (empty($rsbsa_id) || empty($first_name) || empty($last_name) || empty($address) || empty($contact_number) || empty($land_location) || empty($land_size) || $age === false || empty($gender) || empty($civil_status) || empty($crop) || $register_user_id === false) {
+        $message = "All required fields must be filled, and User ID/Age must be valid numbers.";
+        $message_type = 'danger';
+    } else {
         // Prepare land_details as JSON
         $land_details_array = [
             'location' => $land_location,
@@ -95,96 +135,84 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register_farmer_submi
             $message = "Farmer for this user ID is already registered.";
             $message_type = 'warning';
         } else {
-            // The INSERT statement does not include the new 'qr_code_image' column yet.
-            // It will be updated *after* insertion to get the auto-generated farmer_id.
-            $stmt_insert = $conn->prepare("INSERT INTO farmers (user_id, rsbsa_id, first_name, middle_name, last_name, address, contact_number, land_details, age, gender, civil_status, crop) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-
-            if ($stmt_insert) {
-                $stmt_insert->bind_param(
-                    "isssssssisss",
-                    $register_user_id,
-                    $rsbsa_id,
-                    $first_name,
-                    $middle_name,
-                    $last_name,
-                    $address,
-                    $contact_number,
-                    $land_details_json,
-                    $age,
-                    $gender,
-                    $civil_status,
-                    $crop
-                );
-
-                if ($stmt_insert->execute()) {
-                    // --- MODIFIED CODE FOR QR GENERATION AND DATABASE UPDATE ---
-                    
-                    // 1. Get the ID of the newly inserted row
-                    $new_farmer_id = $conn->insert_id;
-
-                    // 2. Define the data to be encoded (e.g., the farmer_id for quick lookup)
-                    $qr_code_data = (string)$new_farmer_id; 
-                    
-                    // 3. Generate QR Code Image URL using an API (e.g., Google Charts API)
-                    // Format: https://chart.googleapis.com/chart?chs=<size>x<size>&cht=qr&chl=<data>
-                    $qr_code_size = '200x200'; // Define size
-                    $qr_code_url = "https://chart.googleapis.com/chart?chs=$qr_code_size&cht=qr&chl=" . urlencode($qr_code_data);
-
-                    // 4. Update the 'farmers' table with the generated QR code URL
-                    // NOTE: This requires the SQL query to add the 'qr_code_image' column to be run first.
-                    $stmt_update_qr = $conn->prepare("UPDATE farmers SET qr_code_image = ? WHERE farmer_id = ?");
-                    if ($stmt_update_qr) {
-                        $stmt_update_qr->bind_param("si", $qr_code_url, $new_farmer_id);
-                        if (!$stmt_update_qr->execute()) {
-                            // Log error but allow operation to continue as insertion was successful
-                            error_log("Failed to update QR code image for farmer ID $new_farmer_id: " . $stmt_update_qr->error);
-                        }
-                        $stmt_update_qr->close();
-                    } else {
-                        error_log("Failed to prepare statement for QR code update: " . $conn->error);
-                    }
-
-                    // 5. Redirect to the display page
-                    $success_message = "Farmer details registered successfully! The QR Code has been generated and saved. Please print it.";
-                    $message_type = 'success';
-                    
-                    // Pass the new farmer_id and the success message
-                    header("Location: admin-show_farmer_qr.php?farmer_id=" . $new_farmer_id . "&msg=" . urlencode($success_message) . "&type=" . urlencode($message_type));
-                    exit();
-                    // --- END MODIFIED CODE ---
-                } else {
-                    $message = "Error registering farmer details: " . $stmt_insert->error;
-                    $message_type = 'danger';
-                    error_log("Error inserting farmer details: " . $stmt_insert->error);
-                }
-                $stmt_insert->close();
+            // Check if RSBSA ID already exists (IMPROVEMENT 7: Duplicate check)
+            $stmt_rsbsa_check = $conn->prepare("SELECT farmer_id FROM farmers WHERE rsbsa_id = ?");
+            $stmt_rsbsa_check->bind_param("s", $rsbsa_id);
+            $stmt_rsbsa_check->execute();
+            $stmt_rsbsa_check->store_result();
+            if ($stmt_rsbsa_check->num_rows > 0) {
+                $message = "The RSBSA ID is already registered for another farmer.";
+                $message_type = 'warning';
+                $stmt_rsbsa_check->close();
             } else {
-                $message = "Database error: Could not prepare farmer registration statement.";
-                $message_type = 'danger';
-                error_log("Failed to prepare farmer registration statement: " . $conn->error);
-            }
-        }
+                $stmt_rsbsa_check->close(); // Close only if not in the error block
+                
+                // --- INSERT FARMER DETAILS ---
+                $stmt_insert = $conn->prepare("INSERT INTO farmers (user_id, rsbsa_id, first_name, middle_name, last_name, address, contact_number, land_details, age, gender, civil_status, crop) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+                if ($stmt_insert) {
+                    $stmt_insert->bind_param(
+                        "isssssssisss",
+                        $register_user_id,
+                        $rsbsa_id,
+                        $first_name,
+                        $middle_name,
+                        $last_name,
+                        $address,
+                        $contact_number,
+                        $land_details_json,
+                        $age,
+                        $gender,
+                        $civil_status,
+                        $crop
+                    );
+
+                    if ($stmt_insert->execute()) {
+                        
+                        // 1. Get the ID of the newly inserted row
+                        $new_farmer_id = $conn->insert_id;
+                        
+                        // NOTE: QR Code Generation and Database Update Logic REMOVED
+
+                        // 5. Redirect to the display page (PRG Pattern)
+                        // --- MODIFIED STEP 5: Redirect back to the current page with success message (PRG Pattern) ---
+                        $_SESSION['message'] = "Farmer details registered successfully! The new farmer will no longer appear in the selection list.";
+                        $_SESSION['message_type'] = 'success';
+                        
+                        // Redirect back to the current registration page
+                        header("Location: admin-register_farmer.php");
+                        exit();
+                        
+                    } else {
+                        $message = "Error registering farmer details: " . $stmt_insert->error;
+                        $message_type = 'danger';
+                        error_log("Error inserting farmer details: " . $stmt_insert->error);
+                    }
+                    $stmt_insert->close();
+                } else {
+                    $message = "Database error: Could not prepare farmer registration statement.";
+                    $message_type = 'danger';
+                    error_log("Failed to prepare farmer registration statement: " . $conn->error);
+                }
+            } // End of RSBSA ID check ELSE
+        } // End of Already Registered check ELSE
         $stmt_check->close();
-    } else {
-        $message = "Invalid User ID provided for registration.";
-        $message_type = 'danger';
-    }
-    // Redirect to self with message to show success/error (This handles non-success cases like 'already registered' or 'invalid user id')
-    header("Location: admin-register_farmer.php?msg=" . urlencode($message) . "&type=" . urlencode($message_type));
+    } // End of Input Validation ELSE
+    
+    // Fallback PRG redirect for non-success cases (e.g., already registered, invalid input)
+    $_SESSION['message'] = $message;
+    $_SESSION['message_type'] = $message_type;
+    header("Location: admin-register_farmer.php");
     exit();
 }
 
-// Check for messages from redirects (if not a POST submission)
-if (isset($_GET['msg']) && isset($_GET['type'])) {
-    $message = htmlspecialchars($_GET['msg']);
-    $message_type = htmlspecialchars($_GET['type']);
-}
 
 // Ensure $conn is closed only if it was opened and not already closed
 if (isset($conn) && $conn->ping()) {
     $conn->close();
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -362,7 +390,6 @@ if (isset($conn) && $conn->ping()) {
         }
     </style>
 </head>
-
 <body>
     <!-- Sidebar -->
     <nav class="sidebar">
@@ -514,7 +541,7 @@ if (isset($conn) && $conn->ping()) {
                             </button>
                         </div>
                     </form>
-                </div>
+                </div> 
             </div>
         </div>
     </main>

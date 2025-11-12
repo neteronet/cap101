@@ -2,7 +2,14 @@
 session_start();
 include '../includes/connection.php'; // Ensure this path is correct for your setup
 
-// Check if the user is logged in and is an admin (reusing logic)
+// --- IMPROVEMENT 1: Robust Connection Check to prevent crashing on DB failure ---
+if (!isset($conn) || $conn->connect_error) {
+    error_log("Database connection failed: " . ($conn->connect_error ?? "Connection object not set"));
+    header("location: database_error.php"); 
+    exit();
+}
+
+// Check if the user is logged in
 if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
     header("location: admin-login.php");
     exit();
@@ -11,6 +18,7 @@ if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
 $admin_user_id = $_SESSION['user_id'];
 $display_name = 'Admin'; // Default fallback
 $farmer_data = null;
+$is_admin = false; // Flag for explicit admin check
 $message = '';
 $message_type = '';
 $farmer_id = $_GET['farmer_id'] ?? null;
@@ -21,78 +29,59 @@ if (isset($_GET['msg']) && isset($_GET['type'])) {
     $message_type = htmlspecialchars($_GET['type']);
 }
 
-// Fetch admin's name
-$stmt_admin_name = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
+// --- IMPROVEMENT 2: Fetch admin's name AND user type for security check ---
+$stmt_admin_name = $conn->prepare("SELECT name, user_type FROM users WHERE user_id = ?");
 if ($stmt_admin_name) {
     $stmt_admin_name->bind_param("i", $admin_user_id);
     $stmt_admin_name->execute();
-    $stmt_admin_name->bind_result($db_name);
+    $stmt_admin_name->bind_result($db_name, $db_user_type);
     $stmt_admin_name->fetch();
+    $stmt_admin_name->close();
+
     if ($db_name) {
         $display_name = htmlspecialchars($db_name);
     }
-    $stmt_admin_name->close();
+    
+    // Explicit Admin Authorization Check
+    if ($db_user_type === 'admin') {
+        $is_admin = true;
+    } 
 } else {
-    error_log("Failed to prepare statement for admin name: " . $conn->error);
+    error_log("Failed to prepare statement for admin name/type: " . $conn->error);
 }
 
-// --- FETCH FARMER DATA FOR EDITING ---
-if ($farmer_id && is_numeric($farmer_id)) {
-    $stmt_fetch = $conn->prepare("
-        SELECT 
-            f.*, u.name AS user_full_name, u.username 
-        FROM 
-            farmers f 
-        JOIN 
-            users u ON f.user_id = u.user_id 
-        WHERE 
-            f.farmer_id = ?
-    ");
-    if ($stmt_fetch) {
-        $stmt_fetch->bind_param("i", $farmer_id);
-        $stmt_fetch->execute();
-        $result = $stmt_fetch->get_result();
-        $farmer_data = $result->fetch_assoc();
-        $stmt_fetch->close();
-
-        if ($farmer_data) {
-            // Decode land_details JSON for form pre-filling
-            $land_details = json_decode($farmer_data['land_details'], true);
-            $farmer_data['land_location'] = $land_details['location'] ?? '';
-            $farmer_data['land_size'] = $land_details['size'] ?? '';
-        } else {
-            $message = "Farmer details not found.";
-            $message_type = 'danger';
-            $farmer_id = null; // Invalidate ID if data not found
-        }
-    } else {
-        $message = "Database error fetching farmer: " . $conn->error;
-        $message_type = 'danger';
-        error_log("Failed to prepare fetch statement: " . $conn->error);
-    }
-} else if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    // Only show error if no ID is passed and it's not a form submission
-    $message = "Invalid or missing Farmer ID.";
-    $message_type = 'danger';
+// --- IMPROVEMENT 3: Enforce Admin Access (Prevents MAO/Farmer access) ---
+if (!$is_admin) {
+    session_unset();
+    session_destroy();
+    header("location: admin-login.php");
+    exit();
 }
+
 
 // --- HANDLE FORM SUBMISSION (UPDATE) ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_farmer_submit'])) {
     $update_farmer_id = $_POST['farmer_id'] ?? null;
-    $rsbsa_id = trim($_POST['rsbsa_id'] ?? '');
-    $first_name = trim($_POST['first_name'] ?? '');
-    $middle_name = trim($_POST['middle_name'] ?? '');
-    $last_name = trim($_POST['last_name'] ?? '');
-    $address = trim($_POST['address'] ?? '');
+    
+    // Input validation and sanitization
+    $rsbsa_id       = trim($_POST['rsbsa_id'] ?? '');
+    $first_name     = trim($_POST['first_name'] ?? '');
+    $middle_name    = trim($_POST['middle_name'] ?? '');
+    $last_name      = trim($_POST['last_name'] ?? '');
+    $address        = trim($_POST['address'] ?? '');
     $contact_number = trim($_POST['contact_number'] ?? '');
-    $land_location = trim($_POST['land_location'] ?? '');
-    $land_size = trim($_POST['land_size'] ?? '');
-    $age = $_POST['age'] ?? null;
-    $gender = $_POST['gender'] ?? '';
-    $civil_status = $_POST['civil_status'] ?? '';
-    $crop = trim($_POST['crop'] ?? '');
+    $land_location  = trim($_POST['land_location'] ?? '');
+    $land_size      = trim($_POST['land_size'] ?? '');
+    $age            = filter_var($_POST['age'] ?? null, FILTER_VALIDATE_INT); // Validate age as integer
+    $gender         = $_POST['gender'] ?? '';
+    $civil_status   = $_POST['civil_status'] ?? '';
+    $crop           = trim($_POST['crop'] ?? '');
 
-    if ($update_farmer_id && is_numeric($update_farmer_id)) {
+    // Basic required field validation
+    if (empty($rsbsa_id) || empty($first_name) || empty($last_name) || empty($address) || empty($contact_number) || empty($land_location) || empty($land_size) || $age === false || empty($gender) || empty($civil_status) || empty($crop)) {
+        $message = "All required fields must be filled and Age must be a valid number.";
+        $message_type = 'danger';
+    } elseif ($update_farmer_id && is_numeric($update_farmer_id)) {
         // Prepare land_details as JSON
         $land_details_array = [
             'location' => $land_location,
@@ -100,6 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_farmer_submit'])
         ];
         $land_details_json = json_encode($land_details_array);
 
+        // --- IMPROVEMENT 4: Update Statement for Farmer Details ---
         $stmt_update = $conn->prepare("
             UPDATE farmers 
             SET 
@@ -119,6 +109,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_farmer_submit'])
         ");
 
         if ($stmt_update) {
+            // Check if $age is not null before binding 'i'
+            $age_to_bind = is_int($age) ? $age : null; 
+
             // Note: age is 'i' (integer), others are 's' (string)
             $stmt_update->bind_param(
                 "sssssssisssi",
@@ -129,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_farmer_submit'])
                 $address,
                 $contact_number,
                 $land_details_json,
-                $age,
+                $age_to_bind, // Use validated/filtered age
                 $gender,
                 $civil_status,
                 $crop,
@@ -137,7 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_farmer_submit'])
             );
 
             if ($stmt_update->execute()) {
-                $message = "Farmer details updated successfully!";
+                $message = "Farmer details updated successfully for ID #{$update_farmer_id}!";
                 $message_type = 'success';
             } else {
                 $message = "Error updating farmer details: " . $stmt_update->error;
@@ -155,19 +148,72 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_farmer_submit'])
         $message_type = 'danger';
     }
 
-    // Redirect back to view page with message after processing
-    header("Location: admin-view_farmers.php?msg=" . urlencode($message) . "&type=" . urlencode($message_type));
+    // --- IMPROVEMENT 5: PRG Redirect on Post ---
+    // Use session for message storage to handle the PRG pattern correctly
+    $_SESSION['message'] = $message;
+    $_SESSION['message_type'] = $message_type;
+    
+    // Redirect back to the view page with a success/failure message
+    header("Location: admin-view_farmers.php");
     exit();
 }
 
-// Ensure $conn is closed only if it was opened and not already closed
+// --- FETCH FARMER DATA FOR EDITING (GET Request) ---
+if ($farmer_id && is_numeric($farmer_id)) {
+    // Note: No need for a WHERE user_type = 'farmer' here, as farmers are already separated 
+    // from 'users' in the JOIN. Admin can access all farmer data.
+    $stmt_fetch = $conn->prepare("
+        SELECT 
+            f.*, u.name AS user_full_name, u.username, u.user_type -- Fetch user_type for verification (extra check)
+        FROM 
+            farmers f 
+        JOIN 
+            users u ON f.user_id = u.user_id 
+        WHERE 
+            f.farmer_id = ? AND u.user_type = 'farmer' -- IMPROVEMENT 6: Ensure it is a 'farmer' type user
+    ");
+    if ($stmt_fetch) {
+        $stmt_fetch->bind_param("i", $farmer_id);
+        $stmt_fetch->execute();
+        $result = $stmt_fetch->get_result();
+        $farmer_data = $result->fetch_assoc();
+        $stmt_fetch->close();
+
+        if ($farmer_data) {
+            // Decode land_details JSON for form pre-filling
+            $land_details = json_decode($farmer_data['land_details'], true);
+            $farmer_data['land_location'] = htmlspecialchars($land_details['location'] ?? '');
+            $farmer_data['land_size'] = htmlspecialchars($land_details['size'] ?? '');
+        } else {
+            $message = "Farmer details not found or user is not a 'farmer' type.";
+            $message_type = 'danger';
+            $farmer_id = null; // Invalidate ID if data not found
+        }
+    } else {
+        $message = "Database error fetching farmer: " . $conn->error;
+        $message_type = 'danger';
+        error_log("Failed to prepare fetch statement: " . $conn->error);
+    }
+} else if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    $message = "Invalid or missing Farmer ID.";
+    $message_type = 'danger';
+}
+
+// --- IMPROVEMENT 7: Handle PRG Session Messages for GET request ---
+if (isset($_SESSION['message'])) {
+    $message = $_SESSION['message'];
+    $message_type = $_SESSION['message_type'];
+    unset($_SESSION['message']);
+    unset($_SESSION['message_type']);
+}
+
+// Close the connection as the very last step
 if (isset($conn) && $conn->ping()) {
     $conn->close();
 }
 ?>
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -493,7 +539,6 @@ if (isset($conn) && $conn->ping()) {
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- No custom JS is needed for this simple form -->
 </body>
 
 </html>

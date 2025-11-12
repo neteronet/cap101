@@ -1,6 +1,16 @@
 <?php
 session_start();
+// Ensure connection.php exists and returns a valid $conn object (mysqli connection)
 include '../includes/connection.php';
+
+// --- STABILITY CHECK 1: Ensure database connection is successful ---
+if (!isset($conn) || $conn->connect_error) {
+    error_log("Database connection failed: " . ($conn->connect_error ?? "Connection object not set"));
+    // Redirect or show a maintenance page, preventing the rest of the script from executing
+    header("location: database_error.php"); // Assuming you have a file for connection errors
+    exit();
+}
+// --- END STABILITY CHECK 1 ---
 
 // Check if the user is logged in and is an admin
 if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
@@ -15,11 +25,14 @@ $display_name = 'Admin'; // Default fallback
 $stmt_name = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
 if ($stmt_name) {
     $stmt_name->bind_param("i", $user_id);
-    $stmt_name->execute();
-    $stmt_name->bind_result($db_name);
-    $stmt_name->fetch();
-    if ($db_name) {
-        $display_name = htmlspecialchars($db_name); // Sanitize immediately
+    if ($stmt_name->execute()) { // Check execute success
+        $stmt_name->bind_result($db_name);
+        $stmt_name->fetch();
+        if ($db_name) {
+            $display_name = htmlspecialchars($db_name); // Sanitize immediately
+        }
+    } else {
+        error_log("Failed to execute statement for user name: " . $stmt_name->error);
     }
     $stmt_name->close();
 } else {
@@ -30,7 +43,7 @@ $farmers_users = [];
 $message = '';
 $message_type = '';
 
-// Handle farmer registration submission
+// The registration logic block remains the same, as the form submission entry is not via this page anymore.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register_farmer_submit'])) {
     $register_user_id = $_POST['register_user_id'] ?? null;
     $rsbsa_id = $_POST['rsbsa_id'] ?? '';
@@ -56,57 +69,120 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register_farmer_submi
 
         // Check if farmer is already registered
         $stmt_check = $conn->prepare("SELECT farmer_id FROM farmers WHERE user_id = ?");
-        $stmt_check->bind_param("i", $register_user_id);
-        $stmt_check->execute();
-        $stmt_check->store_result();
+        if ($stmt_check) {
+            $stmt_check->bind_param("i", $register_user_id);
+            if ($stmt_check->execute()) {
+                $stmt_check->store_result();
 
-        if ($stmt_check->num_rows > 0) {
-            $message = "Farmer for this user ID is already registered.";
-            $message_type = 'warning';
-        } else {
-            $stmt_insert = $conn->prepare("INSERT INTO farmers (user_id, rsbsa_id, first_name, middle_name, last_name, address, contact_number, land_details, age, gender, civil_status, crop) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-
-            if ($stmt_insert) {
-                $stmt_insert->bind_param(
-                    "isssssssisss",
-                    $register_user_id,
-                    $rsbsa_id,
-                    $first_name,
-                    $middle_name,
-                    $last_name,
-                    $address,
-                    $contact_number,
-                    $land_details_json,
-                    $age,
-                    $gender,
-                    $civil_status,
-                    $crop
-                );
-
-                if ($stmt_insert->execute()) {
-                    $message = "Farmer details registered successfully!";
-                    $message_type = 'success';
+                if ($stmt_check->num_rows > 0) {
+                    $message = "Farmer for this user ID is already registered.";
+                    $message_type = 'warning';
                 } else {
-                    $message = "Error registering farmer details: " . $stmt_insert->error;
-                    $message_type = 'danger';
-                    error_log("Error inserting farmer details: " . $stmt_insert->error);
+                    $stmt_insert = $conn->prepare("INSERT INTO farmers (user_id, rsbsa_id, first_name, middle_name, last_name, address, contact_number, land_details, age, gender, civil_status, crop) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+                    if ($stmt_insert) {
+                        $stmt_insert->bind_param(
+                            "isssssssisss",
+                            $register_user_id,
+                            $rsbsa_id,
+                            $first_name,
+                            $middle_name,
+                            $last_name,
+                            $address,
+                            $contact_number,
+                            $land_details_json,
+                            $age,
+                            $gender,
+                            $civil_status,
+                            $crop
+                        );
+
+                        if ($stmt_insert->execute()) {
+                            $message = "Farmer details registered successfully!";
+                            $message_type = 'success';
+                        } else {
+                            $message = "Error registering farmer details: " . $stmt_insert->error;
+                            $message_type = 'danger';
+                            error_log("Error inserting farmer details: " . $stmt_insert->error);
+                        }
+                        $stmt_insert->close();
+                    } else {
+                        $message = "Database error: Could not prepare farmer registration statement.";
+                        $message_type = 'danger';
+                        error_log("Failed to prepare farmer registration statement: " . $conn->error);
+                    }
                 }
-                $stmt_insert->close();
             } else {
-                $message = "Database error: Could not prepare farmer registration statement.";
-                $message_type = 'danger';
-                error_log("Failed to prepare farmer registration statement: " . $conn->error);
+                 error_log("Failed to execute farmer check statement: " . $stmt_check->error);
+                 $message = "Database error during farmer check.";
+                 $message_type = 'danger';
             }
+            $stmt_check->close();
+        } else {
+             error_log("Failed to prepare farmer check statement: " . $conn->error);
+             $message = "Database error: Could not prepare farmer check statement.";
+             $message_type = 'danger';
         }
-        $stmt_check->close();
     } else {
         $message = "Invalid User ID provided for registration.";
         $message_type = 'danger';
     }
-    // Redirect to prevent form resubmission
+    // Redirect is done after the deletion logic to handle both in one request cycle
+}
+
+// --- PHP DELETION LOGIC (Retained) ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_farmer_submit'])) {
+    $farmer_id_to_delete = $_POST['delete_farmer_id'] ?? null;
+
+    if ($farmer_id_to_delete && is_numeric($farmer_id_to_delete)) {
+        // Fetch the user_name for the success/error message before deletion
+        $stmt_fetch_name = $conn->prepare("SELECT u.name FROM farmers f JOIN users u ON f.user_id = u.user_id WHERE f.farmer_id = ?");
+        $user_name = 'a farmer';
+        if ($stmt_fetch_name) {
+            $stmt_fetch_name->bind_param("i", $farmer_id_to_delete);
+            if ($stmt_fetch_name->execute()) {
+                $stmt_fetch_name->bind_result($fetched_name);
+                if ($stmt_fetch_name->fetch()) {
+                    $user_name = htmlspecialchars($fetched_name);
+                }
+            } else {
+                 error_log("Failed to execute name fetch for deletion: " . $stmt_fetch_name->error);
+            }
+            $stmt_fetch_name->close();
+        } else {
+            error_log("Failed to prepare name fetch for deletion: " . $conn->error);
+        }
+
+
+        // Delete the farmer's details (not the user account)
+        $stmt_delete = $conn->prepare("DELETE FROM farmers WHERE farmer_id = ?");
+
+        if ($stmt_delete) {
+            $stmt_delete->bind_param("i", $farmer_id_to_delete);
+
+            if ($stmt_delete->execute()) {
+                $message = "Farmer details for {$user_name} (Farmer ID: {$farmer_id_to_delete}) deleted successfully! The user account remains.";
+                $message_type = 'success';
+            } else {
+                $message = "Error deleting farmer details: " . $stmt_delete->error;
+                $message_type = 'danger';
+                error_log("Error deleting farmer details: " . $stmt_delete->error);
+            }
+            $stmt_delete->close();
+        } else {
+            $message = "Database error: Could not prepare farmer deletion statement.";
+            $message_type = 'danger';
+            error_log("Failed to prepare farmer deletion statement: " . $conn->error);
+        }
+    } else {
+        $message = "Invalid Farmer ID provided for deletion.";
+        $message_type = 'danger';
+    }
+    // Redirect to prevent form resubmission for delete and register actions
     header("Location: admin-view_farmers.php?msg=" . urlencode($message) . "&type=" . urlencode($message_type));
     exit();
 }
+// --- END PHP DELETION LOGIC ---
 
 
 // Fetch all users with user_type = 'farmer' and their registration status in the 'farmers' table,
@@ -141,10 +217,15 @@ $stmt_farmers = $conn->prepare("
 ");
 
 if ($stmt_farmers) {
-    $stmt_farmers->execute();
-    $result = $stmt_farmers->get_result();
-    while ($row = $result->fetch_assoc()) {
-        $farmers_users[] = $row;
+    if ($stmt_farmers->execute()) {
+        $result = $stmt_farmers->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $farmers_users[] = $row;
+        }
+    } else {
+        $message = "Error executing fetch farmers statement: " . $stmt_farmers->error;
+        $message_type = 'danger';
+        error_log("Error executing fetch farmers statement: " . $stmt_farmers->error);
     }
     $stmt_farmers->close();
 } else {
@@ -369,47 +450,18 @@ if (isset($conn) && $conn->ping()) {
         .modal-dialog {
             margin-top: 70px;
         }
-
-        #registerFarmerModal .modal-dialog {
-            margin-top: 70px;
-            max-width: 900px;
+        
+        /* Style for the new delete modal close button */
+        .btn-close-white {
+            filter: invert(1) grayscale(100%) brightness(200%);
         }
-
-        #registerFarmerModal .modal-body {
-            padding-left: 2rem;
-            padding-right: 2rem;
+        
+        /* NEW style for the clickable table row */
+        .clickable-row {
+            cursor: pointer;
         }
-
-        #registerFarmerModal .modal-dialog {
-            margin-top: 70px;
-            max-width: 900px;
-        }
-
-        #registerFarmerModal .modal-body {
-            padding-left: 2rem;
-            padding-right: 2rem;
-        }
-
-        #registerFarmerModal .modal-header {
-            padding-left: 2rem;
-            padding-right: 2rem;
-        }
-
-        #registerFarmerModal .modal-footer {
-            padding-left: 2rem;
-            padding-right: 2rem;
-        }
-
-        #viewFarmerDetailsModal .modal-dialog {
-            margin-top: 70px;
-            max-width: 800px; /* Adjust as needed */
-        }
-        #viewFarmerDetailsModal .modal-body {
-            padding: 2rem;
-        }
-        #viewFarmerDetailsModal .modal-header,
-        #viewFarmerDetailsModal .modal-footer {
-            padding: 1rem 2rem;
+        .clickable-row:hover {
+            background-color: #e2e6ea; /* Lighter hover color for clickability hint */
         }
     </style>
 </head>
@@ -489,9 +541,31 @@ if (isset($conn) && $conn->ping()) {
                                 <?php else: ?>
                                     <?php $counter = 1; ?>
                                     <?php foreach ($farmers_users as $farmer_user): ?>
-                                        <tr>
+                                        <!-- Check if farmer is registered to make the row clickable for view -->
+                                        <tr 
+                                            class="<?php echo $farmer_user['is_registered_farmer'] ? 'clickable-row' : ''; ?>"
+                                            <?php if ($farmer_user['is_registered_farmer']): ?>
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#viewFarmerDetailsModal"
+                                                data-farmer-id="<?php echo $farmer_user['farmer_id']; ?>"
+                                                data-user-name="<?php echo htmlspecialchars($farmer_user['name']); ?>"
+                                                data-rsbsa-id="<?php echo htmlspecialchars($farmer_user['rsbsa_id']); ?>"
+                                                data-first-name="<?php echo htmlspecialchars($farmer_user['first_name']); ?>"
+                                                data-middle-name="<?php echo htmlspecialchars($farmer_user['middle_name']); ?>"
+                                                data-last-name="<?php echo htmlspecialchars($farmer_user['last_name']); ?>"
+                                                data-address="<?php echo htmlspecialchars($farmer_user['address']); ?>"
+                                                data-contact-number="<?php echo htmlspecialchars($farmer_user['contact_number']); ?>"
+                                                data-land-details='<?php echo htmlspecialchars($farmer_user['land_details']); ?>'
+                                                data-age="<?php echo htmlspecialchars($farmer_user['age']); ?>"
+                                                data-gender="<?php echo htmlspecialchars($farmer_user['gender']); ?>"
+                                                data-civil-status="<?php echo htmlspecialchars($farmer_user['civil_status']); ?>"
+                                                data-crop="<?php echo htmlspecialchars($farmer_user['crop']); ?>"
+                                            <?php endif; ?>
+                                        >
                                             <td><?php echo $counter++; ?></td>
-                                            <td><?php echo htmlspecialchars($farmer_user['name']); ?></td>
+                                            <td>
+                                                <?php echo htmlspecialchars($farmer_user['name']); ?>
+                                            </td>
                                             <td><?php echo htmlspecialchars($farmer_user['username']); ?></td>
                                             <td><?php echo htmlspecialchars(date('M d, Y H:i A', strtotime($farmer_user['created_at']))); ?></td>
                                             <td>
@@ -503,32 +577,26 @@ if (isset($conn) && $conn->ping()) {
                                             </td>
                                             <td>
                                                 <?php if (!$farmer_user['is_registered_farmer']): ?>
-                                                    <!-- Changed to button to trigger modal -->
-                                                    <button type="button" class="btn btn-sm btn-success register-farmer-btn"
-                                                        data-bs-toggle="modal" data-bs-target="#registerFarmerModal"
-                                                        data-user-id="<?php echo $farmer_user['user_id']; ?>"
-                                                        data-user-name="<?php echo htmlspecialchars($farmer_user['name']); ?>">
+                                                    <!-- Link for registration -->
+                                                    <a href="admin-register_farmer.php?user_id=<?php echo $farmer_user['user_id']; ?>" class="btn btn-sm btn-success">
                                                         <i class="fas fa-plus me-1"></i> Register Farmer
-                                                    </button>
+                                                    </a>
                                                 <?php else: ?>
-                                                    <button type="button" class="btn btn-sm btn-info view-farmer-details-btn"
-                                                        data-bs-toggle="modal" data-bs-target="#viewFarmerDetailsModal"
-                                                        data-farmer-id="<?php echo $farmer_user['farmer_id']; ?>"
-                                                        data-user-name="<?php echo htmlspecialchars($farmer_user['name']); ?>"
-                                                        data-rsbsa-id="<?php echo htmlspecialchars($farmer_user['rsbsa_id']); ?>"
-                                                        data-first-name="<?php echo htmlspecialchars($farmer_user['first_name']); ?>"
-                                                        data-middle-name="<?php echo htmlspecialchars($farmer_user['middle_name']); ?>"
-                                                        data-last-name="<?php echo htmlspecialchars($farmer_user['last_name']); ?>"
-                                                        data-address="<?php echo htmlspecialchars($farmer_user['address']); ?>"
-                                                        data-contact-number="<?php echo htmlspecialchars($farmer_user['contact_number']); ?>"
-                                                        data-land-details='<?php echo htmlspecialchars($farmer_user['land_details']); ?>'
-                                                        data-age="<?php echo htmlspecialchars($farmer_user['age']); ?>"
-                                                        data-gender="<?php echo htmlspecialchars($farmer_user['gender']); ?>"
-                                                        data-civil-status="<?php echo htmlspecialchars($farmer_user['civil_status']); ?>"
-                                                        data-crop="<?php echo htmlspecialchars($farmer_user['crop']); ?>"
-                                                    >
-                                                        <i class="fas fa-eye me-1"></i> View Details
-                                                    </button>
+                                                    <!-- Edit and Delete Buttons for Registered Farmers -->
+                                                    <div class="d-flex flex-wrap gap-1" role="group" aria-label="Farmer Actions">
+                                                        <!-- EDIT BUTTON -->
+                                                        <a href="admin-edit_farmer.php?farmer_id=<?php echo $farmer_user['farmer_id']; ?>" class="btn btn-sm btn-warning" onclick="event.stopPropagation();">
+                                                            <i class="fas fa-edit me-1"></i> Edit
+                                                        </a>
+                                                        <!-- DELETE BUTTON (Triggers Modal) -->
+                                                        <button type="button" class="btn btn-sm btn-danger delete-farmer-btn"
+                                                            data-bs-toggle="modal" data-bs-target="#deleteFarmerModal"
+                                                            data-farmer-id="<?php echo $farmer_user['farmer_id']; ?>"
+                                                            data-user-name="<?php echo htmlspecialchars($farmer_user['name']); ?>"
+                                                            onclick="event.stopPropagation();">
+                                                            <i class="fas fa-trash-alt me-1"></i> Delete
+                                                        </button>
+                                                    </div>
                                                 <?php endif; ?>
                                             </td>
                                         </tr>
@@ -542,100 +610,7 @@ if (isset($conn) && $conn->ping()) {
         </div>
     </main>
 
-    <!-- Register Farmer Modal -->
-    <div class="modal fade" id="registerFarmerModal" tabindex="-1" aria-labelledby="registerFarmerModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="registerFarmerModalLabel">Register Farmer Details for <span id="modalUserName"></span></h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <form action="admin-view_farmers.php" method="POST">
-                    <div class="modal-body">
-                        <input type="hidden" name="register_user_id" id="modalUserId">
-
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="rsbsa_id" class="form-label">RSBSA ID <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="rsbsa_id" name="rsbsa_id" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="first_name" class="form-label">First Name <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="first_name" name="first_name" required>
-                            </div>
-                        </div>
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="middle_name" class="form-label">Middle Name</label>
-                                <input type="text" class="form-control" id="middle_name" name="middle_name">
-                            </div>
-                            <div class="col-md-6">
-                                <label for="last_name" class="form-label">Last Name <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="last_name" name="last_name" required>
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <label for="address" class="form-label">Address <span class="text-danger">*</span></label>
-                            <textarea class="form-control" id="address" name="address" rows="2" required></textarea>
-                        </div>
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="contact_number" class="form-label">Contact Number <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="contact_number" name="contact_number" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="age" class="form-label">Age <span class="text-danger">*</span></label>
-                                <input type="number" class="form-control" id="age" name="age" required min="18">
-                            </div>
-                        </div>
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="gender" class="form-label">Gender <span class="text-danger">*</span></label>
-                                <select class="form-select" id="gender" name="gender" required>
-                                    <option value="">Select Gender</option>
-                                    <option value="Male">Male</option>
-                                    <option value="Female">Female</option>
-                                    <option value="Other">Other</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="civil_status" class="form-label">Civil Status <span class="text-danger">*</span></label>
-                                <select class="form-select" id="civil_status" name="civil_status" required>
-                                    <option value="">Select Civil Status</option>
-                                    <option value="Single">Single</option>
-                                    <option value="Married">Married</option>
-                                    <option value="Widowed">Widowed</option>
-                                    <option value="Divorced">Divorced</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="land_location" class="form-label">Land Location <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="land_location" name="land_location" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="land_size" class="form-label">Land Size (e.g., "1.5 hectares") <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="land_size" name="land_size" required>
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <label for="crop" class="form-label">Main Crop <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="crop" name="crop" required>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" name="register_farmer_submit" class="btn btn-success">
-                            <i class="fas fa-save me-1"></i> Register Farmer
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- View Farmer Details Modal -->
+    <!-- View Farmer Details Modal (Unchanged) -->
     <div class="modal fade" id="viewFarmerDetailsModal" tabindex="-1" aria-labelledby="viewFarmerDetailsModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
@@ -686,14 +661,37 @@ if (isset($conn) && $conn->ping()) {
                         </div>
                     </div>
                 </div>
-                <!-- MODIFIED MODAL FOOTER: Added Edit Details button -->
+                <!-- MODIFIED MODAL FOOTER: Only Close button remains -->
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-warning" id="editFarmerBtn">
-                        <i class="fas fa-edit me-1"></i> Edit Details
-                    </button>
                 </div>
                 <!-- END MODIFIED MODAL FOOTER -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Farmer Confirmation Modal (Retained) -->
+    <div class="modal fade" id="deleteFarmerModal" tabindex="-1" aria-labelledby="deleteFarmerModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <form action="admin-view_farmers.php" method="POST">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title" id="deleteFarmerModalLabel">Confirm Deletion</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Are you sure you want to delete the farmer details for <strong><span id="deleteModalUserName"></span></strong>?</p>
+                        <p class="text-danger small">This action is irreversible and will remove all associated farmer data, but the user account will remain.</p>
+                        <input type="hidden" name="delete_farmer_id" id="deleteModalFarmerId">
+                        <input type="hidden" name="delete_farmer_submit" value="1">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash-alt me-1"></i> Delete
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -702,36 +700,18 @@ if (isset($conn) && $conn->ping()) {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            var registerFarmerModal = document.getElementById('registerFarmerModal');
-            registerFarmerModal.addEventListener('show.bs.modal', function(event) {
-                // Button that triggered the modal
-                var button = event.relatedTarget;
-                // Extract info from data-bs-* attributes
-                var userId = button.getAttribute('data-user-id');
-                var userName = button.getAttribute('data-user-name');
 
-                // Update the modal's content.
-                var modalTitle = registerFarmerModal.querySelector('#modalUserName');
-                var modalUserIdInput = registerFarmerModal.querySelector('#modalUserId');
-
-                modalTitle.textContent = userName;
-                modalUserIdInput.value = userId;
-
-                // Clear previous form data when modal opens
-                var form = registerFarmerModal.querySelector('form');
-                form.reset();
-                // You might want to pre-fill first_name, last_name, etc., if you have that data for the user in the 'users' table.
-                // For now, we'll just clear it for a fresh entry.
-            });
-
+            // --- VIEW FARMER DETAILS MODAL LOGIC (Modified to accept event from TR) ---
             var viewFarmerDetailsModal = document.getElementById('viewFarmerDetailsModal');
             viewFarmerDetailsModal.addEventListener('show.bs.modal', function(event) {
-                var button = event.relatedTarget; // Button that triggered the modal
+                // Determine the trigger element. It can be the TR or the element that triggered the modal.
+                var button = event.relatedTarget; 
+                if (!button.classList.contains('clickable-row')) {
+                    // This handles cases where the modal is manually triggered or a child button was clicked (which we've prevented via event.stopPropagation())
+                    // If the modal is directly triggered by an element other than the TR, use that element.
+                }
 
-                // Get the farmer_id for the edit button
-                var farmerId = button.getAttribute('data-farmer-id'); 
-
-                // Extract info from data-bs-* attributes
+                // We get the data attributes directly from the row (which is the button/element that triggered the modal for clickable rows)
                 var userName = button.getAttribute('data-user-name');
                 var rsbsaId = button.getAttribute('data-rsbsa-id');
                 var firstName = button.getAttribute('data-first-name');
@@ -747,8 +727,8 @@ if (isset($conn) && $conn->ping()) {
 
                 // Parse land details JSON
                 var landLocation = 'N/A';
-                var landSizeRaw = 'N/A'; // Store the raw size string
-                var landHectaresValue = 'N/A'; // Store just the numeric part for display
+                var landSizeRaw = 'N/A'; 
+                var landHectaresValue = 'N/A'; 
 
                 try {
                     if (landDetailsJson) {
@@ -757,7 +737,7 @@ if (isset($conn) && $conn->ping()) {
                         landSizeRaw = landDetails.size || 'N/A';
 
                         if (landSizeRaw !== 'N/A') {
-                            // Try to extract the numeric part, whether 'hectares' is present or not
+                            // Try to extract the numeric part
                             const match = landSizeRaw.match(/(\d+(\.\d+)?)/);
                             if (match && match[1]) {
                                 landHectaresValue = match[1];
@@ -771,7 +751,7 @@ if (isset($conn) && $conn->ping()) {
                 // Update the modal's content
                 viewFarmerDetailsModal.querySelector('#viewModalUserName').textContent = userName;
                 viewFarmerDetailsModal.querySelector('#viewRsbsaId').textContent = rsbsaId;
-                // Construct full name, handling cases where middle name might be empty
+                // Construct full name
                 viewFarmerDetailsModal.querySelector('#viewFullName').textContent = `${firstName} ${middleName ? middleName + ' ' : ''}${lastName}`;
                 viewFarmerDetailsModal.querySelector('#viewAddress').textContent = address;
                 viewFarmerDetailsModal.querySelector('#viewContactNumber').textContent = contactNumber;
@@ -780,28 +760,28 @@ if (isset($conn) && $conn->ping()) {
                 viewFarmerDetailsModal.querySelector('#viewCivilStatus').textContent = civilStatus;
                 viewFarmerDetailsModal.querySelector('#viewCrop').textContent = crop;
                 viewFarmerDetailsModal.querySelector('#viewLandLocation').textContent = landLocation;
-                // Always append " hectares" for consistent display
-                viewFarmerDetailsModal.querySelector('#viewLandSize').textContent = (landHectaresValue !== 'N/A' ? landHectaresValue : 'N/A') + ' hectares';
-                
-                // --- NEW EDIT BUTTON LOGIC ---
-                var editButton = viewFarmerDetailsModal.querySelector('#editFarmerBtn');
-                if (editButton) {
-                    // Set the redirect URL for the Edit button using the retrieved farmerId
-                    // NOTE: You must create 'admin-edit_farmer.php' to handle the editing.
-                    editButton.onclick = function() {
-                        window.location.href = 'admin-edit_farmer.php?farmer_id=' + farmerId;
-                    };
-                }
-                // --- END NEW EDIT BUTTON LOGIC ---
+                // Display size
+                viewFarmerDetailsModal.querySelector('#viewLandSize').textContent = (landHectaresValue !== 'N/A' ? landHectaresValue : 'N/A') + (landHectaresValue !== 'N/A' ? ' hectares' : '');
             });
 
-            // Clear the onclick action when the modal hides to prevent stale data
-            viewFarmerDetailsModal.addEventListener('hidden.bs.modal', function() {
-                var editButton = viewFarmerDetailsModal.querySelector('#editFarmerBtn');
-                if (editButton) {
-                    editButton.onclick = null;
-                }
+
+            // --- DELETE FARMER MODAL JAVASCRIPT ---
+            var deleteFarmerModal = document.getElementById('deleteFarmerModal');
+            deleteFarmerModal.addEventListener('show.bs.modal', function(event) {
+                // Button that triggered the modal
+                var button = event.relatedTarget;
+                // Extract info from data-bs-* attributes
+                var farmerId = button.getAttribute('data-farmer-id');
+                var userName = button.getAttribute('data-user-name');
+
+                // Update the modal's content.
+                var modalUserNameSpan = deleteFarmerModal.querySelector('#deleteModalUserName');
+                var modalFarmerIdInput = deleteFarmerModal.querySelector('#deleteModalFarmerId');
+
+                modalUserNameSpan.textContent = userName;
+                modalFarmerIdInput.value = farmerId;
             });
+            // --- END DELETE FARMER MODAL JAVASCRIPT ---
         });
     </script>
 </body>

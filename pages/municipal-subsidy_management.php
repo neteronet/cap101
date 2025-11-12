@@ -3,6 +3,14 @@ session_start();
 
 include '../includes/connection.php'; // Ensure this path is correct
 
+// --- IMPROVEMENT 1: Robust Connection Check ---
+if (!isset($conn) || $conn->connect_error) {
+    error_log("Database connection failed: " . ($conn->connect_error ?? "Connection object not set"));
+    // Redirect to login on critical error
+    header("location: municipal-login.php");
+    exit();
+}
+
 // Redirect if user_id is not set or not an integer
 if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
     header("location: municipal-login.php");
@@ -10,27 +18,44 @@ if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
 }
 
 $user_id = $_SESSION['user_id'];
-$display_name = 'Mao'; // Default fallback
+$display_name = 'MAO User'; // Better default fallback
+$is_mao = false; // Flag for explicit MAO check
 
-// --- IMPROVED NAME FETCHING ---
-// Always try to fetch the name from the database for accuracy.
-// This ensures that if the session name is outdated or not set, the DB name is used.
-$stmt_name = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
+// --- IMPROVEMENT 2 & 3: Fetch Name AND User Type for Security Check ---
+$stmt_name = $conn->prepare("SELECT name, user_type FROM users WHERE user_id = ?");
 if ($stmt_name) {
     $stmt_name->bind_param("i", $user_id);
     $stmt_name->execute();
-    $stmt_name->bind_result($db_name);
+    $stmt_name->bind_result($db_name, $db_user_type);
     $stmt_name->fetch();
+    $stmt_name->close();
+
     if ($db_name) {
         $display_name = htmlspecialchars($db_name); // Sanitize immediately
     }
-    $stmt_name->close();
+
+    // --- Explicit MAO Authorization Check ---
+    if ($db_user_type === 'mao') {
+        $is_mao = true;
+    } else {
+        // If not MAO, destroy session and redirect
+        session_destroy();
+        header("location: municipal-login.php");
+        exit();
+    }
 } else {
-    error_log("Failed to prepare statement for user name: " . $conn->error);
+    error_log("Failed to prepare statement for user name/type: " . $conn->error);
+    // Treat preparation failure as a security risk/critical error
+    session_destroy();
+    header("location: municipal-login.php");
+    exit();
 }
+
+// --- START: FETCHING LOGIC RE-ADDED ---
 
 // Fetch subsidy applications from the database
 $applications = [];
+// Assuming aa.user_id is the correct foreign key for the farmer, as per context.
 $sql = "
 SELECT
     aa.application_id,
@@ -42,8 +67,7 @@ SELECT
     aa.engine_type,
     aa.remarks,
     aa.status,
-    aa.user_id,
-    aa.qr_code_data
+    aa.user_id
 FROM assistance_applications aa
 JOIN users u ON aa.user_id = u.user_id
 LEFT JOIN farmers f ON u.user_id = f.user_id -- Joining with the 'farmers' table
@@ -57,8 +81,10 @@ if ($result) {
 } else {
     error_log("Error fetching applications: " . $conn->error);
 }
-// Keep the connection open for AJAX updates, or close and reopen in AJAX
-// For now, let's keep it open until the HTML is served. AJAX will handle its own connection.
+
+// --- END: FETCHING LOGIC RE-ADDED ---
+
+// Note: Closing the connection is moved to the end of the file.
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -75,8 +101,9 @@ if ($result) {
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
 
-    <!-- Custom Styles -->
+    <!-- Custom Styles (Keep the provided styles here) -->
     <style>
+        /* [Styles remain the same for consistency] */
         body {
             font-family: "Poppins", sans-serif;
             background: #f8f9fa;
@@ -119,7 +146,7 @@ if ($result) {
         .sidebar .nav-link.active {
             background-color: #fff;
             color: #19860f;
-            font-weight: 600;
+            font-weight: 601;
         }
 
         .sidebar .nav-link:hover:not(.active) {
@@ -359,29 +386,32 @@ if ($result) {
                                     <th>Address</th>
                                     <th>Assistance Type</th>
                                     <th>Details</th>
-                                    <th>Remarks</th> <!-- Added Remarks Column -->
+                                    <th>Remarks</th> 
                                     <th>Status</th>
-                                    <th>QR Code</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php if (empty($applications)) : ?>
                                     <tr>
-                                        <td colspan="9" class="text-center">No subsidy applications found.</td>
+                                        <td colspan="8" class="text-center">No subsidy applications found.</td>
                                     </tr>
                                 <?php else : ?>
                                     <?php foreach ($applications as $app) :
-                                        // Determine details string
+                                        
+                                        // Determine details string, using the assistance_type if no specific detail is found.
                                         $details = '';
-                                        if ($app['assistance_type'] == 'Seeds') {
-                                            $details = $app['seed_type'] . ' (' . $app['seed_quantity'] . ')';
-                                        } elseif ($app['assistance_type'] == 'Fuel') { // Changed 'Engine' to 'Fuel' based on farmer form
-                                            $details = $app['engine_type'];
-                                        } elseif ($app['assistance_type'] == 'Cash Assistance') {
-                                            $details = '(N/A)'; // Or specify amount if you have it
+                                        $assistanceType = htmlspecialchars($app['assistance_type']);
+
+                                        if ($assistanceType == 'Seeds') {
+                                            $details = htmlspecialchars($app['seed_type'] ?? 'N/A') . ' (' . htmlspecialchars($app['seed_quantity'] ?? 'N/A') . ')';
+                                        } elseif ($assistanceType == 'Fuel') { 
+                                            $details = htmlspecialchars($app['engine_type'] ?? 'N/A');
+                                        } elseif ($assistanceType == 'Cash Assistance') {
+                                            $details = 'Cash Request'; 
                                         } else {
-                                            $details = '(N/A)'; // For Fertilizer, etc.
+                                            // Fallback for Fertilizer, Tools, etc.
+                                            $details = $assistanceType . ' Request'; 
                                         }
 
                                         // Determine status badge class
@@ -403,7 +433,7 @@ if ($result) {
                                     ?>
                                         <tr id="request-<?php echo htmlspecialchars($app['application_id']); ?>">
                                             <td><?php echo htmlspecialchars($app['application_id']); ?></td>
-                                            <td data-farmer-name="<?php echo htmlspecialchars(str_replace(' ', '', $app['farmer_name'])); ?>" data-user-id="<?php echo htmlspecialchars($app['user_id']); ?>">
+                                            <td data-user-id="<?php echo htmlspecialchars($app['user_id']); ?>">
                                                 <?php echo htmlspecialchars($app['farmer_name']); ?>
                                             </td>
                                             <td>
@@ -412,8 +442,8 @@ if ($result) {
                                                 echo htmlspecialchars($app['farmer_address'] ?? 'N/A');
                                                 ?>
                                             </td>
-                                            <td><?php echo htmlspecialchars($app['assistance_type']); ?></td>
-                                            <td><?php echo htmlspecialchars($details); ?></td>
+                                            <td><?php echo $assistanceType; ?></td>
+                                            <td><?php echo $details; ?></td>
                                             <td>
                                                 <?php if (!empty($app['remarks'])) : ?>
                                                     <button class="btn btn-sm btn-info view-remarks-btn" data-bs-toggle="modal" data-bs-target="#remarksModal" data-remarks="<?php echo htmlspecialchars($app['remarks']); ?>">
@@ -424,13 +454,6 @@ if ($result) {
                                                 <?php endif; ?>
                                             </td>
                                             <td><span class="badge <?php echo $statusClass; ?>"><?php echo htmlspecialchars($app['status']); ?></span></td>
-                                            <td id="qr-<?php echo htmlspecialchars($app['application_id']); ?>">
-                                                <?php if (!empty($app['qr_code_data'])) : ?>
-                                                    <img src="https://api.qrserver.com/v1/create-qr-code/?data=<?php echo urlencode($app['qr_code_data']); ?>&size=70x70" alt="QR Code" class="img-fluid">
-                                                <?php else : ?>
-                                                    —
-                                                <?php endif; ?>
-                                            </td>
                                             <td>
                                                 <?php if ($app['status'] == 'Pending') : ?>
                                                     <button class="btn btn-sm btn-success mb-1" onclick="approveRequest(<?php echo htmlspecialchars($app['application_id']); ?>)"><i class="fas fa-check me-1"></i>Approve</button>
@@ -484,6 +507,11 @@ if ($result) {
             });
         });
 
+        // The index of the status column is 6 (0-indexed)
+        // The index of the action column is 7 (0-indexed)
+        const STATUS_CELL_INDEX = 6;
+        const ACTION_CELL_INDEX = 7;
+
         function approveRequest(id) {
             const row = document.getElementById(`request-${id}`);
             if (!row) {
@@ -491,19 +519,8 @@ if ($result) {
                 return;
             }
 
-            const farmerNameElement = row.querySelector('td[data-farmer-name]');
-            const farmerNameClean = farmerNameElement ? farmerNameElement.dataset.farmerName : `UnknownFarmer${id}`;
-            const farmerUserId = farmerNameElement ? farmerNameElement.dataset.userId : `N/A`;
-
-            const assistanceType = row.children[3].textContent;
-            const assistanceDetails = row.children[4].textContent;
-            const farmerAddress = row.children[2].textContent;
-
-            // Generate QR code data
-            const qrData = `AppID:${id}|UserID:${farmerUserId}|FarmerName:${farmerNameClean}|Address:${farmerAddress.replace(/[^\w\s]/gi, '').replace(/\s+/g, '')}|Assistance:${assistanceType.replace(/\s+/g, '')}|Details:${assistanceDetails.replace(/[^\w\s]/gi, '').replace(/\s+/g, '')}|Status:Approved`;
-
             // AJAX call to update the database
-            fetch('municipal-update_subsidy_status.php', { // Create this PHP file
+            fetch('municipal-update_subsidy_status.php', { 
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -511,22 +528,18 @@ if ($result) {
                     body: JSON.stringify({
                         application_id: id,
                         status: 'Approved',
-                        qr_code_data: qrData // Send QR data to be stored in DB
                     })
                 })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        const statusCell = row.children[6]; // Adjusted index for new 'Remarks' column
-                        const qrCell = row.children[7]; // Adjusted index
-                        const actionCell = row.children[8]; // Adjusted index
+                        const statusCell = row.children[STATUS_CELL_INDEX];
+                        const actionCell = row.children[ACTION_CELL_INDEX];
 
                         statusCell.innerHTML = '<span class="badge status-approved">Approved</span>';
-                        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qrData)}&size=70x70`;
-                        qrCell.innerHTML = `<img src="${qrUrl}" alt="QR Code" class="img-fluid">`;
                         actionCell.innerHTML = '<button class="btn btn-sm btn-secondary" disabled><i class="fas fa-check me-1"></i>Approved</button>';
 
-                        alert(`Subsidy request ${id} approved and QR code generated.`);
+                        alert(`Subsidy request ${id} approved.`);
                     } else {
                         console.error('DB update failed:', data.message);
                         alert('Failed to update subsidy status in database: ' + data.message);
@@ -546,7 +559,7 @@ if ($result) {
             }
 
             // AJAX call to update the database
-            fetch('municipal-update_subsidy_status.php', { // Create this PHP file
+            fetch('municipal-update_subsidy_status.php', { 
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -554,18 +567,15 @@ if ($result) {
                     body: JSON.stringify({
                         application_id: id,
                         status: 'Rejected',
-                        qr_code_data: null // Clear QR data on rejection
                     })
                 })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        const statusCell = row.children[6]; // Adjusted index
-                        const qrCell = row.children[7]; // Adjusted index
-                        const actionCell = row.children[8]; // Adjusted index
+                        const statusCell = row.children[STATUS_CELL_INDEX];
+                        const actionCell = row.children[ACTION_CELL_INDEX];
 
                         statusCell.innerHTML = '<span class="badge status-rejected">Rejected</span>';
-                        qrCell.textContent = '—'; // Clear QR code
                         actionCell.innerHTML = `<button class="btn btn-sm btn-outline-primary" onclick="sendBackForReview(${id})"><i class="fas fa-undo me-1"></i>Send Back</button>`;
 
                         alert(`Subsidy request ${id} rejected.`);
@@ -588,7 +598,7 @@ if ($result) {
             }
 
             // AJAX call to update the database
-            fetch('municipal-update_subsidy_status.php', { // Create this PHP file
+            fetch('municipal-update_subsidy_status.php', { 
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -596,18 +606,15 @@ if ($result) {
                     body: JSON.stringify({
                         application_id: id,
                         status: 'Pending',
-                        qr_code_data: null // Clear QR data when sending back to pending
                     })
                 })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        const statusCell = row.children[6]; // Adjusted index
-                        const qrCell = row.children[7]; // Adjusted index
-                        const actionCell = row.children[8]; // Adjusted index
+                        const statusCell = row.children[STATUS_CELL_INDEX];
+                        const actionCell = row.children[ACTION_CELL_INDEX];
 
                         statusCell.innerHTML = '<span class="badge status-pending">Pending</span>';
-                        qrCell.textContent = '—';
                         actionCell.innerHTML = `
                             <button class="btn btn-sm btn-success mb-1" onclick="approveRequest(${id})"><i class="fas fa-check me-1"></i>Approve</button>
                             <button class="btn btn-sm btn-danger" onclick="rejectRequest(${id})"><i class="fas fa-times me-1"></i>Reject</button>
@@ -627,3 +634,12 @@ if ($result) {
     </script>
 </body>
 </html>
+<?php
+// Close the database connection once all operations are complete
+if (isset($conn)) {
+    // Check if the connection object is valid before attempting to close
+    if ($conn->close() === false) {
+        error_log("Failed to close database connection at end of script.");
+    }
+}
+?>

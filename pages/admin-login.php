@@ -5,7 +5,7 @@ include '../includes/connection.php';
 
 $error = '';
 
-if (isset($_POST['login'])) {
+if (isset($_POST['login'] )) {
     $username_input = $_POST['username']; // Use a distinct variable name for input
     $password_input = $_POST['password']; // Use a distinct variable name for input
 
@@ -30,6 +30,7 @@ if (isset($_POST['login'])) {
         } else {
             $error = "Invalid username or password.";
         }
+        
     } else {
         // Updated error message for MAO login context
         $error = "Invalid username or password, or you are not authorized to log in as a Admin.";
