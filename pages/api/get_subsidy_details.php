@@ -7,8 +7,28 @@ include '../includes/connection.php'; // Adjust path as necessary
 $response = ['success' => false, 'message' => 'Invalid request.', 'details' => null];
 
 // Security check: Only municipal users can access this API
-if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id']) /* Add check for user_type='municipal' if needed */) {
+if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
     $response['message'] = 'Unauthorized access.';
+    echo json_encode($response);
+    exit();
+}
+
+// Additional check for user_type
+$stmt_user = $conn->prepare("SELECT user_type FROM users WHERE user_id = ?");
+if ($stmt_user) {
+    $stmt_user->bind_param("i", $_SESSION['user_id']);
+    $stmt_user->execute();
+    $stmt_user->bind_result($user_type);
+    $stmt_user->fetch();
+    $stmt_user->close();
+
+    if ($user_type !== 'mao') {
+        $response['message'] = 'Unauthorized access.';
+        echo json_encode($response);
+        exit();
+    }
+} else {
+    $response['message'] = 'Database error.';
     echo json_encode($response);
     exit();
 }
@@ -51,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['application_id']) && 
                 'farmer_name' => htmlspecialchars($details['name']),
                 'subsidy_type' => htmlspecialchars($details['assistance_type']),
                 'current_status' => htmlspecialchars($details['status']),
-                'is_claimed' => (int)$details['claimed']
+                'claim_count' => (int)$details['claimed']
             ];
         } else {
             $response['message'] = 'No matching approved subsidy found.';

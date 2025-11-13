@@ -7,8 +7,28 @@ include '../includes/connection.php'; // Adjust path as necessary
 $response = ['success' => false, 'message' => 'Invalid request.'];
 
 // Security check: Only municipal users can access this API
-if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id']) /* Add check for user_type='municipal' if needed */) {
+if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
     $response['message'] = 'Unauthorized access.';
+    echo json_encode($response);
+    exit();
+}
+
+// Additional check for user_type
+$stmt_user = $conn->prepare("SELECT user_type FROM users WHERE user_id = ?");
+if ($stmt_user) {
+    $stmt_user->bind_param("i", $_SESSION['user_id']);
+    $stmt_user->execute();
+    $stmt_user->bind_result($user_type);
+    $stmt_user->fetch();
+    $stmt_user->close();
+
+    if ($user_type !== 'mao') {
+        $response['message'] = 'Unauthorized access.';
+        echo json_encode($response);
+        exit();
+    }
+} else {
+    $response['message'] = 'Database error.';
     echo json_encode($response);
     exit();
 }
@@ -24,26 +44,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['application_id']) && 
         exit();
     }
 
-    // Update the application status
+    // Update the application status and increment the claimed counter
     $new_status = 'Claimed';
-    $claimed_flag = 1;
 
     $update_stmt = $conn->prepare("
         UPDATE assistance_applications
-        SET 
-            status = ?, 
-            claimed = ?, 
-            claimed_by_user_id = ?, 
+        SET
+            status = ?,
+            claimed = claimed + 1,
+            claimed_by_user_id = ?,
             claimed_date = NOW()
-        WHERE 
-            application_id = ? 
-            AND user_id = ? 
-            AND claimed = 0
-            AND status = 'Approved'
+        WHERE
+            application_id = ?
+            AND user_id = ?
+            AND (status = 'Approved' OR status = 'Claimed')
     ");
 
     if ($update_stmt) {
-        $update_stmt->bind_param("siiii", $new_status, $claimed_flag, $claimer_id, $application_id, $user_id);
+        $update_stmt->bind_param("siii", $new_status, $claimer_id, $application_id, $user_id);
         
         if ($update_stmt->execute()) {
             if ($update_stmt->affected_rows > 0) {
