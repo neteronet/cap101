@@ -416,6 +416,11 @@ $conn->close(); // Close the database connection here, after all queries.
                 <i class="fas fa-qrcode"></i> QR Code Management
             </a>
         </li>
+        <li class="nav-item">
+            <a href="manual_claim.php" class="nav-link">
+                <i class="fas fa-hand-paper"></i> Manual Claim
+            </a>
+        </li>
     </ul>
 </nav>
 

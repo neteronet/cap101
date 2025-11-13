@@ -45,10 +45,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['application_id']) && 
 
     // 1. Fetch Subsidy Details
     $stmt_subsidy = $conn->prepare("
-        SELECT 
-            aa.assistance_type, 
-            aa.status, 
-            aa.claimed,
+        SELECT
+            aa.assistance_type,
+            aa.status,
             u.name
         FROM assistance_applications aa
         JOIN users u ON aa.user_id = u.user_id
@@ -63,6 +62,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['application_id']) && 
         $stmt_subsidy->close();
 
         if ($details) {
+            // 2. Fetch Claim Count from subsidy_claims
+            $stmt_claims = $conn->prepare("
+                SELECT COUNT(*) as claim_count
+                FROM subsidy_claims
+                WHERE application_id = ?
+            ");
+            $claim_count = 0;
+            if ($stmt_claims) {
+                $stmt_claims->bind_param("i", $application_id);
+                $stmt_claims->execute();
+                $stmt_claims->bind_result($claim_count);
+                $stmt_claims->fetch();
+                $stmt_claims->close();
+            }
+
             $response['success'] = true;
             $response['message'] = 'Details fetched successfully.';
             $response['details'] = [
@@ -71,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['application_id']) && 
                 'farmer_name' => htmlspecialchars($details['name']),
                 'subsidy_type' => htmlspecialchars($details['assistance_type']),
                 'current_status' => htmlspecialchars($details['status']),
-                'claim_count' => (int)$details['claimed']
+                'claim_count' => (int)$claim_count
             ];
         } else {
             $response['message'] = 'No matching approved subsidy found.';

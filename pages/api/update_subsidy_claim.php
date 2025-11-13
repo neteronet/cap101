@@ -44,16 +44,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['application_id']) && 
         exit();
     }
 
-    // Update the application status and increment the claimed counter
+    // Update the application status to 'Claimed' if not already
     $new_status = 'Claimed';
 
     $update_stmt = $conn->prepare("
         UPDATE assistance_applications
         SET
-            status = ?,
-            claimed = claimed + 1,
-            claimed_by_user_id = ?,
-            claimed_date = NOW()
+            status = ?
         WHERE
             application_id = ?
             AND user_id = ?
@@ -61,15 +58,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['application_id']) && 
     ");
 
     if ($update_stmt) {
-        $update_stmt->bind_param("siii", $new_status, $claimer_id, $application_id, $user_id);
-        
+        $update_stmt->bind_param("sii", $new_status, $application_id, $user_id);
+
         if ($update_stmt->execute()) {
             if ($update_stmt->affected_rows > 0) {
-                $response['success'] = true;
-                $response['message'] = 'Subsidy successfully marked as claimed!';
+                // Now insert a new claim record into subsidy_claims
+                $insert_claim_stmt = $conn->prepare("
+                    INSERT INTO subsidy_claims (application_id, user_id, claimer_id, notes)
+                    VALUES (?, ?, ?, ?)
+                ");
+                $notes = 'Claimed via QR scan'; // Optional notes
+                if ($insert_claim_stmt) {
+                    $insert_claim_stmt->bind_param("iiis", $application_id, $user_id, $claimer_id, $notes);
+                    if ($insert_claim_stmt->execute()) {
+                        $response['success'] = true;
+                        $response['message'] = 'Subsidy successfully marked as claimed!';
+                    } else {
+                        $response['message'] = 'Claim logged, but database error: ' . $insert_claim_stmt->error;
+                    }
+                    $insert_claim_stmt->close();
+                } else {
+                    $response['message'] = 'Database error: Could not prepare claim insert statement.';
+                }
             } else {
-                // This means the application was already claimed, not approved, or IDs didn't match
-                $response['message'] = 'Claim failed. The subsidy might be already claimed or not yet approved.';
+                // This means the application was not approved or IDs didn't match
+                $response['message'] = 'Claim failed. The subsidy is not eligible for claiming.';
             }
         } else {
             $response['message'] = 'Database execution error: ' . $update_stmt->error;

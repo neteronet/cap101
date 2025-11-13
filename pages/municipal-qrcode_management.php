@@ -55,16 +55,17 @@ if ($stmt_name) {
 $recent_claims = [];
 $stmt_recent = $conn->prepare("
     SELECT
+        sc.claim_id,
+        sc.claim_date,
         aa.application_id,
-        aa.claimed_date,
         aa.user_id,
         u.name,
         aa.assistance_type,
         aa.status
-    FROM assistance_applications aa
+    FROM subsidy_claims sc
+    JOIN assistance_applications aa ON sc.application_id = aa.application_id
     JOIN users u ON aa.user_id = u.user_id
-    WHERE aa.claimed = 1
-    ORDER BY aa.claimed_date DESC
+    ORDER BY sc.claim_date DESC
     LIMIT 10
 ");
 
@@ -419,6 +420,27 @@ if (isset($conn)) {
             </div>
         </div>
 
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Manual Claim (When Scanner Unavailable)</h5>
+                    <p class="card-text">
+                        Enter the Farmer ID manually to fetch and claim the subsidy.
+                    </p>
+                    <form id="manualClaimForm">
+                        <div class="mb-3">
+                            <label for="manualFarmerId" class="form-label">Farmer ID (e.g., FRM-000000002):</label>
+                            <input type="text" class="form-control" id="manualFarmerId" placeholder="FRM-XXXXXXXXX" required>
+                        </div>
+                        <button type="submit" class="btn btn-theme">
+                            <i class="fas fa-search me-1"></i> Fetch Details
+                        </button>
+                        <div id="manualMessage" class="mt-3"></div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
         <div class="col-12">
             <div class="card">
                 <div class="card-body">
@@ -439,7 +461,7 @@ if (isset($conn)) {
                             <tbody>
                                 <?php foreach ($recent_claims as $claim): ?>
                                     <tr>
-                                        <td><?php echo htmlspecialchars($claim['claimed_date']); ?></td>
+                                        <td><?php echo htmlspecialchars($claim['claim_date']); ?></td>
                                         <td><?php echo htmlspecialchars($claim['application_id']); ?></td>
                                         <td><?php echo htmlspecialchars($claim['farmer_id_display']); ?></td>
                                         <td><?php echo htmlspecialchars($claim['name']); ?></td>
@@ -583,8 +605,7 @@ if (isset($conn)) {
 
         // Fetch details from the server
         try {
-            // FIX: Changed to correct relative path: '../api/get_subsidy_details.php'
-            const response = await fetch('../api/get_subsidy_details.php', {
+            const response = await fetch('api/get_subsidy_details.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: `application_id=${parsedData.application_id}&user_id=${parsedData.user_id}`
@@ -642,8 +663,7 @@ if (isset($conn)) {
         verifyButton.disabled = true; // Disable to prevent double submission
 
         try {
-            // FIX: Changed to correct relative path: '../api/update_subsidy_claim.php'
-            const response = await fetch('../api/update_subsidy_claim.php', {
+            const response = await fetch('api/update_subsidy_claim.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: `application_id=${appId}&user_id=${userId}`
