@@ -500,7 +500,8 @@ if (isset($conn)) {
     const verificationMessage = document.getElementById('verificationMessage');
     const verifyClaimForm = document.getElementById('verifyClaimForm');
 
-    let html5QrcodeScanner; // html5-qrcode scanner instance
+    let html5QrcodeScanner = null; // html5-qrcode scanner instance
+    let isScanning = false;
 
     // Helper function to reset the verification form
     function resetVerificationForm(message = '', type = 'danger') {
@@ -519,72 +520,222 @@ if (isset($conn)) {
         verificationMessage.innerHTML = message ? `<div class="alert alert-${type}">${message}</div>` : '';
     }
 
+    // Helper function to stop scanner
+    async function stopScanner() {
+        if (html5QrcodeScanner && isScanning) {
+            try {
+                await html5QrcodeScanner.stop();
+                await html5QrcodeScanner.clear();
+                html5QrcodeScanner = null;
+                isScanning = false;
+                startButton.style.display = 'inline-block';
+                stopButton.style.display = 'none';
+                qrScanMessage.style.display = 'block';
+                document.getElementById('reader').innerHTML = '';
+            } catch (error) {
+                console.error('Failed to stop scanner:', error);
+            }
+        }
+    }
+
     // --- Scanner Control ---
-    startButton.addEventListener('click', () => {
-        if (html5QrcodeScanner) {
-            html5QrcodeScanner.clear().catch(error => {
-                console.error('Failed to clear scanner:', error);
-            });
+    startButton.addEventListener('click', async () => {
+        if (isScanning) {
+            return;
         }
 
         // Reset UI on new scan attempt
         resetVerificationForm();
         qrResultDisplay.style.display = 'none';
+        qrScanMessage.style.display = 'none';
 
-        html5QrcodeScanner = new Html5QrcodeScanner(
-            "reader", {
-                fps: 10,
-                qrbox: { width: 250, height: 250 },
-                supportedScanTypes: [Html5QrcodeSupportedFormats.QR_CODE]
-            }
-        );
-
-        html5QrcodeScanner.render((decodedText, decodedResult) => {
-            console.log('Scanned:', decodedText);
-            scannedDataSpan.textContent = decodedText;
-            qrResultDisplay.style.display = 'block';
-
-            // Process the QR code content
-            processQrData(decodedText);
-
-            // Stop scanning after one successful scan
-            html5QrcodeScanner.clear().catch(error => {
-                console.error('Failed to clear scanner after scan:', error);
+        try {
+            // Create scanner instance with optimized settings
+            html5QrcodeScanner = new Html5Qrcode("reader", {
+                verbose: false, // Disable verbose logging for better performance
+                formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE] // Only QR codes for speed
             });
-        }, (errorMessage) => {
-            // Ignore errors during scanning
-        });
+
+            // Get available cameras (with timeout to avoid hanging)
+            const devices = await Promise.race([
+                Html5Qrcode.getCameras(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Camera detection timeout')), 5000))
+            ]);
+            
+            if (devices && devices.length > 0) {
+                // Optimized camera selection - prefer back camera but don't delay
+                let cameraId = devices[0].id;
+                
+                // Quick check for back camera (only check first few devices for speed)
+                for (let i = 0; i < Math.min(devices.length, 3); i++) {
+                    const label = devices[i].label.toLowerCase();
+                    if (label.includes('back') || label.includes('rear') || label.includes('environment')) {
+                        cameraId = devices[i].id;
+                        break; // Found it, stop searching
+                    }
+                }
+                
+                // Start scanning with optimized configuration for speed
+                await html5QrcodeScanner.start(
+                    cameraId,
+                    {
+                        fps: 30, // Increased from 10 to 30 for faster scanning
+                        qrbox: function(viewfinderWidth, viewfinderHeight) {
+                            // Optimized: Use 60% instead of 80% for faster processing
+                            // Smaller area = less processing = faster detection
+                            let minEdgePercentage = 0.6;
+                            let minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
+                            let qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
+                            // Ensure minimum size for readability
+                            return {
+                                width: Math.max(qrboxSize, 200),
+                                height: Math.max(qrboxSize, 200)
+                            };
+                        },
+                        aspectRatio: 1.0,
+                        // Video constraints for better performance
+                        videoConstraints: {
+                            facingMode: "environment" // Prefer back camera
+                        },
+                        // Disable verbose mode for better performance
+                        verbose: false
+                    },
+                    (decodedText, decodedResult) => {
+                        // Success callback - QR code detected!
+                        console.log('QR Code detected:', decodedText);
+                        scannedDataSpan.textContent = decodedText;
+                        qrResultDisplay.style.display = 'block';
+
+                        // Process the QR code content
+                        processQrData(decodedText);
+
+                        // Stop scanning after one successful scan
+                        stopScanner();
+                    },
+                    (errorMessage) => {
+                        // Error callback - ignore scanning errors
+                        // Errors are normal during scanning (no QR code in view, etc.)
+                        // Only log if it's not a common scanning error
+                        if (!errorMessage.includes('NotFoundException') && 
+                            !errorMessage.includes('No QR code found')) {
+                            // Silent - these are expected during scanning
+                        }
+                    }
+                );
+
+                isScanning = true;
+                startButton.style.display = 'none';
+                stopButton.style.display = 'inline-block';
+                
+                // Show success message
+                verificationMessage.innerHTML = '<div class="alert alert-info"><i class="fas fa-camera me-2"></i>Scanner active. Point camera at QR code...</div>';
+            } else {
+                throw new Error('No cameras found. Please ensure your device has a camera and grant camera permissions.');
+            }
+        } catch (error) {
+            console.error('Scanner error:', error);
+            let errorMsg = error.message;
+            if (error.name === 'NotAllowedError' || error.message.includes('permission')) {
+                errorMsg = 'Camera permission denied. Please allow camera access and try again.';
+            } else if (error.name === 'NotFoundError') {
+                errorMsg = 'No camera found on this device.';
+            } else if (error.name === 'NotReadableError') {
+                errorMsg = 'Camera is already in use by another application.';
+            }
+            verificationMessage.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>Failed to start scanner: ${errorMsg}</div>`;
+            qrScanMessage.style.display = 'block';
+            html5QrcodeScanner = null;
+            isScanning = false;
+        }
     });
 
-    stopButton.addEventListener('click', () => {
-        if (html5QrcodeScanner) {
-            html5QrcodeScanner.clear().catch(error => {
-                console.error('Failed to clear scanner:', error);
-            });
-        }
+    stopButton.addEventListener('click', async () => {
+        await stopScanner();
     });
     
     // --- QR Data Parsing & Fetching ---
 
     function parseQrData(qrData) {
         // Expected format: "app_id:XX&user_id:YY&approved_on:YYYY-MM-DD"
+        // Or variations like: "app_id=XX&user_id=YY" (URL encoded)
         const data = {};
         try {
-            // Use URLSearchParams to correctly parse the '&' separated key:value pairs
-            // First, replace ':' with '=' so URLSearchParams can interpret them as key=value
-            const urlParams = new URLSearchParams(qrData.replace(/:/g, '='));
+            let parsedString = qrData;
+            
+            // If it's already in URL format (key=value&key=value), use it directly
+            // Otherwise, convert from key:value format to key=value format
+            if (!qrData.includes('=') && qrData.includes(':')) {
+                // Convert "key:value" pairs to "key=value" format
+                // Split by & first, then replace first : with = in each part
+                parsedString = qrData.split('&').map(pair => {
+                    const colonIndex = pair.indexOf(':');
+                    if (colonIndex > 0) {
+                        return pair.substring(0, colonIndex) + '=' + pair.substring(colonIndex + 1);
+                    }
+                    return pair;
+                }).join('&');
+            }
+            
+            const urlParams = new URLSearchParams(parsedString);
             data.application_id = urlParams.get('app_id');
             data.user_id = urlParams.get('user_id');
             // approved_on is not strictly needed for the fetch, but good for validation
             
             // Validate parsed data
             if (data.application_id && data.user_id) {
-                return data;
+                // Ensure they're valid numbers
+                data.application_id = data.application_id.trim();
+                data.user_id = data.user_id.trim();
+                if (data.application_id && data.user_id) {
+                    return data;
+                }
             }
+            
+            console.warn('QR data parsing failed. Raw data:', qrData);
         } catch (e) {
-            console.error("Error parsing QR data:", e);
+            console.error("Error parsing QR data:", e, "Raw data:", qrData);
         }
         return null;
+    }
+
+    // Helper function to automatically save claim to database
+    async function autoSaveClaim(appId, userId, farmerName, subsidyType) {
+        try {
+            verificationMessage.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin me-2"></i> Automatically saving claim to database...</div>';
+            
+            const response = await fetch('api/update_subsidy_claim.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `application_id=${appId}&user_id=${userId}`
+            });
+            
+            const data = await response.json();
+
+            if (data.success) {
+                verificationMessage.innerHTML = `<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i> ${data.message} Claim automatically saved to database.</div>`;
+                claimStatusInput.value = 'Claimed';
+                verifyButton.textContent = 'Already Claimed';
+                verifyButton.classList.remove('btn-theme');
+                verifyButton.classList.add('btn-secondary');
+                verifyButton.disabled = true;
+                
+                // Update claim count
+                const newClaimCount = parseInt(claimCountInput.value || 0) + 1;
+                claimCountInput.value = newClaimCount;
+                
+                // Update the recent transactions table dynamically
+                addTransactionToTable(appId, userId, farmerName, subsidyType, 'Claimed');
+                
+                return true;
+            } else {
+                verificationMessage.innerHTML = `<div class="alert alert-danger"><i class="fas fa-times-circle me-2"></i> ${data.message}</div>`;
+                return false;
+            }
+        } catch (error) {
+            console.error('Auto-save claim error:', error);
+            verificationMessage.innerHTML = '<div class="alert alert-danger">An error occurred while saving to database. Please try again.</div>';
+            return false;
+        }
     }
 
     async function processQrData(qrData) {
@@ -621,14 +772,15 @@ if (isset($conn)) {
                 claimCountInput.value = details.claim_count;
 
                 if (details.current_status === 'Approved' || details.current_status === 'Claimed') {
-                    verifyButton.disabled = false;
-                    verifyButton.textContent = 'Mark as Claimed';
-                    verificationMessage.innerHTML = '<div class="alert alert-info">Verification successful. Proceed to mark as claimed.</div>';
-                } else if (details.current_status !== 'Approved' && details.current_status !== 'Claimed') {
-                    resetVerificationForm(`Subsidy status is '${details.current_status}'. Only 'Approved' or 'Claimed' applications can be claimed.`, 'warning');
+                    // Automatically save the claim to database
+                    await autoSaveClaim(
+                        parsedData.application_id,
+                        parsedData.user_id,
+                        details.farmer_name,
+                        details.subsidy_type
+                    );
                 } else {
-                    // Catch-all for weird states
-                    resetVerificationForm('Subsidy status check inconclusive.', 'warning');
+                    resetVerificationForm(`Subsidy status is '${details.current_status}'. Only 'Approved' or 'Claimed' applications can be claimed.`, 'warning');
                 }
             } else {
                 resetVerificationForm(data.message || 'Error fetching subsidy details from the server.');
@@ -715,6 +867,84 @@ if (isset($conn)) {
         subsidyTypeCell.textContent = subsidyType;
         statusCell.innerHTML = `<span class="status-badge status-${status}">${status}</span>`;
     }
+    
+    // --- Manual Claim Form Handler ---
+    const manualClaimForm = document.getElementById('manualClaimForm');
+    const manualFarmerIdInput = document.getElementById('manualFarmerId');
+    const manualMessage = document.getElementById('manualMessage');
+
+    manualClaimForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const farmerIdInput = manualFarmerIdInput.value.trim();
+        
+        if (!farmerIdInput) {
+            manualMessage.innerHTML = '<div class="alert alert-danger">Please enter a Farmer ID.</div>';
+            return;
+        }
+
+        // Extract user_id from FRM-XXXXXXXXX format
+        let userId = null;
+        if (farmerIdInput.startsWith('FRM-')) {
+            const idPart = farmerIdInput.substring(4);
+            userId = parseInt(idPart, 10);
+            if (isNaN(userId)) {
+                manualMessage.innerHTML = '<div class="alert alert-danger">Invalid Farmer ID format. Please use FRM-XXXXXXXXX format.</div>';
+                return;
+            }
+        } else {
+            // Try to parse as direct number
+            userId = parseInt(farmerIdInput, 10);
+            if (isNaN(userId)) {
+                manualMessage.innerHTML = '<div class="alert alert-danger">Invalid Farmer ID format. Please use FRM-XXXXXXXXX format.</div>';
+                return;
+            }
+        }
+
+        manualMessage.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin me-2"></i> Fetching details...</div>';
+
+        try {
+            // First, we need to find the application_id for this user
+            // We'll need to create an API endpoint or modify the existing one to accept just user_id
+            // For now, let's try to fetch using a modified approach
+            const response = await fetch('api/get_subsidy_details.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `user_id=${userId}`
+            });
+
+            const data = await response.json();
+
+            if (data.success && data.details) {
+                const details = data.details;
+                
+                // Populate the verification form
+                hiddenApplicationIdInput.value = details.application_id;
+                hiddenFarmerIdInput.value = details.farmer_id;
+                applicationIdDisplayInput.value = details.application_id;
+                farmerIdDisplayInput.value = `FRM-${String(details.farmer_id).padStart(9, '0')}`;
+                farmerNameInput.value = details.farmer_name;
+                subsidyTypeInput.value = details.subsidy_type;
+                claimStatusInput.value = details.current_status;
+                claimCountInput.value = details.claim_count;
+
+                if (details.current_status === 'Approved' || details.current_status === 'Claimed') {
+                    verifyButton.disabled = false;
+                    verifyButton.textContent = 'Mark as Claimed';
+                    verificationMessage.innerHTML = '<div class="alert alert-info">Details fetched successfully. You can now mark as claimed.</div>';
+                    manualMessage.innerHTML = '<div class="alert alert-success">Details fetched successfully!</div>';
+                } else {
+                    verificationMessage.innerHTML = `<div class="alert alert-warning">Subsidy status is '${details.current_status}'. Only 'Approved' or 'Claimed' applications can be claimed.</div>`;
+                    manualMessage.innerHTML = `<div class="alert alert-warning">Subsidy status is '${details.current_status}'. Only 'Approved' or 'Claimed' applications can be claimed.</div>`;
+                }
+            } else {
+                manualMessage.innerHTML = `<div class="alert alert-danger">${data.message || 'No matching subsidy found for this Farmer ID.'}</div>`;
+            }
+        } catch (error) {
+            console.error('Manual fetch error:', error);
+            manualMessage.innerHTML = '<div class="alert alert-danger">An error occurred while fetching details from the server.</div>';
+        }
+    });
     
     // Initial state
     document.addEventListener('DOMContentLoaded', () => {

@@ -1,16 +1,57 @@
 <?php
 // api/update_subsidy_claim.php
+// Suppress any output before JSON
+error_reporting(E_ALL);
+ini_set('display_errors', 0); // Don't display errors, we'll handle them
+ob_start(); // Start output buffering to catch any unexpected output
+
+// Helper function to output clean JSON
+function outputJson($data) {
+    ob_end_clean(); // Clear any output
+    echo json_encode($data);
+    exit();
+}
+
 session_start();
 header('Content-Type: application/json');
-include '../includes/connection.php'; // Adjust path as necessary
+
+// Include connection file
+$conn = null;
+try {
+    // Include connection file - any output (like die() messages) will be caught by ob_start() at top
+    include '../../includes/connection.php';
+    
+    // Check if connection was established
+    if (!isset($conn)) {
+        outputJson(['success' => false, 'message' => 'Database connection failed. Connection object not created.']);
+    }
+    
+    // Check if connection has errors
+    if ($conn->connect_error) {
+        outputJson(['success' => false, 'message' => 'Database connection error: ' . $conn->connect_error]);
+    }
+} catch (Exception $e) {
+    outputJson(['success' => false, 'message' => 'Database connection failed: ' . $e->getMessage()]);
+} catch (Error $e) {
+    outputJson(['success' => false, 'message' => 'Database connection failed: ' . $e->getMessage()]);
+}
+
+// Check if any output was generated (like from die() in connection.php)
+$buffer_content = ob_get_contents();
+if (!empty($buffer_content)) {
+    // If there's any output, it's likely from die() in connection.php
+    ob_clean(); // Clear the die() output
+    // Log the actual error for debugging (but don't expose it to user for security)
+    error_log("Connection.php output: " . $buffer_content);
+    outputJson(['success' => false, 'message' => 'Database connection failed. Please ensure MySQL is running and database "cap101" exists.']);
+}
 
 $response = ['success' => false, 'message' => 'Invalid request.'];
 
 // Security check: Only municipal users can access this API
 if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
     $response['message'] = 'Unauthorized access.';
-    echo json_encode($response);
-    exit();
+    outputJson($response);
 }
 
 // Additional check for user_type
@@ -24,13 +65,11 @@ if ($stmt_user) {
 
     if ($user_type !== 'mao') {
         $response['message'] = 'Unauthorized access.';
-        echo json_encode($response);
-        exit();
+        outputJson($response);
     }
 } else {
     $response['message'] = 'Database error.';
-    echo json_encode($response);
-    exit();
+    outputJson($response);
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['application_id']) && isset($_POST['user_id'])) {
@@ -40,59 +79,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['application_id']) && 
 
     if (empty($application_id) || empty($user_id)) {
         $response['message'] = 'Missing application or user ID.';
-        echo json_encode($response);
-        exit();
+        outputJson($response);
     }
 
-    // Update the application status to 'Claimed' if not already
-    $new_status = 'Claimed';
-
-    $update_stmt = $conn->prepare("
-        UPDATE assistance_applications
-        SET
-            status = ?
-        WHERE
-            application_id = ?
+    // First, verify the application exists and is eligible for claiming
+    $check_stmt = $conn->prepare("
+        SELECT application_id, status
+        FROM assistance_applications
+        WHERE application_id = ?
             AND user_id = ?
             AND (status = 'Approved' OR status = 'Claimed')
     ");
 
-    if ($update_stmt) {
-        $update_stmt->bind_param("sii", $new_status, $application_id, $user_id);
+    if ($check_stmt) {
+        $check_stmt->bind_param("ii", $application_id, $user_id);
+        $check_stmt->execute();
+        $check_result = $check_stmt->get_result();
+        $application = $check_result->fetch_assoc();
+        $check_stmt->close();
 
-        if ($update_stmt->execute()) {
-            if ($update_stmt->affected_rows > 0) {
-                // Now insert a new claim record into subsidy_claims
-                $insert_claim_stmt = $conn->prepare("
-                    INSERT INTO subsidy_claims (application_id, user_id, claimer_id, notes)
-                    VALUES (?, ?, ?, ?)
-                ");
-                $notes = 'Claimed via QR scan'; // Optional notes
-                if ($insert_claim_stmt) {
-                    $insert_claim_stmt->bind_param("iiis", $application_id, $user_id, $claimer_id, $notes);
-                    if ($insert_claim_stmt->execute()) {
-                        $response['success'] = true;
-                        $response['message'] = 'Subsidy successfully marked as claimed!';
-                    } else {
-                        $response['message'] = 'Claim logged, but database error: ' . $insert_claim_stmt->error;
+        if ($application) {
+            // Application is eligible - always insert a new claim record
+            $insert_claim_stmt = $conn->prepare("
+                INSERT INTO subsidy_claims (application_id, user_id, claimer_id, notes)
+                VALUES (?, ?, ?, ?)
+            ");
+            $notes = 'Claimed via QR scan'; // Optional notes
+            if ($insert_claim_stmt) {
+                $insert_claim_stmt->bind_param("iiis", $application_id, $user_id, $claimer_id, $notes);
+                if ($insert_claim_stmt->execute()) {
+                    // Now update the status to 'Claimed' if it's not already
+                    $new_status = 'Claimed';
+                    $update_stmt = $conn->prepare("
+                        UPDATE assistance_applications
+                        SET status = ?
+                        WHERE application_id = ?
+                            AND user_id = ?
+                            AND status = 'Approved'
+                    ");
+                    if ($update_stmt) {
+                        $update_stmt->bind_param("sii", $new_status, $application_id, $user_id);
+                        $update_stmt->execute(); // Don't check affected_rows - status might already be 'Claimed'
+                        $update_stmt->close();
                     }
-                    $insert_claim_stmt->close();
+                    
+                    $response['success'] = true;
+                    $response['message'] = 'Subsidy claim successfully saved to database!';
                 } else {
-                    $response['message'] = 'Database error: Could not prepare claim insert statement.';
+                    $response['message'] = 'Database error while saving claim: ' . $insert_claim_stmt->error;
                 }
+                $insert_claim_stmt->close();
             } else {
-                // This means the application was not approved or IDs didn't match
-                $response['message'] = 'Claim failed. The subsidy is not eligible for claiming.';
+                $response['message'] = 'Database error: Could not prepare claim insert statement.';
             }
         } else {
-            $response['message'] = 'Database execution error: ' . $update_stmt->error;
+            // Application not found or not eligible
+            $response['message'] = 'Claim failed. The subsidy is not eligible for claiming or does not exist.';
         }
-        $update_stmt->close();
     } else {
-        $response['message'] = 'Database error: Could not prepare statement.';
+        $response['message'] = 'Database error: Could not prepare verification statement.';
     }
 }
 
 $conn->close();
-echo json_encode($response);
+outputJson($response);
 ?>
