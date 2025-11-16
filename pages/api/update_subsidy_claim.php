@@ -12,7 +12,7 @@ function outputJson($data) {
     exit();
 }
 
-session_start();
+session_start(); 
 header('Content-Type: application/json');
 
 // Include connection file
@@ -71,7 +71,7 @@ if ($stmt_user) {
     $response['message'] = 'Database error.';
     outputJson($response);
 }
-
+ 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['application_id']) && isset($_POST['user_id'])) {
     $application_id = filter_input(INPUT_POST, 'application_id', FILTER_SANITIZE_NUMBER_INT);
     $user_id = filter_input(INPUT_POST, 'user_id', FILTER_SANITIZE_NUMBER_INT);
@@ -99,6 +99,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['application_id']) && 
         $check_stmt->close();
 
         if ($application) {
+            // Get the current maximum claimed value for this farmer
+            $max_claimed_stmt = $conn->prepare("SELECT MAX(claimed) FROM assistance_applications WHERE user_id = ?");
+            $current_claimed = 0;
+            if ($max_claimed_stmt) {
+                $max_claimed_stmt->bind_param("i", $user_id);
+                $max_claimed_stmt->execute();
+                $max_claimed_stmt->bind_result($current_claimed);
+                $max_claimed_stmt->fetch();
+                $max_claimed_stmt->close();
+            }
+            $new_claimed = ($current_claimed ? $current_claimed : 0) + 1;
+
+            // Update the claimed count only for the specific application being claimed
+            $update_claimed_stmt = $conn->prepare("UPDATE assistance_applications SET claimed = ? WHERE application_id = ? AND user_id = ?");
+            if ($update_claimed_stmt) {
+                $update_claimed_stmt->bind_param("iii", $new_claimed, $application_id, $user_id);
+                $update_claimed_stmt->execute();
+                $update_claimed_stmt->close();
+            }
+
             // Application is eligible - always insert a new claim record
             $insert_claim_stmt = $conn->prepare("
                 INSERT INTO subsidy_claims (application_id, user_id, claimer_id, notes)
@@ -122,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['application_id']) && 
                         $update_stmt->execute(); // Don't check affected_rows - status might already be 'Claimed'
                         $update_stmt->close();
                     }
-                    
+
                     $response['success'] = true;
                     $response['message'] = 'Subsidy claim successfully saved to database!';
                 } else {

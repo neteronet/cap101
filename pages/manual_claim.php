@@ -46,6 +46,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($insert_stmt) {
                         $insert_stmt->bind_param("iiis", $application_id, $app_user_id, $claimer_id, $notes);
                         if ($insert_stmt->execute()) {
+                            // Get the current maximum claimed value for this farmer
+                            $max_claimed_stmt = $conn->prepare("SELECT MAX(claimed) FROM assistance_applications WHERE user_id = ?");
+                            $current_claimed = 0;
+                            if ($max_claimed_stmt) {
+                                $max_claimed_stmt->bind_param("i", $app_user_id);
+                                $max_claimed_stmt->execute();
+                                $max_claimed_stmt->bind_result($current_claimed);
+                                $max_claimed_stmt->fetch();
+                                $max_claimed_stmt->close();
+                            }
+                            $new_claimed = ($current_claimed ? $current_claimed : 0) + 1;
+
+                            // Update the claimed count only for the specific application being claimed
+                            $update_claimed_stmt = $conn->prepare("UPDATE assistance_applications SET claimed = ? WHERE application_id = ? AND user_id = ?");
+                            if ($update_claimed_stmt) {
+                                $update_claimed_stmt->bind_param("iii", $new_claimed, $application_id, $app_user_id);
+                                $update_claimed_stmt->execute();
+                                $update_claimed_stmt->close();
+                            }
+
+                            // Update the status to 'Claimed' if it's not already
+                            $update_status_stmt = $conn->prepare("UPDATE assistance_applications SET status = 'Claimed' WHERE application_id = ? AND user_id = ? AND status = 'Approved'");
+                            if ($update_status_stmt) {
+                                $update_status_stmt->bind_param("ii", $application_id, $app_user_id);
+                                $update_status_stmt->execute();
+                                $update_status_stmt->close();
+                            }
+
                             $message = '<div class="alert alert-success">Claim successfully marked for Farmer ID ' . htmlspecialchars($farmer_id_input) . ' on ' . htmlspecialchars($approved_date) . '.</div>';
                         } else {
                             $message = '<div class="alert alert-danger">Error inserting claim: ' . $conn->error . '</div>';

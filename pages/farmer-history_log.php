@@ -365,6 +365,11 @@ $conn->close(); // Close the connection after all database operations
                     <i class="fas fa-history"></i> History Log
                 </a>
             </li>
+            <li class="nav-item">
+                <a href="farmer-claim_history.php" class="nav-link">
+                    <i class="fas fa-history"></i> Claim History
+                </a>
+            </li>
         </ul>
     </nav>
 

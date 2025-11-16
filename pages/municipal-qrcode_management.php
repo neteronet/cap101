@@ -771,7 +771,9 @@ if (isset($conn)) {
                 claimStatusInput.value = details.current_status;
                 claimCountInput.value = details.claim_count;
 
-                if (details.current_status === 'Approved' || details.current_status === 'Claimed') {
+                if (details.claim_count > 0) {
+                    resetVerificationForm('This subsidy has already been claimed. The QR code cannot be scanned again unless the farmer applies for a new subsidy.', 'danger');
+                } else if (details.current_status === 'Approved' || details.current_status === 'Claimed') {
                     // Automatically save the claim to database
                     await autoSaveClaim(
                         parsedData.application_id,

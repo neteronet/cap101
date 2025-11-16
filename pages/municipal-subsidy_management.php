@@ -519,6 +519,8 @@ if ($result) {
                 return;
             }
 
+            const farmerName = row.children[1].textContent.trim();
+
             // AJAX call to update the database
             fetch('municipal-update_subsidy_status.php', { 
                     method: 'POST',
@@ -539,7 +541,7 @@ if ($result) {
                         statusCell.innerHTML = '<span class="badge status-approved">Approved</span>';
                         actionCell.innerHTML = '<button class="btn btn-sm btn-secondary" disabled><i class="fas fa-check me-1"></i>Approved</button>';
 
-                        alert(`Subsidy request ${id} approved.`);
+                        alert(`Subsidy request '${farmerName}' approved.`);
                     } else {
                         console.error('DB update failed:', data.message);
                         alert('Failed to update subsidy status in database: ' + data.message);
@@ -557,6 +559,8 @@ if ($result) {
                 console.error(`Row with ID 'request-${id}' not found.`);
                 return;
             }
+
+            const farmerName = row.children[1].textContent.trim();
 
             // AJAX call to update the database
             fetch('municipal-update_subsidy_status.php', { 
@@ -578,7 +582,7 @@ if ($result) {
                         statusCell.innerHTML = '<span class="badge status-rejected">Rejected</span>';
                         actionCell.innerHTML = `<button class="btn btn-sm btn-outline-primary" onclick="sendBackForReview(${id})"><i class="fas fa-undo me-1"></i>Send Back</button>`;
 
-                        alert(`Subsidy request ${id} rejected.`);
+                        alert(`Subsidy request '${farmerName}' rejected.`);
                     } else {
                         console.error('DB update failed:', data.message);
                         alert('Failed to update subsidy status in database: ' + data.message);
@@ -596,6 +600,8 @@ if ($result) {
                 console.error(`Row with ID 'request-${id}' not found.`);
                 return;
             }
+
+            const farmerName = row.children[1].textContent.trim();
 
             // AJAX call to update the database
             fetch('municipal-update_subsidy_status.php', { 
@@ -620,7 +626,7 @@ if ($result) {
                             <button class="btn btn-sm btn-danger" onclick="rejectRequest(${id})"><i class="fas fa-times me-1"></i>Reject</button>
                         `;
 
-                        alert(`Subsidy request ${id} returned to pending for review.`);
+                        alert(`Subsidy request '${farmerName}' returned to pending for review.`);
                     } else {
                         console.error('DB update failed:', data.message);
                         alert('Failed to update subsidy status in database: ' + data.message);
