@@ -8,15 +8,62 @@ if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
     exit();
 }
 
+// START: INSERT CODE for File Upload Handling
+$target_dir = "../uploads/announcements/"; // Define target directory relative to this script's location
+$uploaded_image_path = ""; // Initialize the variable for the uploaded file path
+
+// Check for file upload before the main POST check
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES['announcementImages']) && $_FILES['announcementImages']['error'] == 0) {
+    
+    // Check if the uploads directory exists, if not, create it
+    if (!is_dir($target_dir)) {
+        mkdir($target_dir, 0777, true);
+    }
+    
+    $file_name = basename($_FILES["announcementImages"]["name"]);
+    // Create a unique file name using current timestamp and sanitizing the original name
+    $unique_file_name = time() . "_" . preg_replace("/[^A-Za-z0-9.]/", "_", $file_name); 
+    $target_file = $target_dir . $unique_file_name;
+    $imageFileType = strtolower(pathinfo($target_file, PATHINFO_EXTENSION));
+
+    // Simple file type validation
+    $uploadOk = 1;
+    if($imageFileType != "jpg" && $imageFileType != "png" && $imageFileType != "jpeg" && $imageFileType != "gif" ) {
+        $_SESSION['message'] = "Sorry, only JPG, JPEG, PNG & GIF files are allowed for the image.";
+        $_SESSION['message_type'] = "danger";
+        $uploadOk = 0;
+    }
+
+    if ($uploadOk == 1 && move_uploaded_file($_FILES["announcementImages"]["tmp_name"], $target_file)) {
+        // File successfully uploaded. Store the path relative to the site root for DB
+        $uploaded_image_path = "uploads/announcements/" . $unique_file_name; 
+    } else if ($uploadOk == 1) {
+        // Handle move error (if validation passed but move failed)
+        $_SESSION['message'] = "Sorry, there was an error uploading your file.";
+        $_SESSION['message_type'] = "danger";
+        // To prevent insertion, we can exit or set a flag, but for now, we let the logic flow.
+    }
+}
+// END: INSERT CODE for File Upload Handling
+
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $title = $_POST['announcementTitle'];
     $category = $_POST['announcementCategory'];
     $content = $_POST['announcementContent'];
-    $image_url = $_POST['announcementImage']; // Optional, can be empty
+    $image_url = $_POST['announcementImage']; // This line is kept but $_POST['announcementImage'] will be empty due to input type change
 
-    // Prepare an insert statement
-    $stmt = $conn->prepare("INSERT INTO announcements (title, category, content, image_url, publish_date) VALUES (?, ?, ?, ?, NOW())");
+    // START: INSERT/APPEND line to use uploaded path
+    if (!empty($uploaded_image_path)) {
+        $image_url = $uploaded_image_path; // Overwrite $image_url with the file path
+    } else {
+         // If no file was uploaded, $image_url is empty string, which is fine for the optional field
+         $image_url = ''; 
+    }
+    // END: INSERT/APPEND line to use uploaded path
+
+    // Prepare an insert statement (MODIFIED: changed column name from 'image_url' to 'images')
+    $stmt = $conn->prepare("INSERT INTO announcements (title, category, content, images, publish_date) VALUES (?, ?, ?, ?, NOW())");
     $stmt->bind_param("ssss", $title, $category, $content, $image_url);
 
     if ($stmt->execute()) {
@@ -210,7 +257,8 @@ $conn->close();
             <div class="card mb-4">
                 <div class="card-body">
                     <h5 class="card-title mb-4">Announcement Details</h5>
-                    <form id="newAnnouncementForm" method="POST" action="">
+                    <!-- MODIFIED: Added enctype for file uploads -->
+                    <form id="newAnnouncementForm" method="POST" action="" enctype="multipart/form-data">
                         <div class="mb-3">
                             <label for="announcementTitle" class="form-label">Title <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" id="announcementTitle" name="announcementTitle" required>
@@ -229,10 +277,11 @@ $conn->close();
                             <label for="announcementContent" class="form-label">Content <span class="text-danger">*</span></label>
                             <textarea class="form-control" id="announcementContent" name="announcementContent" rows="8" required></textarea>
                         </div>
+                        <!-- MODIFIED: Changed input type and name for file upload, and updated label text -->
                         <div class="mb-3">
-                            <label for="announcementImage" class="form-label">Image URL (Optional)</label>
-                            <input type="url" class="form-control" id="announcementImage" name="announcementImage" placeholder="e.g., https://via.placeholder.com/600x400/19860f/ffffff?text=Announcement+Image">
-                            <small class="form-text text-muted">Provide a direct link to an image to include with your announcement.</small>
+                            <label for="announcementImage" class="form-label">Add Image (Optional)</label>
+                            <input type="file" class="form-control" id="announcementImage" name="announcementImages" accept="image/*">
+                            <small class="form-text text-muted">Select an image file to include with your announcement.</small>
                         </div>
                         <div class="d-flex justify-content-end">
                             <button type="submit" class="btn btn-theme"><i class="fas fa-paper-plane me-2"></i>Publish Announcement</button>

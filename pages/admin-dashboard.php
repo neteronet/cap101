@@ -254,7 +254,7 @@ if($stmt_count){
         }
 
         .card-title {
-            color: #19860f;
+            color: #fff;
             font-size: 1.25rem;
             margin-bottom: 0.75rem;
         }

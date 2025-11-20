@@ -246,41 +246,13 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
             <div>Province of Antique</div>
         </a>
         <ul class="nav flex-column">
-            <li class="nav-item">
-                <a href="municipal-dashboard.php" class="nav-link">
-                    <i class="fas fa-tachometer-alt"></i> Dashboard
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="municipal-farmer_profiles.php" class="nav-link active">
-                    <i class="fas fa-users"></i> Farmer Profiles
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="municipal-crop_monitoring.php" class="nav-link">
-                    <i class="fas fa-seedling"></i> Crop Monitoring
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="municipal-subsidy_management.php" class="nav-link">
-                    <i class="fas fa-hand-holding-usd"></i> Subsidy Management
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="municipal-announcements.php" class="nav-link">
-                    <i class="fas fa-bullhorn"></i> Announcements
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="municipal-reports_analytics.php" class="nav-link">
-                    <i class="fas fa-chart-line"></i> Reports & Analytics
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="municipal-qrcode_management.php" class="nav-link">
-                    <i class="fas fa-qrcode"></i> QR Code Management
-                </a>
-            </li>
+            <li class="nav-item"><a href="municipal-dashboard.php" class="nav-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+            <li class="nav-item"><a href="municipal-subsidy_management.php" class="nav-link"><i class="fas fa-hand-holding-usd"></i> Subsidy Management</a></li>
+            <li class="nav-item"><a href="municipal-qrcode_management.php" class="nav-link"><i class="fas fa-qrcode"></i> QR Code Management</a></li>
+            <li class="nav-item"><a href="municipal-crop_monitoring.php" class="nav-link"><i class="fas fa-seedling"></i> Crop Monitoring</a></li>
+            <li class="nav-item"><a href="municipal-reports_analytics.php" class="nav-link"><i class="fas fa-chart-line"></i> Reports & Analytics</a></li>
+            <li class="nav-item"><a href="municipal-farmer_profiles.php" class="nav-link active"><i class="fas fa-users"></i> Farmer Profiles</a></li>
+            <li class="nav-item"><a href="municipal-announcements.php" class="nav-link"><i class="fas fa-bullhorn"></i> Announcements</a></li>
         </ul>
     </nav>
 

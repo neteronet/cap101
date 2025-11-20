@@ -225,55 +225,70 @@ $conn->close(); // Close the connection after all database operations
         main {
             margin-left: 250px;
             /* Space for the sidebar */
-            padding: 1rem 2rem 2rem 2rem;
-            padding-top: 72px;
-            /* Space for the fixed top header */
+            padding: 1.5rem 2.5rem 2.5rem 2.5rem;
+            padding-top: 80px;
+            /* Slightly more space for the fixed top header */
             background: #f8f9fa;
             min-height: 100vh;
         }
 
         .page-title {
-            font-size: 1.8rem;
-            /* Adjusted for consistency */
+            font-size: 1.9rem;
+            /* Slightly larger for emphasis */
             font-weight: 600;
             color: #19860f;
             /* Green */
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            /* Center the title for better alignment */
         }
 
         .card {
-            border-radius: 0.5rem;
-            /* Consistent border-radius */
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-            /* Consistent shadow */
-            margin-bottom: 1rem;
+            border-radius: 0.75rem;
+            /* Slightly more rounded for visual quality */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            /* Enhanced shadow for depth */
+            margin-bottom: 1.5rem;
+            border: 1px solid #e9ecef;
+            /* Subtle border */
+        }
+
+        .card-body {
+            padding: 2rem;
+            /* Increased padding for better spacing */
         }
 
         .card-title {
             color: #19860f;
             /* Green title for cards */
             font-weight: 600;
-            margin-bottom: 0.75rem;
-            font-size: 1.25rem;
-            /* Consistent with dashboard */
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+            /* Slightly larger */
         }
 
         /* --- Progress Tracking Specific Styles --- */
         .progress-bar-custom {
             background-color: #28a745;
             /* Success green */
+            transition: width 0.3s ease;
+            /* Smooth animation */
         }
 
         .progress-label {
             font-weight: 600;
             color: #333;
-            margin-bottom: 0.5rem;
-            font-size: 1.1rem;
+            margin-bottom: 0.75rem;
+            font-size: 1.15rem;
+            text-align: left;
+            /* Ensure left alignment */
         }
 
         .progress-text {
-            font-size: 0.9em;
+            font-size: 0.95em;
             color: #6c757d;
+            text-align: right;
+            /* Align to right for balance */
         }
 
         .btn-theme {
@@ -358,13 +373,12 @@ $conn->close(); // Close the connection after all database operations
         </a>
         <ul class="nav flex-column">
             <li class="nav-item"><a href="farmer-dashboard.php" class="nav-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
-            <li class="nav-item"><a href="farmer-my_profile.php" class="nav-link"><i class="fas fa-user-circle"></i> My Profile</a></li>
-            <!-- Highlighted as the central page for both status and application -->
             <li class="nav-item"><a href="farmer-apply_for_assistance.php" class="nav-link"><i class="fas fa-hand-holding-usd"></i>Apply for Assistance</a></li>
-            <li class="nav-item"><a href="farmer-announcement.php" class="nav-link"><i class="fas fa-bullhorn"></i> Announcements</a></li>
             <li class="nav-item"><a href="farmer-planting_status.php" class="nav-link"><i class="fas fa-leaf"></i> Planting Status</a></li>
-            <li class="nav-item"><a href="farmer-progress_tracking.php" class="nav-link active"><i class="fas fa-chart-line"></i> Progress Tracking</a></li>
             <li class="nav-item"><a href="farmer-claim_history.php" class="nav-link"><i class="fas fa-history"></i> Claim History</a></li>
+            <li class="nav-item"><a href="farmer-progress_tracking.php" class="nav-link active"><i class="fas fa-chart-line"></i> Progress Tracking</a></li>
+            <li class="nav-item"><a href="farmer-announcement.php" class="nav-link"><i class="fas fa-bullhorn"></i> Announcements</a></li>
+            <li class="nav-item"><a href="farmer-my_profile.php" class="nav-link"><i class="fas fa-user-circle"></i> My Profile</a></li>
         </ul>
     </nav>
 
@@ -442,41 +456,45 @@ $conn->close(); // Close the connection after all database operations
                                     break;
                             }
                         ?>
-                            <div class="mb-4 pb-3 border-bottom">
-                                <div class="d-flex justify-content-between align-items-center mb-1">
+                            <div class="mb-4 pb-4 border-bottom border-light">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
                                     <span class="progress-label"><?php echo htmlspecialchars($crop['crop_identifier']); ?></span>
                                     <span class="progress-text"><?php echo $days_text; ?></span>
                                 </div>
-                                <div class="progress" role="progressbar" aria-label="<?php echo htmlspecialchars($crop['crop_identifier']); ?> Progress" aria-valuenow="<?php echo $progress_percent; ?>" aria-valuemin="0" aria-valuemax="100" style="height: 20px;">
+                                <div class="progress mb-3" role="progressbar" aria-label="<?php echo htmlspecialchars($crop['crop_identifier']); ?> Progress" aria-valuenow="<?php echo $progress_percent; ?>" aria-valuemin="0" aria-valuemax="100" style="height: 24px;">
                                     <div class="progress-bar progress-bar-custom" style="width: <?php echo $progress_percent; ?>%;">
                                         <?php echo $progress_stage; ?> (<?php echo $progress_percent; ?>%)
                                     </div>
                                 </div>
-                                <small class="text-muted d-block mt-1">
-                                    Current Status: <strong><?php echo htmlspecialchars($crop['status']); ?></strong>
-                                    <?php if ($crop['photo_path'] && file_exists($crop['photo_path'])): ?>
-                                        <!-- MODIFIED: Changed View Photo link to open in modal -->
-                                        <a href="#" class="ms-2 view-photo-btn" data-bs-toggle="modal" data-bs-target="#imageViewModal" data-photo-path="<?php echo htmlspecialchars($crop['photo_path']); ?>">
-                                            <i class="fas fa-camera"></i> View Photo
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-muted">
+                                        Current Status: <strong><?php echo htmlspecialchars($crop['status']); ?></strong>
+                                        <?php if ($crop['photo_path'] && file_exists($crop['photo_path'])): ?>
+                                            <!-- MODIFIED: Changed View Photo link to open in modal -->
+                                            <a href="#" class="ms-3 view-photo-btn text-decoration-none" data-bs-toggle="modal" data-bs-target="#imageViewModal" data-photo-path="<?php echo htmlspecialchars($crop['photo_path']); ?>">
+                                                <i class="fas fa-camera"></i> View Photo
+                                            </a>
+                                        <?php endif; ?>
+                                    </small>
+                                    <div class="d-flex gap-2">
+                                        <!-- You can link 'View Details' to a more specific page or modal later -->
+                                        <button class="btn btn-outline-info btn-sm">View Details</button>
+                                        <a href="farmer-planting_status.php">
+                                            <button class="btn btn-outline-primary btn-sm">Update Status</button>
                                         </a>
-                                    <?php endif; ?>
-                                </small>
-                                <div class="mt-2">
-                                    <!-- You can link 'View Details' to a more specific page or modal later -->
-                                    <button class="btn btn-outline-info btn-sm">View Details</button>
-                                    <a href="farmer-planting_status.php">
-                                        <button class="btn btn-outline-primary btn-sm">Update Status</button>
-                                    </a>
+                                    </div>
                                 </div>
                             </div>
                         <?php endforeach; ?>
                     <?php else: ?>
-                        <div class="alert alert-info text-center" role="alert">
+                        <div class="alert alert-info text-center py-4" role="alert">
                             <i class="fas fa-info-circle me-2"></i> No active crops being tracked yet. Start by adding one!
                         </div>
                     <?php endif; ?>
 
-                    <a href="farmer-planting_status.php" class="btn btn-theme mt-3"><i class="fas fa-plus me-1"></i> Add New Crop for Tracking</a>
+                    <div class="text-center mt-4">
+                        <a href="farmer-planting_status.php" class="btn btn-theme"><i class="fas fa-plus me-2"></i> Add New Crop for Tracking</a>
+                    </div>
                 </div>
             </div>
         </div>

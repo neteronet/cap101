@@ -337,7 +337,7 @@ $conn->close();
                 </a>
             </li>
             <li class="nav-item">
-                <a href="add-user.php" class="nav-link active">
+                <a href="admin-add_user.php" class="nav-link active">
                     <i class="fas fa-user-plus"></i> Add User
                 </a>
             </li>
