@@ -695,18 +695,12 @@
             background-color: #fff;
             border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            border: 1px solid #eee;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border: none;
             text-decoration: none;
             color: inherit;
             display: flex;
             flex-direction: column;
-        }
-
-        .blog-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
         }
 
         .blog-img-container {

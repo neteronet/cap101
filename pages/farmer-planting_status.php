@@ -1,7 +1,8 @@
 <?php
 session_start();
 
-include '../includes/connection.php';
+// NOTE: Ensure the path to connection.php is correct based on your file structure.
+include '../includes/connection.php'; 
 
 // --- IMPROVEMENT 1: Robust Connection Check ---
 if (!isset($conn) || $conn->connect_error) {
@@ -58,10 +59,11 @@ $error_message = '';
 $alerts = []; // To store dynamic alerts from the database
 $user_planting_statuses = []; // Initialize here
 
-// --- Function to fetch user's current planting statuses ---
+// --- Function to fetch user's current planting statuses (USED BY BOTH FILES) ---
 function fetchUserPlantingStatuses($conn, $user_id) {
     $statuses = [];
-    $stmt = $conn->prepare("SELECT crop_identifier, status, photo_path, update_date FROM planting_status WHERE user_id = ? ORDER BY update_date DESC");
+    // Note: The 'id' column is needed for potential future detail pages/tracking
+    $stmt = $conn->prepare("SELECT id, crop_identifier, status, photo_path, update_date FROM planting_status WHERE user_id = ? ORDER BY update_date DESC");
     if ($stmt) {
         $stmt->bind_param("i", $user_id);
         $stmt->execute();
@@ -76,7 +78,7 @@ function fetchUserPlantingStatuses($conn, $user_id) {
     return $statuses;
 }
 
-// --- Function to generate alerts based on planting statuses ---
+// --- Function to generate alerts based on planting statuses (FROM FILE 1) ---
 function generateAlerts($user_planting_statuses) {
     $generated_alerts = [];
 
@@ -91,40 +93,22 @@ function generateAlerts($user_planting_statuses) {
                     'message' => 'Please update the planting status for your <strong class="text-dark">Corn crop (Field 2)</strong>. It is currently marked as "Not Planted".'
                 ];
             }
-            // You can add more complex logic here, e.g., "not updated in X days"
-            // $last_update_timestamp = strtotime($status_item['update_date']);
-            // if (time() - $last_update_timestamp > (7 * 24 * 60 * 60)) { // 7 days
-            //     $generated_alerts[] = [
-            //         'type' => 'warning',
-            //         'message' => 'Your <strong class="text-dark">Corn crop (Field 2)</strong> hasn\'t been updated in over a week.'
-            //     ];
-            // }
             break;
         }
     }
     // General alert if no planting status is recorded at all
     if (empty($user_planting_statuses)) {
         $generated_alerts[] = [
-            'type' => 'info', // Changed to info, as it's less critical than a specific "not planted" warning
+            'type' => 'info',
             'message' => 'You haven\'t recorded any planting status yet. Please use the form to submit your first update!'
         ];
-    } elseif (!$corn_field2_status_found) {
-        // If Corn (Field 2) is a required crop for the farmer but not found in their list,
-        // you might want to add a specific prompt here.
-        // For simplicity, we'll just rely on the general "empty" alert above if no crops exist.
-        // If 'Corn (Field 2)' is an *expected* crop for all farmers, you might add:
-        // $generated_alerts[] = [
-        //     'type' => 'info',
-        //     'message' => 'Consider adding a planting status for <strong class="text-dark">Corn (Field 2)</strong> if you are cultivating it.'
-        // ];
     }
-
 
     return $generated_alerts;
 }
 
 
-// --- Handle Form Submission ---
+// --- Handle Form Submission (FROM FILE 1) ---
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $crop_identifier = $_POST['cropSelect'] ?? '';
     $planting_status_val = $_POST['plantingStatus'] ?? '';
@@ -170,6 +154,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
 
         // Prepare to insert or update the database
+        // Assuming a UNIQUE constraint on (user_id, crop_identifier) exists for ON DUPLICATE KEY UPDATE
         $stmt = $conn->prepare("INSERT INTO planting_status (user_id, crop_identifier, status, photo_path)
                                 VALUES (?, ?, ?, ?)
                                 ON DUPLICATE KEY UPDATE status = VALUES(status), photo_path = VALUES(photo_path), update_date = CURRENT_TIMESTAMP");
@@ -202,7 +187,7 @@ if (empty($user_planting_statuses)) { // Only fetch if not already updated by PO
 }
 
 // --- Generate Alerts for initial page load or if form submission didn't update it ---
-if (empty($alerts) && $_SERVER["REQUEST_METHOD"] != "POST") { // Only generate if not already updated by POST
+if (empty($alerts)) { // Generate alerts only if POST didn't already
     $alerts = generateAlerts($user_planting_statuses);
 }
 
@@ -215,16 +200,15 @@ $conn->close(); // Close the connection after all database operations
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Farmer Account - Planting Status</title>
+    <title>Farmer Account - Planting Status & Tracking</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <!-- Custom Styles -->
+    <!-- Custom Styles (Combined from both files) -->
     <style>
-        /* ... (Your existing CSS styles go here) ... */
         body {
             font-family: "Poppins", sans-serif;
             background: #f8f9fa;
@@ -246,7 +230,7 @@ $conn->close(); // Close the connection after all database operations
             overflow-y: auto;
             font-size: 14px;
             z-index: 1050;
-            border-right: 1px solid #ddd;
+            border-right: 1px solid #ddd; /* Original subtle border kept */
         }
 
         .sidebar .nav-link {
@@ -276,43 +260,6 @@ $conn->close(); // Close the connection after all database operations
             background-color: #146c0b; /* Darker green on hover */
             color: #fff;
         }
-
-        /* Submenu styles (these styles are no longer directly used for Crop Monitoring,
-           but kept in case other dropdowns exist or are added later) */
-        .sidebar .nav-item .collapse .nav-link {
-            padding-left: 2.5rem; /* Indent for submenu items */
-            background-color: #19860f; /* Inherit parent background */
-            color: #fff;
-            font-size: 0.95rem;
-            padding-right: 1rem;
-        }
-        .sidebar .nav-item .collapse .nav-link.active {
-            background-color: #fff; /* Active submenu item background */
-            color: #19860f;
-            font-weight: 600;
-            border-radius: 0;
-        }
-        .sidebar .nav-item .collapse .nav-link:hover:not(.active) {
-            background-color: #146c0b; /* Hover for submenu item */
-            color: #fff;
-        }
-
-        /* Specific style for the dropdown toggle link itself (no longer needed for crop monitoring) */
-        .sidebar .nav-link.dropdown-toggle-custom {
-            background-color: transparent;
-            color: #fff;
-        }
-        .sidebar .nav-link.dropdown-toggle-custom:hover {
-            background-color: #146c0b;
-            color: #fff;
-        }
-        .sidebar .nav-link.dropdown-toggle-custom[aria-expanded="true"] .fa-chevron-down {
-            transform: rotate(180deg);
-        }
-        .sidebar .nav-link .fa-chevron-down {
-            transition: transform 0.2s ease-in-out;
-        }
-
 
         .sidebar .header-brand {
             display: flex;
@@ -357,13 +304,7 @@ $conn->close(); // Close the connection after all database operations
             justify-content: flex-end; /* Align items to the right */
             z-index: 1060; /* Higher than sidebar */
             border-bottom: 1px solid #ddd;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05); /* Subtle shadow */
-        }
-
-        .header-brand span { /* This style is for the "AntiqueProv Agri" in the original header. Not used in this layout. */
-            font-size: 1rem;
-            font-weight: 600;
-            color: #19860f;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05); /* Original subtle shadow kept */
         }
 
         .logout-btn {
@@ -384,121 +325,78 @@ $conn->close(); // Close the connection after all database operations
         /* --- Main Content Area --- */
         main {
             margin-left: 250px; /* Space for the sidebar */
-            padding: 1rem 2rem 2rem 2rem;
-            padding-top: 72px; /* Space for the fixed top header */
+            padding: 2rem 3rem 3rem 3rem; /* Increased padding for more airiness */
+            padding-top: 80px; /* Space for the fixed top header */
             background: #f8f9fa;
             min-height: 100vh;
         }
 
         .page-title {
-            font-size: 1.8rem; /* Adjusted for consistency */
+            font-size: 1.9rem;
             font-weight: 600;
             color: #19860f; /* Green */
-            margin-bottom: 1rem;
+            margin-bottom: 2rem; /* Increased margin */
+            text-align: center;
         }
 
         .card {
-            border-radius: 0.5rem; /* Consistent border-radius */
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05); /* Consistent shadow */
-            margin-bottom: 1rem;
+            border-radius: 0.85rem; /* Slightly more rounded */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Original shadow kept */
+            margin-bottom: 2rem; /* Consistent spacing */
+            border: none; /* Removed original faint border-bottom/border */
+            transition: transform 0.3s ease, box-shadow 0.3s ease; /* Transition for smoothness */
+        }
+
+        .card:hover {
+            /* No lift or stronger shadow, as requested */
+        }
+
+        .card-body {
+            padding: 2.5rem; /* Increased padding */
         }
 
         .card-title {
             color: #19860f; /* Green title for cards */
             font-weight: 600;
-            margin-bottom: 0.75rem;
-            font-size: 1.25rem; /* Consistent with dashboard */
+            margin-bottom: 1.5rem; /* More spacing below title */
+            font-size: 1.3rem;
+            border-left: 4px solid #19860f; /* Visual accent line */
+            padding-left: 10px; /* Space for accent line */
         }
 
-        /* --- Custom Elements for Planting Status --- */
+        /* --- Custom Elements for Planting Status & Alerts (FROM FILE 1) --- */
         .alert-custom-warning {
             background-color: #fff3cd; /* Light yellow */
             border-color: #ffeeba;
             color: #856404;
-            padding: 1rem;
-            border-radius: 0.5rem;
+        }
+        .alert-custom-info {
+            background-color: #cfe2ff; /* Light blue */
+            border-color: #b9d1f3;
+            color: #084298;
+        }
+        /* Combined alert styles for consistent look */
+        .alert-custom-warning, .alert-custom-info {
+            padding: 1.25rem; /* Increased padding */
+            border-radius: 0.75rem; /* More rounded */
             margin-bottom: 1.5rem;
             display: flex;
-            align-items: center;
+            align-items: flex-start; /* Align icon and text to the top */
         }
-        .alert-custom-warning i {
-            margin-right: 10px;
-            font-size: 1.5rem;
-            color: #ffc107; /* Warning yellow icon */
+        .alert-custom-warning i,
+        .alert-custom-info i {
+            margin-right: 15px; /* More space between icon and text */
+            font-size: 1.8rem; /* Larger icons */
+            flex-shrink: 0; /* Prevent icon from shrinking */
         }
-        .alert-custom-warning .alert-heading {
-            color: #856404;
+        .alert-custom-warning .alert-heading,
+        .alert-custom-info .alert-heading {
+            font-size: 1.1rem; /* Slightly larger heading */
             font-weight: 600;
+            margin-top: -3px; /* Adjust alignment with larger icon */
+            /* Color inherited from parent alert */
         }
 
-        .list-unstyled li {
-            font-size: 0.95rem;
-            color: #555;
-            margin-bottom: 0.5rem;
-        }
-        .list-unstyled li i {
-            width: 20px; /* Align icons */
-            text-align: center;
-        }
-
-        .form-label {
-            font-weight: 500;
-            color: #333;
-        }
-
-        .form-check-label {
-            font-size: 1rem;
-            color: #444;
-        }
-
-        .form-check-input:checked {
-            background-color: #19860f;
-            border-color: #19860f;
-        }
-
-        .btn-theme { /* Re-using the btn-theme from dashboard for consistency */
-            background-color: #19860f;
-            color: #fff;
-            font-size: 15px;
-            padding: 10px 20px;
-            border-radius: 4px;
-            transition: background 0.2s ease;
-            border: none; /* Ensure no default border */
-        }
-
-        .btn-theme:hover {
-            background-color: #146c0b;
-            color: #fff; /* Keep text white on hover */
-        }
-        .planting-status-item {
-            display: flex;
-            align-items: center;
-            margin-bottom: 10px;
-            padding: 8px;
-            border: 1px solid #eee;
-            border-radius: 5px;
-            background-color: #fcfcfc;
-        }
-        .planting-status-item img {
-            width: 50px;
-            height: 50px;
-            object-fit: cover;
-            border-radius: 5px;
-            margin-right: 15px;
-            border: 1px solid #ddd;
-        }
-        .planting-status-item .details {
-            flex-grow: 1;
-        }
-        .planting-status-item .details strong {
-            color: #19860f;
-            font-size: 1.05rem;
-        }
-        .planting-status-item .details span {
-            display: block;
-            font-size: 0.85rem;
-            color: #666;
-        }
         .alert-custom-success {
             background-color: #d4edda;
             border-color: #c3e6cb;
@@ -514,6 +412,112 @@ $conn->close(); // Close the connection after all database operations
             padding: 1rem;
             border-radius: 0.5rem;
             margin-bottom: 1.5rem;
+        }
+        
+        /* Form styling */
+        .form-label {
+            font-weight: 500;
+            color: #333;
+        }
+        .form-select, .form-control {
+            border-radius: 0.5rem; /* Consistent rounding on inputs */
+            padding: 0.65rem 1rem; /* Better input padding */
+        }
+
+        .form-check-label {
+            font-size: 1rem;
+            color: #444;
+            padding-top: 2px; /* Align text slightly better with radio button */
+        }
+
+        .form-check-input:checked {
+            background-color: #19860f;
+            border-color: #19860f;
+        }
+        
+        /* --- Progress Tracking Specific Styles (FROM FILE 2) --- */
+        .progress-bar-custom {
+            background-color: #28a745; /* Success green */
+            transition: width 0.3s ease;
+            font-weight: 600; /* Bold text inside bar */
+            font-size: 0.95rem;
+            color: #fff; /* Ensure white text for contrast */
+            border-radius: 0.4rem; /* Match progress container */
+        }
+
+        .progress {
+            height: 28px !important; /* Taller progress bar for visibility */
+            border-radius: 0.5rem; /* Consistent rounding */
+            background-color: #e9ecef; /* Lighter background for empty space */
+        }
+
+        .progress-label {
+            font-weight: 700; /* Bolder label */
+            color: #333;
+            margin-bottom: 0.75rem;
+            font-size: 1.2rem; /* Slightly larger label */
+            text-align: left;
+        }
+
+        .progress-text {
+            font-size: 0.95em;
+            color: #6c757d;
+            text-align: right;
+        }
+
+        .btn-theme { /* Re-using the btn-theme from dashboard for consistency */
+            background-color: #19860f;
+            color: #fff;
+            font-size: 15px;
+            padding: 12px 20px; /* Taller button */
+            border-radius: 0.5rem; /* Consistent rounding */
+            transition: background 0.2s ease;
+            border: none;
+            font-weight: 500;
+            /* Shadow kept off */
+        }
+
+        .btn-theme:hover {
+            background-color: #146c0b;
+            color: #fff;
+        }
+
+        .btn-outline-info {
+            color: #17a2b8;
+            border-color: #17a2b8;
+            transition: all 0.2s ease;
+            border-radius: 0.5rem; /* Consistent rounding for detail buttons */
+        }
+
+        .btn-outline-info:hover {
+            background-color: #17a2b8;
+            color: #fff;
+        }
+
+        .btn-outline-primary {
+            color: #007bff;
+            border-color: #007bff;
+            transition: all 0.2s ease;
+            border-radius: 0.5rem; /* Consistent rounding for detail buttons */
+        }
+
+        .btn-outline-primary:hover {
+            background-color: #007bff;
+            color: #fff;
+        }
+
+        /* --- Image View Modal Adjustments (FROM FILE 2) --- */
+        .modal {
+            z-index: 1070;
+        }
+
+        #modalImage {
+            max-width: 100%;
+            max-height: 100%;
+            height: auto;
+            width: auto;
+            display: block;
+            margin: 0 auto;
         }
     </style>
 </head>
@@ -546,9 +550,7 @@ $conn->close(); // Close the connection after all database operations
     <!-- Content -->
     <main>
         <div class="container">
-            <h2 class="page-title"><i class="fas fa-leaf me-2"></i>Planting Status</h2>
-            <p class="text-muted mb-4">Update your crop's planting progress and check for alerts.</p>
-
+            
             <?php if ($success_message): ?>
                 <div class="alert alert-custom-success" role="alert">
                     <?php echo $success_message; ?>
@@ -562,7 +564,7 @@ $conn->close(); // Close the connection after all database operations
             <?php endif; ?>
 
             <div class="row">
-                <!-- Reminders/Alerts Card -->
+                <!-- Reminders/Alerts Card (FROM FILE 1) -->
                 <div class="col-md-6 mb-4">
                     <div class="card h-100">
                         <div class="card-body">
@@ -577,7 +579,7 @@ $conn->close(); // Close the connection after all database operations
                                                 <?php echo $alert['message']; ?>
                                             </div>
                                         <?php elseif ($alert['type'] == 'info'): ?>
-                                            <i class="fas fa-info-circle me-2"></i>
+                                            <i class="fas fa-info-circle"></i>
                                             <div>
                                                 <h6 class="alert-heading mb-1">Information:</h6>
                                                 <?php echo $alert['message']; ?>
@@ -590,61 +592,52 @@ $conn->close(); // Close the connection after all database operations
                                     <i class="fas fa-info-circle me-2"></i>No immediate alerts or reminders. All good!
                                 </div>
                             <?php endif; ?>
-
-                            <p class="text-muted small mt-3">Your recorded planting statuses:</p>
-                            <?php if (!empty($user_planting_statuses)): ?>
-                                <div class="list-group">
-                                    <?php foreach ($user_planting_statuses as $status_item): ?>
-                                        <div class="planting-status-item">
-                                            <?php if ($status_item['photo_path'] && file_exists($status_item['photo_path'])): ?>
-                                                <img src="<?php echo htmlspecialchars($status_item['photo_path']); ?>" alt="Crop Photo" class="img-thumbnail">
-                                            <?php else: ?>
-                                                <img src="https://via.placeholder.com/50?text=No+Photo" alt="No Photo" class="img-thumbnail">
-                                            <?php endif; ?>
-                                            <div class="details">
-                                                <strong><?php echo htmlspecialchars($status_item['crop_identifier']); ?></strong>
-                                                <span>Status: <?php echo htmlspecialchars($status_item['status']); ?></span>
-                                                <span>Last Updated: <?php echo date("M d, Y H:i", strtotime($status_item['update_date'])); ?></span>
-                                            </div>
-                                        </div>
-                                    <?php endforeach; ?>
-                                </div>
-                            <?php else: ?>
-                                <p class="text-muted">No planting statuses recorded yet. Use the form to submit one!</p>
-                            <?php endif; ?>
+                            <p class="text-muted small mt-3">Use the form opposite to update a status.</p>
                         </div>
                     </div>
                 </div>
 
-                <!-- Planting Status Card -->
+                <!-- Planting Status Card (Form) (FROM FILE 1) -->
                 <div class="col-md-6 mb-4">
                     <div class="card h-100">
                         <div class="card-body">
                             <h5 class="card-title"><i class="fas fa-clipboard-check me-2"></i>Update Planting Status</h5>
-                            <form method="POST" enctype="multipart/form-data"> <!-- Added method="POST" and enctype -->
+                            <form method="POST" enctype="multipart/form-data">
                                 <div class="mb-3">
                                     <label for="cropSelect" class="form-label">Select Crop:</label>
                                     <select class="form-select" id="cropSelect" name="cropSelect" aria-label="Select Crop" required>
                                         <option value="Choose..." selected>Choose...</option>
-                                        <!-- Populate options dynamically from a database table of registered crops if available -->
                                         <option value="Rice (Field 1)">Rice (Field 1)</option>
                                         <option value="Corn (Field 2)">Corn (Field 2)</option>
                                         <option value="Vegetables (Plot 3)">Vegetables (Plot 3)</option>
-                                        <!-- Add more options as needed -->
                                     </select>
                                 </div>
 
                                 <div class="form-check mb-2">
                                     <input class="form-check-input" type="radio" name="plantingStatus" id="planted" value="Planted" required>
                                     <label class="form-check-label" for="planted">
-                                        ✅ Seeds have been planted
+                                        ✅ Seeds have been planted (Initial Stage)
+                                    </label>
+                                </div>
+                                
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="radio" name="plantingStatus" id="growing" value="Growing" required>
+                                    <label class="form-check-label" for="growing">
+                                        🌱 Crop is actively growing (Mid-stage)
+                                    </label>
+                                </div>
+                                
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="radio" name="plantingStatus" id="harvesting" value="Harvesting" required>
+                                    <label class="form-check-label" for="harvesting">
+                                        🌾 Ready for harvest (Final Stage)
                                     </label>
                                 </div>
 
                                 <div class="form-check mb-3">
                                     <input class="form-check-input" type="radio" name="plantingStatus" id="notPlanted" value="Not Planted" required>
                                     <label class="form-check-label" for="notPlanted">
-                                        ❌ Seeds not yet planted
+                                        ❌ Seeds not yet planted (Planning Stage)
                                     </label>
                                 </div>
 
@@ -660,10 +653,130 @@ $conn->close(); // Close the connection after all database operations
                     </div>
                 </div>
             </div>
+            
+            <!-- Active Crop Progress Card (FROM FILE 2) -->
+            <div class="card mb-4 mt-3">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-chart-line me-2"></i>Active Crop Progress Overview</h5>
+
+                    <?php if (!empty($user_planting_statuses)): ?>
+                        <?php foreach ($user_planting_statuses as $crop):
+                            // Logic to calculate progress percent and stage (Simplified from FILE 2)
+                            $progress_percent = 0;
+                            $progress_stage = "Unknown Stage";
+                            $days_since_update = '';
+
+                            if ($crop['update_date']) {
+                                $last_update_timestamp = strtotime($crop['update_date']);
+                                $current_timestamp = time();
+                                $diff_seconds = $current_timestamp - $last_update_timestamp;
+                                $days_since_update = floor($diff_seconds / (60 * 60 * 24));
+                            }
+
+
+                            switch ($crop['status']) {
+                                case 'Planted':
+                                    $progress_percent = 25;
+                                    $progress_stage = "Early Growth";
+                                    $days_text = ($days_since_update !== '') ? $days_since_update . " Days since update" : "Status: Planted";
+                                    break;
+                                case 'Growing':
+                                    $progress_percent = 50;
+                                    $progress_stage = "Vegetative Stage";
+                                    $days_text = ($days_since_update !== '') ? $days_since_update . " Days since update" : "Status: Growing";
+                                    break;
+                                case 'Harvesting':
+                                    $progress_percent = 90;
+                                    $progress_stage = "Ready for Harvest";
+                                    $days_text = ($days_since_update !== '') ? $days_since_update . " Days since update" : "Status: Harvesting";
+                                    break;
+                                case 'Not Planted':
+                                    $progress_percent = 5;
+                                    $progress_stage = "Planning Stage";
+                                    $days_text = "Not yet planted";
+                                    break;
+                                default:
+                                    $progress_percent = 0;
+                                    $progress_stage = "Status: " . htmlspecialchars($crop['status']);
+                                    $days_text = "Last updated: " . date("M d, Y", strtotime($crop['update_date']));
+                                    break;
+                            }
+                        ?>
+                            <div class="mb-4 pb-4 border-bottom border-light">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="progress-label"><?php echo htmlspecialchars($crop['crop_identifier']); ?></span>
+                                    <span class="progress-text"><?php echo $days_text; ?></span>
+                                </div>
+                                <div class="progress mb-3" role="progressbar" aria-label="<?php echo htmlspecialchars($crop['crop_identifier']); ?> Progress" aria-valuenow="<?php echo $progress_percent; ?>" aria-valuemin="0" aria-valuemax="100">
+                                    <div class="progress-bar progress-bar-custom" style="width: <?php echo $progress_percent; ?>%;">
+                                        <?php echo $progress_stage; ?> (<?php echo $progress_percent; ?>%)
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-muted">
+                                        Current Status: <strong><?php echo htmlspecialchars($crop['status']); ?></strong>
+                                        <?php if ($crop['photo_path'] && file_exists($crop['photo_path'])): ?>
+                                            <!-- MODIFIED: Changed View Photo link to open in modal (FROM FILE 2) -->
+                                            <a href="#" class="ms-3 view-photo-btn text-decoration-none" data-bs-toggle="modal" data-bs-target="#imageViewModal" data-photo-path="<?php echo htmlspecialchars($crop['photo_path']); ?>">
+                                                <i class="fas fa-camera"></i> View Photo
+                                            </a>
+                                        <?php endif; ?>
+                                    </small>
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-outline-info btn-sm">View Details</button>
+                                        <!-- No need for 'Update Status' button linking to the same page, but we keep the structure if needed later -->
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <div class="alert alert-info text-center py-4" role="alert">
+                            <i class="fas fa-info-circle me-2"></i> No crops recorded yet. Use the "Update Planting Status" form above to start tracking!
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
         </div>
     </main>
 
+    <!-- Image View Modal (FROM FILE 2) -->
+    <div class="modal fade" id="imageViewModal" tabindex="-1" aria-labelledby="imageViewModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="imageViewModalLabel">Crop Photo</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img src="" id="modalImage" class="img-fluid" alt="Crop Photo">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Bootstrap Script -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- JavaScript for Modal (FROM FILE 2) -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var imageViewModal = document.getElementById('imageViewModal');
+            var modalImage = document.getElementById('modalImage');
+
+            // Listen for when the modal is about to be shown
+            imageViewModal.addEventListener('show.bs.modal', function (event) {
+                // Button that triggered the modal is in event.relatedTarget
+                var button = event.relatedTarget;
+                // Extract info from data-photo-path attribute
+                var photoPath = button.getAttribute('data-photo-path');
+
+                // Update the modal's content.
+                modalImage.src = photoPath;
+            });
+        });
+    </script>
 </body>
 </html>
