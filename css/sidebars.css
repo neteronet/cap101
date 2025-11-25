@@ -29,6 +29,7 @@ main {
   color: var(--bs-emphasis-color);
   background-color: transparent;
 }
+
 .btn-toggle:hover,
 .btn-toggle:focus {
   color: rgba(var(--bs-emphasis-color-rgb), 0.85);
@@ -50,6 +51,7 @@ main {
 .btn-toggle[aria-expanded="true"] {
   color: rgba(var(--bs-emphasis-color-rgb), 0.85);
 }
+
 .btn-toggle[aria-expanded="true"]::before {
   transform: rotate(90deg);
 }
@@ -59,6 +61,7 @@ main {
   margin-top: 0.125rem;
   margin-left: 1.25rem;
 }
+
 .btn-toggle-nav a:hover,
 .btn-toggle-nav a:focus {
   background-color: var(--bs-tertiary-bg);
@@ -81,4 +84,73 @@ main {
 .card-summary {
   padding: 1rem;
   border-left: 5px solid;
+}
+
+/* -- Sidebar logout button styles consistent with nav links -- */
+.sidebar .sidebar-logout-btn {
+  color: #fff;
+  padding: 0.6rem 1rem;
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 0;
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+}
+
+.sidebar .sidebar-logout-btn.active {
+  background: transparent !important;
+  color: #fff !important;
+  font-weight: 500 !important;
+  border-color: #19860f !important;
+  pointer-events: none;
+  cursor: default;
+}
+
+.sidebar .sidebar-logout-btn:hover {
+  background-color: #146c0b;
+  color: #fff;
+}
+
+.sidebar .sidebar-logout-btn i {
+  margin-right: 8px;
+  font-size: 1rem;
+}
+
+/* Removed legacy .logout-btn styles */
+
+/* Additional CSS as previously read */
+/* ... Previous CSS rules continuing unchanged ... */
+
+/* Sidebar styles */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 250px;
+  height: 100vh;
+  background: #19860f;
+  padding: 1rem 0;
+  overflow-y: auto;
+  font-size: 14px;
+  z-index: 1050;
+  border-right: 1px solid #ddd;
+  transition: left 0.3s ease;
+}
+
+/* Sidebar collapsed state (hidden/off-canvas) */
+.sidebar.collapsed {
+  left: -250px;
+}
+
+main {
+  margin-left: 250px;
+  transition: margin-left 0.3s ease;
+}
+
+/* Adjust main margin when sidebar collapsed */
+.sidebar.collapsed ~ main {
+  margin-left: 0;
 }

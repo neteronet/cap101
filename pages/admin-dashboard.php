@@ -204,16 +204,17 @@ if($stmt_count){
         .logout-btn {
             background: #ff4b2b;
             color: #fff;
-            border: none;
+            border: 2px solid #19860f;
             padding: 6px 14px;
             font-size: 14px;
             border-radius: 20px;
-            transition: background 0.2s ease;
+            transition: background 0.2s ease, border-color 0.2s ease;
             cursor: pointer;
         }
 
         .logout-btn:hover {
             background: #e04325;
+            border-color: #e04325;
         }
 
         .btn-theme {
@@ -315,16 +316,22 @@ if($stmt_count){
                     <i class="fas fa-clipboard-list"></i> Register Farmer Details
                 </a>
             </li>
+            <!-- Added logout as nav item -->
+            <li class="nav-item">
+                <a href="admin-logout.php" class="nav-link sidebar-logout-btn">
+                    <i class="fas fa-sign-out-alt me-1"></i> Logout
+                </a>
+            </li>
         </ul>
     </nav>
 
     <!-- Header -->
-    <div class="card-header card-header-custom d-flex justify-content-end align-items-center">
-        <span class="me-3">Hi, <strong><?php echo $display_name; ?></strong></span>
-        <button class="logout-btn" onclick="location.href='admin-logout.php'">
-            <i class="fas fa-sign-out-alt me-1"></i> Logout
-        </button>
-    </div>
+<div class="card-header card-header-custom d-flex justify-content-between align-items-center">
+    <button id="sidebarToggleBtn" class="btn btn-link p-0 text-dark" title="Toggle Sidebar" style="font-size: 1.5rem;">
+        <i class="fas fa-bars"></i>
+    </button>
+    <span class="me-3">Hi, <strong><?php echo $display_name; ?></strong></span>
+</div>
 
     <!-- Main Content -->
     <main>
@@ -379,6 +386,21 @@ if($stmt_count){
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // JavaScript to toggle sidebar collapse
+        const sidebar = document.querySelector('.sidebar');
+        const mainContent = document.querySelector('main');
+        const toggleBtn = document.getElementById('sidebarToggleBtn');
+        toggleBtn.addEventListener('click', function () {
+            sidebar.classList.toggle('collapsed');
+            // Adjust main content margin
+            if (sidebar.classList.contains('collapsed')) {
+                mainContent.style.marginLeft = '0';
+            } else {
+                mainContent.style.marginLeft = '250px';
+            }
+        });
+    </script>
 </body>
 
 </html>

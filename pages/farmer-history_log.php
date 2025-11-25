@@ -355,11 +355,7 @@ $conn->close(); // Close the connection after all database operations
                     <i class="fas fa-leaf"></i> Planting Status
                 </a>
             </li>
-            <li class="nav-item">
-                <a href="farmer-progress_tracking.php" class="nav-link">
-                    <i class="fas fa-chart-line"></i> Progress Tracking
-                </a>
-            </li>
+            <!-- Removed link to Progress Tracking -->
             <li class="nav-item">
                 <a href="farmer-history_log.php" class="nav-link active">
                     <i class="fas fa-history"></i> History Log

@@ -271,16 +271,17 @@ $conn->close(); // Close the database connection here, after all queries.
         .logout-btn {
             background: #ff4b2b;
             color: #fff;
-            border: none;
+            border: 2px solid #19860f;
             padding: 6px 14px;
             font-size: 14px;
             border-radius: 20px;
-            transition: background 0.2s ease;
+            transition: background 0.2s ease, border-color 0.2s ease;
             cursor: pointer;
         }
 
         .logout-btn:hover {
             background: #e04325;
+            border-color: #e04325;
         }
 
         .btn-theme {

@@ -474,7 +474,7 @@ if ($conn && $conn->ping()) {
             <li class="nav-item"><a href="farmer-apply_for_assistance.php" class="nav-link active"><i class="fas fa-hand-holding-usd"></i>Apply for Assistance</a></li>
             <li class="nav-item"><a href="farmer-planting_status.php" class="nav-link"><i class="fas fa-leaf"></i> Planting Status</a></li>
             <li class="nav-item"><a href="farmer-claim_history.php" class="nav-link"><i class="fas fa-history"></i> Claim History</a></li>
-            <li class="nav-item"><a href="farmer-progress_tracking.php" class="nav-link"><i class="fas fa-chart-line"></i> Progress Tracking</a></li>
+            <!-- Removed link to Progress Tracking -->
             <li class="nav-item"><a href="farmer-announcement.php" class="nav-link"><i class="fas fa-bullhorn"></i> Announcements</a></li>
             <li class="nav-item"><a href="farmer-my_profile.php" class="nav-link"><i class="fas fa-user-circle"></i> My Profile</a></li>
         </ul>
@@ -584,14 +584,30 @@ if ($conn && $conn->ping()) {
                                     <label for="seedType" class="form-label">
                                         <i class="fas fa-seedling"></i>Seed Type
                                     </label>
-                                    <select class="form-select" id="seedType" name="seedType">
-                                        <option value="">-- Select Seed Type --</option>
-                                        <option value="Hybrid Rice Seeds" <?php echo ($seedType == 'Hybrid Rice Seeds') ? 'selected' : ''; ?>>Hybrid Rice Seeds</option>
-                                        <option value="Inbred Rice Seeds" <?php echo ($seedType == 'Inbred Rice Seeds') ? 'selected' : ''; ?>>Inbred Rice Seeds</option>
-                                        <option value="Hybrid Corn Seeds" <?php echo ($seedType == 'Hybrid Corn Seeds') ? 'selected' : ''; ?>>Hybrid Corn Seeds</option>
-                                        <option value="Vegetable Seeds (Assorted)" <?php echo ($seedType == 'Vegetable Seeds (Assorted)') ? 'selected' : ''; ?>>Vegetable Seeds (Assorted)</option>
-                                        <option value="Other" <?php echo ($seedType == 'Other') ? 'selected' : ''; ?>>Other</option>
-                                    </select>
+<select class="form-select" id="seedType" name="seedType">
+    <option value="">-- Select Seed Type --</option>
+    <option value="pechay" <?php echo ($seedType == 'pechay') ? 'selected' : ''; ?>>Hybrid Rice</option>
+    <option value="kangkong" <?php echo ($seedType == 'kangkong') ? 'selected' : ''; ?>>Inbred Rice</option>
+    <option value="pechay" <?php echo ($seedType == 'pechay') ? 'selected' : ''; ?>>Hybrid Corn</option>
+    <option value="kangkong" <?php echo ($seedType == 'kangkong') ? 'selected' : ''; ?>>Inbred Corn</option>
+    <option value="pechay" <?php echo ($seedType == 'pechay') ? 'selected' : ''; ?>>pechay</option>
+    <option value="kangkong" <?php echo ($seedType == 'kangkong') ? 'selected' : ''; ?>>kangkong</option>
+    <option value="mustasa" <?php echo ($seedType == 'mustasa') ? 'selected' : ''; ?>>mustasa</option>
+    <option value="alugbati" <?php echo ($seedType == 'alugbati') ? 'selected' : ''; ?>>alugbati</option>
+    <option value="malunggay" <?php echo ($seedType == 'malunggay') ? 'selected' : ''; ?>>malunggay</option>
+    <option value="sitaw" <?php echo ($seedType == 'sitaw') ? 'selected' : ''; ?>>sitaw</option>
+    <option value="ampalaya" <?php echo ($seedType == 'ampalaya') ? 'selected' : ''; ?>>ampalaya</option>
+    <option value="okra" <?php echo ($seedType == 'okra') ? 'selected' : ''; ?>>okra</option>
+    <option value="talong" <?php echo ($seedType == 'talong') ? 'selected' : ''; ?>>talong</option>
+    <option value="kamatis" <?php echo ($seedType == 'kamatis') ? 'selected' : ''; ?>>kamatis</option>
+    <option value="sibuyas" <?php echo ($seedType == 'sibuyas') ? 'selected' : ''; ?>>sibuyas</option>
+    <option value="kadyos" <?php echo ($seedType == 'kadyos') ? 'selected' : ''; ?>>kadyos</option>
+    <option value="kamote" <?php echo ($seedType == 'kamote') ? 'selected' : ''; ?>>kamote</option>
+    <option value="gabi" <?php echo ($seedType == 'gabi') ? 'selected' : ''; ?>>gabi</option>
+    <option value="carrots" <?php echo ($seedType == 'carrots') ? 'selected' : ''; ?>>carrots</option>
+    <option value="redish" <?php echo ($seedType == 'redish') ? 'selected' : ''; ?>>redish</option>
+    <option value="cassava" <?php echo ($seedType == 'cassava') ? 'selected' : ''; ?>>cassava</option>
+</select>
                                 </div>
                                 <div class="mb-4">
                                     <label for="seedQuantity" class="form-label">

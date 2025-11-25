@@ -318,6 +318,34 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
             /* For the last paragraph in a section */
             margin-bottom: 0;
         }
+
+        /* Update contact button styling */
+        .update-contact-btn {
+            background: #19860f;
+            color: #fff;
+            border: none;
+            padding: 4px 10px;
+            font-size: 11px;
+            border-radius: 12px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            font-weight: 500;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+
+        .update-contact-btn:hover {
+            background: #146c0b;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 6px rgba(25, 134, 15, 0.3);
+        }
+
+        .contact-number-wrapper {
+            display: inline-flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
     </style>
 </head>
 
@@ -334,7 +362,7 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
             <li class="nav-item"><a href="farmer-apply_for_assistance.php" class="nav-link"><i class="fas fa-hand-holding-usd"></i>Apply for Assistance</a></li>
             <li class="nav-item"><a href="farmer-planting_status.php" class="nav-link"><i class="fas fa-leaf"></i> Planting Status</a></li>
             <li class="nav-item"><a href="farmer-claim_history.php" class="nav-link"><i class="fas fa-history"></i> Claim History</a></li>
-            <li class="nav-item"><a href="farmer-progress_tracking.php" class="nav-link"><i class="fas fa-chart-line"></i> Progress Tracking</a></li>
+            <!-- Removed link to Progress Tracking -->
             <li class="nav-item"><a href="farmer-announcement.php" class="nav-link"><i class="fas fa-bullhorn"></i> Announcements</a></li>
             <li class="nav-item"><a href="farmer-my_profile.php" class="nav-link active"><i class="fas fa-user-circle"></i> My Profile</a></li>
         </ul>
@@ -372,7 +400,15 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
                             <p><span class="info-label"><i class="fas fa-venus-mars me-2 text-success"></i>Gender:</span> <?php echo $gender; ?></p>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <p><span class="info-label"><i class="fas fa-phone-alt me-2 text-success"></i>Contact:</span> <?php echo htmlspecialchars($farmer_data['contact_number']); ?></p>
+                            <p>
+                                <span class="info-label"><i class="fas fa-phone-alt me-2 text-success"></i>Contact:</span>
+                                <span class="contact-number-wrapper">
+                                    <?php echo htmlspecialchars($farmer_data['contact_number']); ?>
+                                    <button class="update-contact-btn" onclick="location.href='farmer-update_contact.php'">
+                                        <i class="fas fa-edit"></i> Update
+                                    </button>
+                                </span>
+                            </p>
                         </div>
                         <div class="col-md-6 mb-3">
                             <p><span class="info-label"><i class="fas fa-ring me-2 text-success"></i>Civil Status:</span> <?php echo $civil_status; ?></p>
