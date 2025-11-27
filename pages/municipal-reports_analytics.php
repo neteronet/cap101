@@ -290,22 +290,25 @@ if (isset($conn) && $conn) {
     <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- MODIFIED: Changed font links to match farmer-dashboard.php -->
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
     <!-- Chart.js for Charts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Custom Styles -->
+    <!-- Custom Styles (COPIED AND ADAPTED FROM farmer-dashboard.php) -->
     <style>
         body {
+            /* MODIFIED: Changed font-family to Poppins for body/content text */
             font-family: "Poppins", sans-serif;
             background: #f8f9fa;
             font-size: 16px;
             line-height: 1.6;
-            color: #333;
+            color: #212529;
             margin: 0;
         }
 
+        /* --- Sidebar Styles (CONSISTENT) --- */
         .sidebar {
             position: fixed;
             top: 0;
@@ -318,6 +321,25 @@ if (isset($conn) && $conn) {
             font-size: 14px;
             z-index: 1050;
             border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            transition: left 0.3s ease;
+            /* MODIFIED: Explicitly set sidebar font to Be Vietnam Pro for UI/Nav consistency */
+            font-family: "Be Vietnam Pro", sans-serif; 
+        }
+        
+        /* Sidebar Menu Label Style */
+        .sidebar-menu-label {
+            color: rgba(255, 255, 255, 0.7);
+            padding: 0 1rem 0.5rem 1rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .sidebar.collapsed {
+            left: -250px;
         }
 
         .sidebar .nav-link {
@@ -347,31 +369,49 @@ if (isset($conn) && $conn) {
             color: #fff;
         }
 
+        /* MODIFIED: Header Brand (Logo and Text) */
         .sidebar .header-brand {
             display: flex;
-            flex-direction: column;
+            flex-direction: row;
             align-items: center;
+            justify-content: flex-start;
             text-decoration: none;
-            margin-bottom: 1rem;
+            margin-bottom: 2rem;
+            padding: 0 1rem;
         }
 
         .sidebar .header-brand img {
-            width: 100%;
-            max-width: 120px;
+            width: auto;
+            max-width: 40px;
             height: auto;
             background: #19860f;
-            padding: 5px;
+            padding: 2px;
             border-radius: 4px;
         }
 
         .sidebar .header-brand div {
-            font-size: 14px;
-            font-weight: 600;
+            font-size: 18px;
+            font-weight: 700;
             color: #fff;
-            text-align: center;
-            margin-top: 6px;
+            margin-top: 0;
+            margin-left: 8px;
+        }
+        /* END MODIFIED HEADER BRAND */
+        
+        .sidebar .nav {
+            flex: 1;
+            margin: 0;
+            padding: 0;
         }
 
+        .sidebar .sidebar-logout {
+            margin-top: auto;
+            padding-top: 0.3rem;
+            padding-bottom: 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* --- Fixed Top Header (CONSISTENT) --- */
         .card-header-custom {
             position: fixed;
             top: 0;
@@ -388,73 +428,82 @@ if (isset($conn) && $conn) {
             justify-content: space-between;
             z-index: 1060;
             border-bottom: 1px solid #ddd;
+            transition: left 0.3s ease;
+            /* MODIFIED: Explicitly set header font to Be Vietnam Pro for UI consistency */
+            font-family: "Be Vietnam Pro", sans-serif;
         }
 
-        .header-brand span {
-            font-size: 1rem;
-            font-weight: 600;
-            color: #19860f;
+        .card-header-custom.collapsed {
+            left: 0;
         }
 
-        .logout-btn {
-            background: #ff4b2b;
-            color: #fff;
-            border: none;
-            padding: 6px 14px;
-            font-size: 14px;
-            border-radius: 20px;
-            transition: background 0.2s ease;
-            cursor: pointer;
+        /* --- Main Content Area (CONSISTENT) --- */
+        main {
+            margin-left: 250px;
+            /* Adjusted padding-top from 72px to match header height */
+            padding: 72px 2rem 2rem 2rem; 
+            background: #f8f9fa;
+            min-height: 100vh;
+            transition: margin-left 0.3s ease;
         }
 
-        .logout-btn:hover {
-            background: #e04325;
+        main.collapsed {
+            margin-left: 0;
         }
-
+        
+        /* 5. Typography Consistency: Headings */
+        h1, h2, h3, h4, h5, h6, .card-title, .page-title {
+            font-family: "Be Vietnam Pro", sans-serif;
+            color: #0f5132; /* Dark Green */
+        }
+        
+        /* NEW: Style for the Page Title */
+        .page-title {
+            font-size: 1.5rem; 
+            font-weight: 600; 
+            margin-bottom: 1rem;
+        }
+        
+        /* 2. Button and Alert Unification: Button Theme */
         .btn-theme {
             background-color: #19860f;
             color: #fff;
-            font-size: 15px;
-            padding: 10px 20px;
-            border-radius: 4px;
-            border: none;
-            transition: all 0.3s ease;
+            border-color: #19860f;
+            font-family: "Be Vietnam Pro", sans-serif;
+            font-size: 15px; /* Added for consistency */
+            padding: 10px 20px; /* Added for consistency */
+            border-radius: 4px; /* Added for consistency */
+            transition: all 0.3s ease; /* Added for consistency */
         }
 
         .btn-theme:hover {
             background-color: #146c0b;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            border-color: #146c0b;
+            color: #fff;
+            transform: translateY(-2px); /* Added for consistency */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Added for consistency */
         }
 
-        main {
-            margin-left: 250px;
-            padding: 1rem 2rem 2rem 2rem;
-            padding-top: 72px;
-            background: #f8f9fa;
-            min-height: 100vh;
-        }
-
-        .container-fluid {
-            max-width: 1200px;
-        }
-
-        .page-title {
-            font-size: 1.8rem;
-            font-weight: 600;
+        /* 2. Button and Alert Unification: Outline Button Theme (Adjusted existing for consistency) */
+        .btn-outline-success {
             color: #19860f;
-            margin-bottom: 1rem;
+            border-color: #19860f;
+            border-radius: 0.5rem;
+            transition: all 0.3s ease;
+            font-family: "Be Vietnam Pro", sans-serif;
         }
 
+        .btn-outline-success:hover {
+            background-color: #19860f;
+            color: #fff;
+        }
+        
+        /* Card styles for consistency */
         .card {
             border-radius: 0.5rem;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
             margin-bottom: 1rem;
-        }
-
-        .card-body h6 {
-            font-size: 14px;
-            color: #6c757d;
+            border: 1px solid #ddd; /* Added for consistency */
         }
 
         .card-body h2 {
@@ -462,77 +511,44 @@ if (isset($conn) && $conn) {
             margin-top: 5px;
             font-weight: 700;
             color: #19860f;
+            font-family: "Be Vietnam Pro", sans-serif; /* Explicit font for large numbers */
         }
 
-        .card-body h2.text-warning {
-            color: #ffc107 !important;
-        }
-
-        .card-body h2.text-primary {
-            color: #0d6efd !important;
-        }
-
-        .card-body .btn-link {
+        .card-body h6 {
             font-size: 14px;
-            color: #19860f;
-            text-decoration: none;
-            padding: 0;
+            color: #6c757d;
         }
-
-        .card-body .btn-link:hover {
-            text-decoration: underline;
-        }
-
+        
+        /* Status badge consistency */
         .status-badge {
             padding: 0.3em 0.6em;
             border-radius: 0.4rem;
             font-size: 13px;
             font-weight: 500;
+            font-family: "Be Vietnam Pro", sans-serif;
+            display: inline-block;
         }
-
         .status-pending {
-            background-color: #ffc107;
-            color: #856404;
+            background-color: #ffc107 !important; /* Warning */
+            color: #664d03 !important;
         }
 
         .status-approved {
-            background-color: #28a745;
-            color: #fff;
+            background-color: #198754 !important; /* Success */
+            color: #fff !important;
         }
 
         .status-rejected {
-            background-color: #dc3545;
-            color: #fff;
+            background-color: #dc3545 !important; /* Danger */
+            color: #fff !important;
+        }
+        
+        #sidebarToggleBtn {
+            color: #0f5132;
         }
 
-        /* Report Sections */
-        .report-section {
-            margin-bottom: 2rem;
-            padding: 1.5rem;
-            background-color: #fff;
-            border-radius: 0.5rem;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-        }
-
-        .report-section h4 {
-            color: #19860f;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            font-size: 1.25rem;
-        }
-
-        .chart-container {
-            position: relative;
-            height: 350px;
-            width: 100%;
-        }
-
-        .filter-controls {
-            background-color: #f0f2f5;
-            padding: 1.5rem;
-            border-radius: 0.5rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        #sidebarToggleBtn:hover {
+            color: #146c0b;
         }
 
         /* Filter controls styling */
@@ -544,66 +560,51 @@ if (isset($conn) && $conn) {
             border-radius: 0.375rem;
         }
 
-
-        .btn-outline-success {
-            color: #19860f;
-            border-color: #19860f;
-            border-radius: 0.5rem;
-            transition: all 0.3s ease;
-        }
-
-        .btn-outline-success:hover {
-            background-color: #19860f;
-            color: #fff;
-        }
-
-        .btn-outline-primary {
-            color: #0d6efd;
-            border-color: #0d6efd;
-            border-radius: 0.5rem;
-        }
-
-        .btn-outline-primary:hover {
-            background-color: #0d6efd;
-            color: #fff;
-        }
-
-        /* Responsive adjustments (Kept original logic) */
+        /* Responsive adjustments (Updated to match the farmer-dashboard logic) */
         @media (max-width: 768px) {
             .sidebar {
-                width: 100%;
-                position: relative;
-                height: auto;
-                border-right: none;
-                border-bottom: 1px solid #ddd;
-                box-shadow: none; /* Remove shadow on small screens */
+                width: 250px;
+                position: fixed;
+                height: 100vh;
+                z-index: 1050;
+            }
+
+            .sidebar.collapsed {
+                left: -250px;
             }
 
             .card-header-custom {
                 left: 0;
-                top: auto;
-                position: relative;
-                margin-bottom: 1rem;
-                height: auto;
-                box-shadow: none;
-                justify-content: space-between !important;
+                top: 0;
+                width: 100%;
+                /* Ensuring it remains fixed and full width */
             }
 
             main {
                 margin-left: 0;
-                padding-top: 1rem;
+                padding-top: 72px;
+            }
+
+            main.collapsed {
+                margin-left: 0;
             }
         }
     </style>
 </head>
 <body>
-    <!-- Sidebar -->
+    <!-- Sidebar (CONSISTENT DESIGN) -->
     <nav class="sidebar">
-        <a href="ProvincialAgriHome.html" class="header-brand">
-            <img src="../photos/Department_of_Agriculture_of_the_Philippines.png" alt="Province of Antique" />
-            <div>Province of Antique</div>
+        <!-- Logo and Text (Consistent with farmer-dashboard.php) -->
+        <a href="municipal-dashboard.php" class="header-brand">
+            <img src="../photos/logo.png" alt="Department of Agriculture Logo" />
+            <div>Agriconnect</div>
         </a>
+
+        <!-- Menu Label (Consistent) -->
+        <div class="sidebar-menu-label">Main Menu</div>
+        
         <ul class="nav flex-column">
+            <!-- Municipal Links (Ensure 'active' is on the correct page) -->
             <li class="nav-item"><a href="municipal-dashboard.php" class="nav-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
             <li class="nav-item"><a href="municipal-subsidy_management.php" class="nav-link"><i class="fas fa-hand-holding-usd"></i> Subsidy Management</a></li>
             <li class="nav-item"><a href="municipal-qrcode_management.php" class="nav-link"><i class="fas fa-qrcode"></i> QR Code Management</a></li>
@@ -612,17 +613,29 @@ if (isset($conn) && $conn) {
             <li class="nav-item"><a href="municipal-farmer_profiles.php" class="nav-link"><i class="fas fa-users"></i> Farmer Profiles</a></li>
             <li class="nav-item"><a href="municipal-announcements.php" class="nav-link"><i class="fas fa-bullhorn"></i> Announcements</a></li>
         </ul>
+        
+        <!-- Logout Section (Consistent) -->
+        <div class="sidebar-logout">
+            <a href="municipal-logout.php" class="nav-link">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
     </nav>
-    <!-- Header -->
-    <div class="card-header card-header-custom d-flex justify-content-end align-items-center">
-        <span class="me-3">Hi, <strong><?php echo htmlspecialchars($display_name); ?></strong></span>
-        <button class="logout-btn" onclick="location.href='municipal-logout.php'">
-            <i class="fas fa-sign-out-alt me-1"></i> Logout
+    
+    <!-- Header (CONSISTENT DESIGN) -->
+    <div class="card-header card-header-custom d-flex justify-content-between align-items-center">
+        <!-- Sidebar Toggle Button (Consistent) -->
+        <button id="sidebarToggleBtn" class="btn btn-link p-0 text-dark" title="Toggle Sidebar" style="font-size: 1.5rem;">
+            <i class="fas fa-bars"></i>
         </button>
+        <!-- Greeting -->
+        <span class="me-3">Hi, <strong><?php echo htmlspecialchars($display_name); ?></strong></span>
     </div>
+
 <!-- Main Content -->
 <main>
     <div class="container-fluid">
+        <!-- Page Title (Uses the new style) -->
         <h1 class="page-title">Reports & Analytics</h1>
 
         <form method="GET" action="municipal-reports_analytics.php" class="filter-controls row g-3 align-items-end mb-4">
@@ -840,6 +853,47 @@ if (isset($conn) && $conn) {
             data: subsidyStatusData,
             options: chartOptions // Use shared options for simplicity
         });
+    });
+</script>
+
+<!-- JavaScript for Sidebar Toggle (COPIED FROM farmer-dashboard.php) -->
+<script>
+    // JavaScript to toggle sidebar collapse and preserve state using localStorage
+    const sidebar = document.querySelector('.sidebar');
+    const mainContent = document.querySelector('main');
+    const header = document.querySelector('.card-header-custom');
+    const toggleBtn = document.getElementById('sidebarToggleBtn');
+
+    function collapseSidebar() {
+        sidebar.classList.add('collapsed');
+        mainContent.classList.add('collapsed');
+        header.classList.add('collapsed');
+        localStorage.setItem('sidebarCollapsed', 'true'); // Save state
+    }
+
+    function openSidebar() {
+        sidebar.classList.remove('collapsed');
+        mainContent.classList.remove('collapsed');
+        header.classList.remove('collapsed');
+        localStorage.setItem('sidebarCollapsed', 'false'); // Save state
+    }
+
+    // --- IMPROVEMENT: Apply saved state on page load ---
+    const isCollapsed = localStorage.getItem('sidebarCollapsed');
+    if (isCollapsed === 'true') {
+        // Apply collapsed state without saving back to localStorage
+        sidebar.classList.add('collapsed');
+        mainContent.classList.add('collapsed');
+        header.classList.add('collapsed');
+    } 
+
+    // Toggle button functionality (now uses state saving)
+    toggleBtn.addEventListener('click', function() {
+        if (sidebar.classList.contains('collapsed')) {
+            openSidebar();
+        } else {
+            collapseSidebar();
+        }
     });
 </script>
 </body>

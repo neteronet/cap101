@@ -1,3 +1,7 @@
+<?php
+// Load latest announcements for landing page carousel (up to 5)
+require_once __DIR__ . '/home_data.php';
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -684,32 +688,110 @@
             color: #333;
         }
 
+        /* Custom sliding carousel - shows 3 cards, slides 1 at a time */
+        .custom-sliding-carousel {
+            position: relative;
+            overflow: hidden;
+            padding: 0 50px; /* Space for controls */
+        }
+        
+        .carousel-wrapper {
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .carousel-track {
+            display: flex;
+            gap: 30px; /* Increased spacing for better visual breathing room */
+            transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            will-change: transform;
+        }
+        
+        .carousel-card {
+            flex: 0 0 calc(33.333% - 20px); /* 3 cards per view, accounting for increased gap */
+            min-width: 0;
+            max-width: none; /* Ensure consistent width */
+        }
+        
         .blog-cards-row {
             display: flex;
             justify-content: space-between;
-            gap: 30px;
+            gap: 30px; /* Increased spacing */
+        }
+        
+        .blog-card {
+            transition: none; /* No transition on individual cards */
+            width: 100%; /* Ensure full width of container */
+            height: 100%; /* Ensure consistent height */
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Carousel controls styling */
+        .custom-sliding-carousel .carousel-control-prev,
+        .custom-sliding-carousel .carousel-control-next {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 40px;
+            height: 40px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 50%;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .custom-sliding-carousel .carousel-control-prev:hover,
+        .custom-sliding-carousel .carousel-control-next:hover {
+            background-color: rgba(0, 0, 0, 0.7);
+        }
+        
+        .custom-sliding-carousel .carousel-control-prev {
+            left: 0;
+        }
+        
+        .custom-sliding-carousel .carousel-control-next {
+            right: 0;
+        }
+        
+        .custom-sliding-carousel .carousel-control-prev-icon,
+        .custom-sliding-carousel .carousel-control-next-icon {
+            width: 20px;
+            height: 20px;
+            background-size: 100% 100%;
         }
 
         .blog-card {
-            flex: 1;
             background-color: #fff;
-            border-radius: 12px;
+            border-radius: 10px;
             overflow: hidden;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
             border: none;
             text-decoration: none;
             color: inherit;
             display: flex;
             flex-direction: column;
+            width: 100%;
+            height: 100%;
+            min-height: 450px; /* Fixed minimum height for consistency */
+            max-height: 500px; /* Maximum height to prevent cards from being too tall */
         }
 
         .blog-img-container {
             position: relative;
             width: 100%;
-            padding-bottom: 65%;
+            height: 220px; /* Fixed height for all images - ensures consistency */
+            min-height: 220px;
+            max-height: 220px;
             background-size: cover;
             background-position: center;
-            border-radius: 12px 12px 0 0;
+            background-repeat: no-repeat;
+            border-radius: 10px 10px 0 0;
+            flex-shrink: 0; /* Prevent image from shrinking */
         }
 
         /* Specific images for blog cards */
@@ -742,10 +824,13 @@
         }
 
         .blog-content {
-            /* REFINEMENT: Increased top padding to clear the date overlay */
-            padding: 40px 20px 25px 20px; 
+            padding: 25px 20px 20px 20px; /* Consistent padding for all cards */
             text-align: center;
-            flex-grow: 1; 
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 200px; /* Ensure content area has consistent minimum height */
         }
 
         .blog-meta {
@@ -779,15 +864,36 @@
         }
 
         .blog-content h3 {
-            font-size: 1.3em;
+            font-size: 1.05em; /* Consistent title size */
             font-weight: 700;
             line-height: 1.4;
             color: #333;
-            transition: color 0.3s ease; /* REFINEMENT: Added transition */
+            transition: color 0.3s ease;
+            margin: 0 0 12px 0; /* Consistent margin */
+            min-height: 2.8em; /* Ensure consistent height for 2-line titles */
+            display: -webkit-box;
+            -webkit-line-clamp: 2; /* Limit to 2 lines */
+            line-clamp: 2; /* Standard property for compatibility */
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         /* REFINEMENT: Title color change on hover */
         .blog-card:hover .blog-content h3 {
             color: #19860f; 
+        }
+        
+        /* Ensure excerpt text is consistent */
+        .blog-content p {
+            margin: 0;
+            line-height: 1.5;
+            min-height: 3em; /* Consistent height for excerpt */
+            display: -webkit-box;
+            -webkit-line-clamp: 2; /* Limit to 2 lines */
+            line-clamp: 2; /* Standard property for compatibility */
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         /* Responsive Adjustments for new sections (Updated for better mobile layout) */
@@ -1044,49 +1150,291 @@
                 <p class="update-label">update</p>
                 <h2>Announcements</h2>
             </div>
-            <div class="blog-cards-row">
-                <!-- Blog Card 1 - MODIFIED TO ANCHOR TAG -->
-                <a href="index.php" class="blog-card">
-                    <div class="blog-img-container">
-                        <div class="blog-date-overlay">06 July 2022</div>
-                    </div>
-                    <div class="blog-content">
-                        <div class="blog-meta">
-                            <span>Kevin Martin</span>
-                            <span>1 Comment</span>
+
+            <?php if (!empty($landing_announcements)) : ?>
+                <?php
+                    // Prepare all announcements for custom sliding carousel
+                    // We'll show 3 at a time, but slide one card at a time
+                    // Duplicate first 3 cards at the end for seamless infinite loop
+                    $total = count($landing_announcements);
+                ?>
+                <div id="landingAnnouncementCarousel" class="custom-sliding-carousel">
+                    <div class="carousel-wrapper">
+                        <div class="carousel-track" data-total="<?php echo $total; ?>">
+                            <?php foreach ($landing_announcements as $idx => $announcement) : ?>
+                                <?php
+                                    // Choose image for announcement card:
+                                    // 1) If this is specifically the "Modern Farming Techniques" announcement,
+                                    //    always use the modernfarming.jpg hero image (override any image_url).
+                                    // 2) Otherwise, use image_url from DB if present.
+                                    // 3) Fallback to default photo5.jpg.
+                                    $rawTitle = $announcement['title'] ?? '';
+                                    $normalizedTitle = strtolower(trim($rawTitle));
+                                    if ($normalizedTitle === 'modern farming techniques') {
+                                        $img = 'photos/modernfarming.jpg';
+                                    } elseif (!empty($announcement['image_url'])) {
+                                        $img = htmlspecialchars($announcement['image_url']);
+                                    } else {
+                                        $img = 'photos/photo5.jpg';
+                                    }
+                                    $dateLabel = !empty($announcement['publish_date'])
+                                        ? date('d M Y', strtotime($announcement['publish_date']))
+                                        : '';
+                                    $title = htmlspecialchars($announcement['title']);
+                                    $excerpt = htmlspecialchars(substr($announcement['content'], 0, 120));
+                                ?>
+                                <div class="carousel-card" data-index="<?php echo $idx; ?>">
+                                    <a href="index.php" class="blog-card">
+                                        <div class="blog-img-container" style="background-image: url('<?php echo $img; ?>');">
+                                            <?php if ($dateLabel) : ?>
+                                                <div class="blog-date-overlay"><?php echo $dateLabel; ?></div>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="blog-content">
+                                            <div class="blog-meta">
+                                                <span>Province of Antique</span>
+                                                <span>Announcement</span>
+                                            </div>
+                                            <h3><?php echo $title; ?></h3>
+                                            <?php if (!empty($excerpt)) : ?>
+                                                <p class="mt-2 text-muted small"><?php echo $excerpt; ?>...</p>
+                                            <?php endif; ?>
+                                        </div>
+                                    </a>
+                                </div>
+                            <?php endforeach; ?>
+                            
+                            <?php 
+                                // Duplicate first 3 cards at the end for seamless infinite loop
+                                $duplicateCount = min(3, $total);
+                                for ($i = 0; $i < $duplicateCount; $i++) {
+                                    $announcement = $landing_announcements[$i];
+                                    $rawTitle = $announcement['title'] ?? '';
+                                    $normalizedTitle = strtolower(trim($rawTitle));
+                                    if ($normalizedTitle === 'modern farming techniques') {
+                                        $img = 'photos/modernfarming.jpg';
+                                    } elseif (!empty($announcement['image_url'])) {
+                                        $img = htmlspecialchars($announcement['image_url']);
+                                    } else {
+                                        $img = 'photos/photo5.jpg';
+                                    }
+                                    $dateLabel = !empty($announcement['publish_date'])
+                                        ? date('d M Y', strtotime($announcement['publish_date']))
+                                        : '';
+                                    $title = htmlspecialchars($announcement['title']);
+                                    $excerpt = htmlspecialchars(substr($announcement['content'], 0, 120));
+                            ?>
+                                <div class="carousel-card carousel-card-duplicate" data-index="<?php echo $i; ?>" data-duplicate="true">
+                                    <a href="index.php" class="blog-card">
+                                        <div class="blog-img-container" style="background-image: url('<?php echo $img; ?>');">
+                                            <?php if ($dateLabel) : ?>
+                                                <div class="blog-date-overlay"><?php echo $dateLabel; ?></div>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="blog-content">
+                                            <div class="blog-meta">
+                                                <span>Province of Antique</span>
+                                                <span>Announcement</span>
+                                            </div>
+                                            <h3><?php echo $title; ?></h3>
+                                            <?php if (!empty($excerpt)) : ?>
+                                                <p class="mt-2 text-muted small"><?php echo $excerpt; ?>...</p>
+                                            <?php endif; ?>
+                                        </div>
+                                    </a>
+                                </div>
+                            <?php } ?>
                         </div>
-                        <h3>Bringing Food Production Back To Cities</h3>
                     </div>
-                </a>
-                <!-- Blog Card 2 - MODIFIED TO ANCHOR TAG -->
-                <a href="index.php" class="blog-card">
-                    <div class="blog-img-container">
-                        <div class="blog-date-overlay">06 July 2022</div>
-                    </div>
-                    <div class="blog-content">
-                        <div class="blog-meta">
-                            <span>Kevin Martin</span>
-                            <span>0 Comments</span>
-                        </div>
-                        <h3>The Future of Farming, Smart Irrigation Solutions</h3>
-                    </div>
-                </a>
-                <!-- Blog Card 3 - MODIFIED TO ANCHOR TAG -->
-                <a href="index.php" class="blog-card">
-                    <div class="blog-img-container">
-                        <div class="blog-date-overlay">06 July 2022</div>
-                    </div>
-                    <div class="blog-content">
-                        <div class="blog-meta">
-                            <span>Kevin Martin</span>
-                            <span>0 Comments</span>
-                        </div>
-                        <h3>Agronomy and relation to Other Sciences</h3>
-                    </div>
-                </a>
-            </div>
+
+                    <?php if ($total > 3) : ?>
+                        <button class="carousel-control-prev" type="button" id="carouselPrev">
+                            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                            <span class="visually-hidden">Previous</span>
+                        </button>
+                        <button class="carousel-control-next" type="button" id="carouselNext">
+                            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                            <span class="visually-hidden">Next</span>
+                        </button>
+                    <?php endif; ?>
+                </div>
+            <?php else : ?>
+                <p class="text-center text-muted">No announcements available at the moment. Please check back later.</p>
+            <?php endif; ?>
         </div>
     </section>
     <!-- END: News & Articles Section -->
+
+    <!-- Bootstrap JS (for carousel functionality) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Custom smooth sliding carousel - slides one card at a time
+        document.addEventListener('DOMContentLoaded', function() {
+            const carousel = document.getElementById('landingAnnouncementCarousel');
+            if (!carousel) return;
+            
+            const track = carousel.querySelector('.carousel-track');
+            const cards = carousel.querySelectorAll('.carousel-card');
+            const prevBtn = carousel.querySelector('#carouselPrev');
+            const nextBtn = carousel.querySelector('#carouselNext');
+            const total = parseInt(track.dataset.total) || cards.length;
+            const actualTotal = total; // Original count (without duplicates)
+            const duplicateCount = Math.min(3, actualTotal); // Number of duplicated cards at the end
+            
+            if (actualTotal <= 3) return; // No need to slide if 3 or fewer cards
+            
+            let currentIndex = 0;
+            let isTransitioning = false;
+            let autoSlideInterval;
+            
+            // Calculate card width including gap
+            function getCardWidth() {
+                if (cards.length === 0) return 0;
+                const card = cards[0];
+                const cardWidth = card.offsetWidth;
+                const gap = 30; // 30px gap (increased spacing)
+                return cardWidth + gap;
+            }
+            
+            // Update carousel position
+            function updateCarousel(animate = true) {
+                if (isTransitioning) return;
+                isTransitioning = true;
+                
+                const cardWidth = getCardWidth();
+                const translateX = -currentIndex * cardWidth;
+                
+                if (animate) {
+                    track.style.transition = 'transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)';
+                } else {
+                    track.style.transition = 'none';
+                }
+                
+                track.style.transform = `translateX(${translateX}px)`;
+                
+                setTimeout(() => {
+                    isTransitioning = false;
+                    
+                    // If we've reached the duplicate cards (beyond original cards), 
+                    // seamlessly jump back to the equivalent position at the start
+                    if (currentIndex >= actualTotal) {
+                        currentIndex = currentIndex - actualTotal;
+                        // Jump back without animation for seamless loop
+                        const cardWidth = getCardWidth();
+                        track.style.transition = 'none';
+                        track.style.transform = `translateX(${-currentIndex * cardWidth}px)`;
+                    }
+                }, animate ? 800 : 0);
+            }
+            
+            // Next slide (forward - left to right, infinite loop)
+            function nextSlide() {
+                if (isTransitioning) return;
+                currentIndex = currentIndex + 1;
+                
+                // If we've passed all original cards and are in duplicate territory
+                // Continue forward - the reset will happen in updateCarousel callback
+                updateCarousel();
+            }
+            
+            // Previous slide (backward - right to left, manual only)
+            function prevSlide() {
+                if (isTransitioning) return;
+                currentIndex = currentIndex - 1;
+                
+                // If we go below 0, jump to the duplicate cards at the end for seamless backward loop
+                if (currentIndex < 0) {
+                    currentIndex = actualTotal + currentIndex; // Jump to duplicate position
+                    // Jump to duplicate position without animation
+                    const cardWidth = getCardWidth();
+                    track.style.transition = 'none';
+                    track.style.transform = `translateX(${-currentIndex * cardWidth}px)`;
+                    // Then animate the previous step
+                    setTimeout(() => {
+                        currentIndex = currentIndex - 1;
+                        updateCarousel(true);
+                    }, 10);
+                } else {
+                    updateCarousel();
+                }
+            }
+            
+            // Event listeners for manual controls
+            if (nextBtn) {
+                nextBtn.addEventListener('click', function() {
+                    stopAutoSlide();
+                    nextSlide();
+                    startAutoSlide(); // Resume auto-slide after manual click
+                });
+            }
+            if (prevBtn) {
+                prevBtn.addEventListener('click', function() {
+                    stopAutoSlide();
+                    prevSlide();
+                    startAutoSlide(); // Resume auto-slide after manual click
+                });
+            }
+            
+            // Auto-slide every 2 seconds - ONLY forward (left to right)
+            function startAutoSlide() {
+                stopAutoSlide(); // Clear any existing interval
+                autoSlideInterval = setInterval(nextSlide, 2000);
+            }
+            
+            function stopAutoSlide() {
+                if (autoSlideInterval) {
+                    clearInterval(autoSlideInterval);
+                }
+            }
+            
+            // Pause on hover (but only auto-slide resumes forward)
+            carousel.addEventListener('mouseenter', stopAutoSlide);
+            carousel.addEventListener('mouseleave', startAutoSlide);
+            
+            // Touch/swipe support for mobile
+            let touchStartX = 0;
+            let touchEndX = 0;
+            
+            track.addEventListener('touchstart', function(e) {
+                touchStartX = e.changedTouches[0].screenX;
+            }, { passive: true });
+            
+            track.addEventListener('touchend', function(e) {
+                touchEndX = e.changedTouches[0].screenX;
+                handleSwipe();
+            }, { passive: true });
+            
+            function handleSwipe() {
+                const swipeThreshold = 50; // Minimum swipe distance
+                const diff = touchStartX - touchEndX;
+                
+                if (Math.abs(diff) > swipeThreshold) {
+                    stopAutoSlide();
+                    if (diff > 0) {
+                        // Swipe left - go forward (left to right)
+                        nextSlide();
+                    } else {
+                        // Swipe right - go backward (right to left, manual only)
+                        prevSlide();
+                    }
+                    startAutoSlide(); // Resume auto-slide after swipe
+                }
+            }
+            
+            // Initialize - start auto-sliding forward continuously
+            updateCarousel(false);
+            startAutoSlide();
+            
+            // Recalculate on window resize
+            let resizeTimeout;
+            window.addEventListener('resize', function() {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    updateCarousel(false);
+                }, 250);
+            });
+        });
+    </script>
 </body>
 </html>

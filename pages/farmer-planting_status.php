@@ -297,6 +297,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $batch_name = isset($_POST['cropBatch']) ? trim($_POST['cropBatch']) : '';
     $status = $_POST['statusSelect'] ?? $_POST['plantingStatus'] ?? '';
     $photo_path = NULL;
+    $file_upload_success = false;
 
     $final_crop_identifier = $base_crop;
 
@@ -311,41 +312,92 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $status = 'Not Planted';
         }
 
-        if (isset($_FILES['photoUpload']) && $_FILES['photoUpload']['error'] == UPLOAD_ERR_OK) {
-            $target_dir = "uploads/planting_photos/";
-            if (!is_dir($target_dir)) {
-                mkdir($target_dir, 0777, true);
-            }
-            $file_name = uniqid() . "_" . basename($_FILES["photoUpload"]["name"]);
-            $target_file = $target_dir . $file_name;
-            $imageFileType = strtolower(pathinfo($target_file, PATHINFO_EXTENSION));
-            $check = getimagesize($_FILES["photoUpload"]["tmp_name"]);
-            if ($check !== false && $_FILES["photoUpload"]["size"] <= 5000000) {
-                if (in_array($imageFileType, ["jpg", "png", "jpeg"])) {
-                    if (move_uploaded_file($_FILES["photoUpload"]["tmp_name"], $target_file)) {
-                        $photo_path = $target_file;
+        // --- ENHANCED PHOTO UPLOAD LOGIC ---
+        if (isset($_FILES['photoUpload']) && $_FILES['photoUpload']['error'] !== UPLOAD_ERR_NO_FILE) {
+            
+            if ($_FILES['photoUpload']['error'] != UPLOAD_ERR_OK) {
+                // Handle non-OK errors (e.g., file too large for PHP config)
+                $error_message = "File upload failed with error code: " . $_FILES['photoUpload']['error'] . ". Check file size and server limits.";
+                error_log("Photo upload error code: " . $_FILES['photoUpload']['error'] . " for file: " . ($_FILES['photoUpload']['name'] ?? 'N/A'));
+            } else {
+                $target_dir = "uploads/planting_photos/";
+                if (!is_dir($target_dir)) {
+                    // Attempt to create directory with permissions (0777 for maximum compatibility, adjust as needed)
+                    if (!mkdir($target_dir, 0777, true)) {
+                        $error_message = "Could not create upload directory. Check server permissions for: " . $target_dir;
+                        error_log("Failed to create directory: " . $target_dir);
+                    }
+                }
+                
+                if (empty($error_message)) { // Proceed only if directory is fine
+                    $file_name = uniqid() . "_" . basename($_FILES["photoUpload"]["name"]);
+                    $target_file = $target_dir . $file_name;
+                    $imageFileType = strtolower(pathinfo($target_file, PATHINFO_EXTENSION));
+                    $check = @getimagesize($_FILES["photoUpload"]["tmp_name"]);
+                    
+                    if ($check === false) {
+                        $error_message = "File upload failed: Uploaded file is not a valid image.";
+                    } elseif ($_FILES["photoUpload"]["size"] > 5000000) { // 5MB limit
+                        $error_message = "File upload failed: Photo is too large (max 5MB).";
+                    } elseif (!in_array($imageFileType, ["jpg", "png", "jpeg"])) {
+                        $error_message = "File upload failed: Invalid file type. Only JPG, JPEG, and PNG are allowed.";
+                    } else {
+                        // Attempt to move the uploaded file
+                        if (move_uploaded_file($_FILES["photoUpload"]["tmp_name"], $target_file)) {
+                            $photo_path = $target_file; // Set path for DB
+                            $file_upload_success = true;
+                        } else {
+                            // IMPROVEMENT: Log and set error if move fails (permissions issue is common)
+                            $error_message = "File upload failed: Could not move uploaded file. Check directory permissions (0777 or equivalent) for: " . $target_dir;
+                            error_log($error_message);
+                        }
                     }
                 }
             }
+            // Ensure photo_path is NULL if file upload failed
+            if (!$file_upload_success) {
+                $photo_path = NULL; 
+            }
         }
+        // --- END ENHANCED PHOTO UPLOAD LOGIC ---
 
-        if ($final_crop_identifier && empty($error_message)) {
+
+        // --- DATABASE INSERTION ---
+        if ($final_crop_identifier) {
             $stmt = $conn->prepare("INSERT INTO planting_status (user_id, crop_identifier, status, photo_path, update_date) 
                                     VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)");
 
             if ($stmt) {
+                // $photo_path is NULL or the correct path
                 $stmt->bind_param("isss", $user_id, $final_crop_identifier, $status, $photo_path);
                 if ($stmt->execute()) {
-                    header("Location: " . $_SERVER['PHP_SELF'] . "?success=1&overview_page=" . $overview_page);
+                    // Redirect with success flag and photo indicator
+                    $photo_query = $file_upload_success ? "&photo_uploaded=1" : "";
+                    header("Location: " . $_SERVER['PHP_SELF'] . "?success=1" . $photo_query . "&overview_page=" . $overview_page);
                     exit();
                 } else {
-                    $error_message = "Error saving: " . $stmt->error;
+                    // Log and set database error
+                    $db_error = "Error saving status to database: " . $stmt->error;
+                    $error_message = empty($error_message) ? $db_error : $error_message . " (Database Save Failed: " . $stmt->error . ")";
+                    error_log("DB Save Error: " . $stmt->error . " for user: " . $user_id);
                 }
                 $stmt->close();
+            } else {
+                $error_message = "Failed to prepare database statement: " . $conn->error;
+                error_log("DB Prepare Error: " . $conn->error);
             }
         }
     }
 }
+
+// --- INITIAL FETCH & SUCCESS MESSAGE HANDLING (MODIFIED) ---
+
+if (isset($_GET['success']) && $_GET['success'] == 1) {
+    $photo_success_msg = isset($_GET['photo_uploaded']) && $_GET['photo_uploaded'] == 1 ? ' and your photo was uploaded successfully' : '';
+    $success_message = "Status updated successfully!" . $photo_success_msg;
+}
+
+// --- END OF MODIFIED PHP BLOCK ---
 
 if (isset($_GET['success']) && $_GET['success'] == 1) {
     $success_message = "Status updated successfully!";
@@ -356,7 +408,7 @@ if (isset($_GET['success']) && $_GET['success'] == 1) {
 $user_planting_statuses = fetchPaginatedCropUpdatesOverview($conn, $user_id, $overview_offset, $overview_limit);
 $update_history = fetchPaginatedUpdateHistory($conn, $user_id, $history_offset, $history_limit);
 $photo_gallery_items = fetchPaginatedPhotoGallery($conn, $user_id, $photo_offset, $photo_limit);
-$alerts = generateAlerts($user_planting_statuses);
+$alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used in the HTML but keeping logic for now
 
 // FIX: Do NOT close connection here, because getCycleStartDate needs it in the HTML loop
 ?>
@@ -369,8 +421,10 @@ $alerts = generateAlerts($user_planting_statuses);
     <title>Farmer Account - Planting Status & Tracking</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Google Fonts (UPDATED for consistency) -->
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <!-- Custom Styles -->
@@ -384,7 +438,7 @@ $alerts = generateAlerts($user_planting_statuses);
             margin: 0;
         }
 
-        /* --- Sidebar Styles (DO NOT TOUCH) --- */
+        /* --- Sidebar Styles (UPDATED for font consistency) --- */
         .sidebar {
             position: fixed;
             top: 0;
@@ -400,6 +454,8 @@ $alerts = generateAlerts($user_planting_statuses);
             display: flex;
             flex-direction: column;
             transition: left 0.3s ease;
+            /* CONSISTENT FONT */
+            font-family: "Be Vietnam Pro", sans-serif; 
         }
         
         /* >>> INSERTION: Sidebar Menu Label Style <<< */
@@ -489,7 +545,7 @@ $alerts = generateAlerts($user_planting_statuses);
             border-top: 1px solid rgba(255, 255, 255, 0.2);
         }
 
-        /* --- Fixed Top Header (DO NOT TOUCH) --- */
+        /* --- Fixed Top Header (UPDATED for font and alignment consistency) --- */
         .card-header-custom {
             position: fixed;
             top: 0;
@@ -502,11 +558,14 @@ $alerts = generateAlerts($user_planting_statuses);
             font-weight: 500;
             font-size: 1rem;
             display: flex;
+            /* CONSISTENT ALIGNMENT */
             align-items: center;
-            justify-content: flex-end;
+            justify-content: space-between; 
+            /* CONSISTENT FONT */
             z-index: 1060;
             border-bottom: 1px solid #ddd;
             transition: left 0.3s ease;
+            font-family: "Be Vietnam Pro", sans-serif;
         }
 
         .card-header-custom.collapsed {
@@ -557,7 +616,7 @@ $alerts = generateAlerts($user_planting_statuses);
             color: #146c0b;
         }
 
-        /* 5. Typography Consistency: Card Titles */
+        /* 5. Typography Consistency: Card Titles (UPDATED for font consistency) */
         h1,
         h2,
         h3,
@@ -566,6 +625,8 @@ $alerts = generateAlerts($user_planting_statuses);
         h6,
         .card-title,
         .modal-title {
+            /* CONSISTENT FONT */
+            font-family: "Be Vietnam Pro", sans-serif; 
             color: #0f5132; /* Dark Green */
         }
 
@@ -579,11 +640,13 @@ $alerts = generateAlerts($user_planting_statuses);
             box-shadow: 0 0 0 0.25rem rgba(25, 134, 15, 0.5) !important; /* Theme Green shadow */
         }
 
-        /* 2. Button and Alert Unification: Button Theme */
+        /* 2. Button and Alert Unification: Button Theme (UPDATED for font consistency) */
         .btn-theme {
             background-color: #19860f;
             color: #fff;
             border-color: #19860f;
+            /* CONSISTENT FONT */
+            font-family: "Be Vietnam Pro", sans-serif;
         }
 
         .btn-theme:hover {
@@ -592,10 +655,12 @@ $alerts = generateAlerts($user_planting_statuses);
             color: #fff;
         }
         
-        /* 2. Button and Alert Unification: Outline Button Theme */
+        /* 2. Button and Alert Unification: Outline Button Theme (UPDATED for font consistency) */
         .btn-outline-theme {
             color: #19860f;
             border-color: #19860f;
+            /* CONSISTENT FONT */
+            font-family: "Be Vietnam Pro", sans-serif;
         }
         .btn-outline-theme:hover,
         .btn-outline-theme:active {
@@ -971,7 +1036,7 @@ $alerts = generateAlerts($user_planting_statuses);
         </div>
     </nav>
 
-    <!-- Header (fixed to top right) (DO NOT TOUCH) -->
+    <!-- Header (fixed to top right) (HTML structure is correct, CSS handles consistency) -->
     <div class="card-header card-header-custom d-flex justify-content-between align-items-center">
         <button id="sidebarToggleBtn" class="btn btn-link p-0 text-dark" title="Toggle Sidebar" style="font-size: 1.5rem;">
             <i class="fas fa-bars"></i>
@@ -996,54 +1061,9 @@ $alerts = generateAlerts($user_planting_statuses);
             <?php endif; ?>
 
             <div class="row">
-                <!-- Reminders/Alerts Card -->
-                <div class="col-md-6 mb-4">
-                    <!-- 1. Card and Shadow Unification: Added shadow-sm -->
-                    <div class="card h-100 shadow-sm"> 
-                        <div class="card-body">
-                            <!-- 5. Typography Consistency: Removed inline text color (h5.card-title handled by CSS) -->
-                            <h5 class="card-title"><i class="fas fa-bell me-2"></i>Reminders & Alerts</h5>
-                            <?php if (!empty($alerts)): ?>
-                                <?php foreach ($alerts as $alert): ?>
-                                    <div class="alert-custom-<?php echo htmlspecialchars($alert['type']); ?> mb-3" role="alert">
-                                        <?php if ($alert['type'] == 'warning'): ?>
-                                            <i class="fas fa-exclamation-triangle"></i>
-                                            <div>
-                                                <h6 class="alert-heading mb-1">Action Required!</h6>
-                                                <?php echo $alert['message']; ?>
-                                            </div>
-                                        <?php elseif ($alert['type'] == 'info'): ?>
-                                            <i class="fas fa-info-circle"></i>
-                                            <div>
-                                                <h6 class="alert-heading mb-1">Information:</h6>
-                                                <?php echo $alert['message']; ?>
-                                            </div>
-                                        <?php elseif ($alert['type'] == 'danger'): ?>
-                                            <i class="fas fa-exclamation-circle"></i>
-                                            <div>
-                                                <h6 class="alert-heading mb-1 text-danger">CRITICAL DAMAGE!</h6>
-                                                <?php echo $alert['message']; ?>
-                                            </div>
-                                        <?php endif; ?>
-                                    </div>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <!-- 3. Alert Unification: Ensures use of alert-custom-info -->
-                                <div class="alert-custom-info" role="alert">
-                                    <i class="fas fa-info-circle"></i>
-                                    <div>
-                                        <h6 class="alert-heading mb-1">Information:</h6>
-                                        No immediate alerts or reminders. All good!
-                                    </div>
-                                </div>
-                            <?php endif; ?>
-                            <p class="text-muted small mt-3">Use the form opposite to update a status.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Planting Status Card (Form) -->
-                <div class="col-md-6 mb-4">
+                
+                <!-- Planting Status Card (Form) - MODIFIED to col-md-12 -->
+                <div class="col-md-12 mb-4">
                     <div class="card h-100 shadow-sm">
                         <div class="card-body">
                             <!-- 5. Typography Consistency: Removed inline text-success class (h5.card-title handled by CSS) -->
@@ -1605,7 +1625,7 @@ $alerts = generateAlerts($user_planting_statuses);
     <!-- Bootstrap Script -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- JavaScript for Modals and Real-time Updates -->
+    <!-- JavaScript for Modals and Sidebar Toggle (UPDATED for local storage persistence) -->
     <script>
         // View Photo Modal (Updated to handle Download Link)
         function viewPhotoModal(photoPath, cropName) {
@@ -1656,25 +1676,37 @@ $alerts = generateAlerts($user_planting_statuses);
             modal.show();
         }
 
-        // JavaScript to toggle sidebar collapse
+        // --- Sidebar Toggle Logic (Consistent with dashboard.php) ---
         const sidebar = document.querySelector('.sidebar');
         const mainContent = document.querySelector('main');
         const header = document.querySelector('.card-header-custom');
         const toggleBtn = document.getElementById('sidebarToggleBtn');
-        const sidebarLinks = document.querySelectorAll('.sidebar .nav-link:not([href*="logout"])');
+        // sidebarLinks is no longer needed but was removed/commented out previously.
 
         function collapseSidebar() {
             sidebar.classList.add('collapsed');
             mainContent.classList.add('collapsed');
             header.classList.add('collapsed');
+            localStorage.setItem('sidebarCollapsed', 'true'); // Save state
         }
 
         function openSidebar() {
             sidebar.classList.remove('collapsed');
             mainContent.classList.remove('collapsed');
             header.classList.remove('collapsed');
+            localStorage.setItem('sidebarCollapsed', 'false'); // Save state
         }
 
+        // Apply saved state on page load
+        const isCollapsed = localStorage.getItem('sidebarCollapsed');
+        if (isCollapsed === 'true') {
+            // Apply collapsed state without saving back to localStorage
+            sidebar.classList.add('collapsed');
+            mainContent.classList.add('collapsed');
+            header.classList.add('collapsed');
+        } 
+
+        // Toggle button functionality (now uses state saving)
         toggleBtn.addEventListener('click', function() {
             if (sidebar.classList.contains('collapsed')) {
                 openSidebar();
@@ -1682,12 +1714,7 @@ $alerts = generateAlerts($user_planting_statuses);
                 collapseSidebar();
             }
         });
-
-        sidebarLinks.forEach(link => {
-            link.addEventListener('click', function() {
-                collapseSidebar();
-            });
-        });
+        // --- END Sidebar Toggle Logic ---
     </script>
 </body>
 

@@ -149,6 +149,23 @@ if ($fetchRecentSubsidyStmt === false) {
 
 $conn->close(); // Close the database connection here, after all queries.
 
+// --- HELPER FUNCTION: Status to CSS Class Mapping (from farmer-dashboard.php) ---
+function get_status_class($status) {
+    $status = strtolower($status);
+    if (strpos($status, 'pending') !== false || strpos($status, 'review') !== false) {
+        return 'status-pending';
+    } elseif (strpos($status, 'approved') !== false || strpos('claimed', $status) !== false) {
+        return 'status-approved';
+    } elseif (strpos($status, 'rejected') !== false || strpos($status, 'cancelled') !== false || strpos(
+            $status,
+            'denied'
+        ) !== false) {
+        return 'status-rejected';
+    } else {
+        return 'status-pending'; // Default fallback
+    }
+}
+// --- END HELPER FUNCTION ---
 ?>
 
 <!DOCTYPE html>
@@ -158,26 +175,31 @@ $conn->close(); // Close the database connection here, after all queries.
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Municipal Account - Dashboard</title>
-    <!-- Bootstrap -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet" />
 
-    <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
 
-    <!-- Custom Styles -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <!-- Custom Styles (Consistent Design) -->
     <style>
         body {
+            /* MODIFIED: Changed font-family to Poppins for body/content text */
             font-family: "Poppins", sans-serif;
             background: #f8f9fa;
             font-size: 16px;
             line-height: 1.6;
-            color: #333;
+            color: #212529;
             margin: 0;
         }
 
+        /* --- Sidebar Styles --- */
         .sidebar {
             position: fixed;
             top: 0;
@@ -190,6 +212,23 @@ $conn->close(); // Close the database connection here, after all queries.
             font-size: 14px;
             z-index: 1050;
             border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            transition: left 0.3s ease;
+            font-family: "Be Vietnam Pro", sans-serif; 
+        }
+        
+        .sidebar-menu-label {
+            color: rgba(255, 255, 255, 0.7);
+            padding: 0 1rem 0.5rem 1rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .sidebar.collapsed {
+            left: -250px;
         }
 
         .sidebar .nav-link {
@@ -219,31 +258,48 @@ $conn->close(); // Close the database connection here, after all queries.
             color: #fff;
         }
 
+        /* MODIFIED: Header Brand (Logo and Text) */
         .sidebar .header-brand {
             display: flex;
-            flex-direction: column;
+            flex-direction: row;
             align-items: center;
+            justify-content: flex-start;
             text-decoration: none;
-            margin-bottom: 1rem;
+            margin-bottom: 2rem;
+            padding: 0 1rem;
         }
 
         .sidebar .header-brand img {
-            width: 100%;
-            max-width: 120px;
+            width: auto;
+            max-width: 40px;
             height: auto;
             background: #19860f;
-            padding: 5px;
+            padding: 2px;
             border-radius: 4px;
         }
 
         .sidebar .header-brand div {
-            font-size: 14px;
-            font-weight: 600;
+            font-size: 18px;
+            font-weight: 700;
             color: #fff;
-            text-align: center;
-            margin-top: 6px;
+            margin-top: 0;
+            margin-left: 8px;
         }
 
+        .sidebar .nav {
+            flex: 1;
+            margin: 0;
+            padding: 0;
+        }
+
+        .sidebar .sidebar-logout {
+            margin-top: auto;
+            padding-top: 0.3rem;
+            padding-bottom: 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* --- Fixed Top Header --- */
         .card-header-custom {
             position: fixed;
             top: 0;
@@ -260,129 +316,152 @@ $conn->close(); // Close the database connection here, after all queries.
             justify-content: space-between;
             z-index: 1060;
             border-bottom: 1px solid #ddd;
+            transition: left 0.3s ease;
+            font-family: "Be Vietnam Pro", sans-serif;
         }
 
-        .header-brand span {
-            font-size: 1rem;
-            font-weight: 600;
+        .card-header-custom.collapsed {
+            left: 0;
+        }
+
+        /* --- Main Content Area --- */
+        main {
+            margin-left: 250px;
+            padding: 72px 2rem 2rem 2rem;
+            background: #f8f9fa;
+            min-height: 100vh;
+            transition: margin-left 0.3s ease;
+        }
+
+        main.collapsed {
+            margin-left: 0;
+        }
+
+        /* Color Palette Standardization: Links */
+        a {
             color: #19860f;
         }
 
-        .logout-btn {
-            background: #ff4b2b;
-            color: #fff;
-            border: 2px solid #19860f;
-            padding: 6px 14px;
-            font-size: 14px;
-            border-radius: 20px;
-            transition: background 0.2s ease, border-color 0.2s ease;
-            cursor: pointer;
+        a:hover {
+            color: #146c0b;
         }
 
-        .logout-btn:hover {
-            background: #e04325;
-            border-color: #e04325;
+        /* Typography Consistency: Headings and Titles */
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6,
+        .card-title,
+        .modal-title,
+        .page-title { 
+            font-family: "Be Vietnam Pro", sans-serif;
+            color: #0f5132;
+        }
+        
+        .page-title {
+            font-size: 1.5rem; 
+            font-weight: 600; 
+            margin-bottom: 0.5rem;
+        }
+        
+        .dashboard-description {
+            font-size: 0.875rem; /* 14px */
+        }
+        
+        .card-title {
+            font-size: 1.25rem; 
+            font-weight: 600; 
+        }
+        
+        /* Explicit Standard Card Text Size for Consistency (~15px) */
+        .card-text, 
+        .card-body p:not(.card-title):not(.dashboard-description), 
+        .list-unstyled li {
+            font-size: 0.9375rem; 
+        }
+        .card-text.small, 
+        .list-unstyled.small li, 
+        .card-text.text-muted.small {
+            font-size: 0.875rem !important; 
         }
 
+        /* Button Theme */
         .btn-theme {
             background-color: #19860f;
             color: #fff;
-            font-size: 15px;
-            padding: 10px 20px;
-            border-radius: 4px;
-            border: none;
-            transition: all 0.3s ease;
+            border-color: #19860f;
+            font-family: "Be Vietnam Pro", sans-serif;
         }
 
         .btn-theme:hover {
             background-color: #146c0b;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            border-color: #146c0b;
+            color: #fff;
         }
 
-        main {
-            margin-left: 250px;
-            padding: 1rem 2rem 2rem 2rem;
-            padding-top: 72px;
-            background: #f8f9fa;
-            min-height: 100vh;
-        }
-
-        .container-fluid {
-            max-width: 1200px;
-        }
-
-        .page-title {
-            font-size: 1.8rem;
-            font-weight: 600;
-            color: #19860f;
-            margin-bottom: 1rem;
-        }
-
+        /* Card Style */
         .card {
             border-radius: 0.5rem;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-            margin-bottom: 1rem;
+            border: 1px solid #ddd;
         }
-
-        .card-body h6 {
-            font-size: 14px;
-            color: #6c757d;
-        }
-
-        .card-body h2 {
-            font-size: 2rem;
-            margin-top: 5px;
-            font-weight: 700;
-            color: #19860f;
-        }
-
-        .card-body h2.text-warning {
-            color: #ffc107 !important;
-        }
-
-        .card-body .btn-link {
-            font-size: 14px;
-            color: #19860f;
-            text-decoration: none;
-            padding: 0;
-        }
-
-        .card-body .btn-link:hover {
-            text-decoration: underline;
-        }
-
+        
+        /* Status Badges */
         .status-badge {
             padding: 0.3em 0.6em;
             border-radius: 0.4rem;
             font-size: 13px;
             font-weight: 500;
+            display: inline-block;
+            font-family: "Be Vietnam Pro", sans-serif;
         }
 
         .status-pending {
-            background-color: #ffc107;
-            color: #856404;
+            background-color: #ffc107 !important; /* Warning */
+            color: #664d03 !important;
         }
 
         .status-approved {
-            background-color: #28a745;
-            color: #fff;
+            background-color: #198754 !important; /* Success */
+            color: #fff !important;
         }
 
         .status-rejected {
-            background-color: #dc3545;
-            color: #fff;
+            background-color: #dc3545 !important; /* Danger */
+            color: #fff !important;
+        }
+
+        /* Text colors */
+        .text-info { color: #0dcaf0 !important; }
+        .text-success { color: #198754 !important; }
+        .text-warning { color: #ffc107 !important; }
+        .text-danger { color: #dc3545 !important; }
+        .text-muted { color: #6c757d !important; }
+        
+        #sidebarToggleBtn {
+            color: #0f5132;
+        }
+
+        #sidebarToggleBtn:hover {
+            color: #146c0b;
         }
     </style>
 </head>
 
 <body>
-    <!-- Sidebar -->
+    <!-- Sidebar (CONSISTENT DESIGN) -->
     <nav class="sidebar">
+        <!-- Logo and Text (Consistent with farmer-dashboard structure) -->
         <a href="ProvincialAgriHome.html" class="header-brand">
-            <img src="../photos/Department_of_Agriculture_of_the_Philippines.png" alt="Province of Antique" />
-            <div>Province of Antique</div>
+            <img src="../photos/logo.png" />
+            <div>Agriconnect</div>
         </a>
+
+        <!-- Menu Label (Consistent) -->
+        <div class="sidebar-menu-label">Main Menu</div>
+
         <ul class="nav flex-column">
             <li class="nav-item"><a href="municipal-dashboard.php" class="nav-link active"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
             <li class="nav-item"><a href="municipal-subsidy_management.php" class="nav-link"><i class="fas fa-hand-holding-usd"></i> Subsidy Management</a></li>
@@ -392,26 +471,37 @@ $conn->close(); // Close the database connection here, after all queries.
             <li class="nav-item"><a href="municipal-farmer_profiles.php" class="nav-link"><i class="fas fa-users"></i> Farmer Profiles</a></li>
             <li class="nav-item"><a href="municipal-announcements.php" class="nav-link"><i class="fas fa-bullhorn"></i> Announcements</a></li>
         </ul>
+        
+        <!-- Logout Section (Consistent) -->
+        <div class="sidebar-logout">
+            <a href="municipal-logout.php" class="nav-link">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
     </nav>
 
-    <!-- Header -->
-    <div class="card-header card-header-custom d-flex justify-content-end align-items-center">
-        <span class="me-3">Hi, <strong><?php echo htmlspecialchars($display_name); ?></strong></span>
-        <button class="logout-btn" onclick="location.href='municipal-logout.php'">
-            <i class="fas fa-sign-out-alt me-1"></i> Logout
+    <!-- Header (CONSISTENT DESIGN) -->
+    <div class="card-header card-header-custom d-flex justify-content-between align-items-center">
+        <!-- Sidebar Toggle Button (Consistent) -->
+        <button id="sidebarToggleBtn" class="btn btn-link p-0 text-dark" title="Toggle Sidebar" style="font-size: 1.5rem;">
+            <i class="fas fa-bars"></i>
         </button>
+        <!-- Greeting -->
+        <span class="me-3">Hi, <strong><?php echo htmlspecialchars($display_name); ?></strong></span>
     </div>
 
     <!-- Main Content -->
     <main>
         <div class="container-fluid">
+            <!-- UPDATED CLASS -->
             <h1 class="page-title">Dashboard</h1>
-            <p class="text-muted mb-4">Quick summary of system activity in your municipality.</p>
+            <!-- UPDATED CLASS -->
+            <p class="text-muted mb-4 dashboard-description">Quick summary of system activity in your municipality.</p>
 
             <div class="row g-4">
                 <!-- Farmers Registered -->
                 <div class="col-md-6 col-xl-3">
-                    <div class="card h-100">
+                    <div class="card h-100 shadow-sm">
                         <div class="card-body d-flex flex-column">
                             <h6 class="text-muted">Farmers Registered</h6>
                             <h2 class="fw-bold" id="farmersCount"><?php echo $farmersCount; ?></h2>
@@ -422,7 +512,7 @@ $conn->close(); // Close the database connection here, after all queries.
 
                 <!-- Total Farms -->
                 <div class="col-md-6 col-xl-3">
-                    <div class="card h-100">
+                    <div class="card h-100 shadow-sm">
                         <div class="card-body d-flex flex-column">
                             <h6 class="text-muted">Total Farms</h6>
                             <h2 class="fw-bold" id="farmsCount"><?php echo $farmsCount; ?></h2>
@@ -433,7 +523,7 @@ $conn->close(); // Close the database connection here, after all queries.
 
                 <!-- Subsidy Requests -->
                 <div class="col-md-6 col-xl-3">
-                    <div class="card h-100">
+                    <div class="card h-100 shadow-sm">
                         <div class="card-body d-flex flex-column">
                             <h6 class="text-muted">Subsidy Requests</h6>
                             <h2 class="fw-bold" id="subsidyCount"><?php echo $subsidyRequestsCount; ?></h2>
@@ -444,7 +534,7 @@ $conn->close(); // Close the database connection here, after all queries.
 
                 <!-- Pending Verifications -->
                 <div class="col-md-6 col-xl-3">
-                    <div class="card h-100">
+                    <div class="card h-100 shadow-sm">
                         <div class="card-body d-flex flex-column">
                             <h6 class="text-muted">Pending Verifications</h6>
                             <h2 class="fw-bold text-warning" id="pendingCount"><?php echo $pendingVerificationsCount; ?></h2>
@@ -457,9 +547,9 @@ $conn->close(); // Close the database connection here, after all queries.
             <div class="row g-4 mt-3">
                 <!-- Crop Monitoring Summary -->
                 <div class="col-lg-6">
-                    <div class="card h-100">
+                    <div class="card h-100 shadow-sm">
                         <div class="card-body d-flex flex-column">
-                            <h5 class="card-title text-success"><i class="fas fa-chart-bar me-2"></i>Crop Monitoring Summary</h5>
+                            <h5 class="card-title"><i class="fas fa-chart-bar me-2"></i>Crop Monitoring Summary</h5>
                             <p class="card-text text-muted small">Overview of current crop statuses and planting updates.</p>
                             <ul class="list-unstyled small mb-3">
                                 <?php
@@ -512,9 +602,9 @@ $conn->close(); // Close the database connection here, after all queries.
 
                 <!-- Latest Subsidy Approvals -->
                 <div class="col-lg-6">
-                    <div class="card h-100">
+                    <div class="card h-100 shadow-sm">
                         <div class="card-body d-flex flex-column">
-                            <h5 class="card-title text-primary"><i class="fas fa-hand-holding-usd me-2"></i>Recent Subsidy Activity</h5>
+                            <h5 class="card-title"><i class="fas fa-hand-holding-usd me-2"></i>Recent Subsidy Activity</h5>
                             <p class="card-text text-muted small">Latest approvals, rejections, and pending requests.</p>
                             <ul class="list-unstyled small mb-3">
                                 <?php if (empty($recentSubsidyActivity)): ?>
@@ -525,39 +615,41 @@ $conn->close(); // Close the database connection here, after all queries.
                                         $icon = '';
                                         $text_color = '';
                                         $description = '';
+                                        $status_class = get_status_class($activity['status']); // Use the helper function
 
                                         if ($activity['status'] == 'Approved') {
                                             $icon = 'fa-check-double';
                                             $text_color = 'text-success';
-                                            $description = "Approved: " . htmlspecialchars($activity['assistance_type']);
-                                            if (!empty($activity['farmer_name'])) {
-                                                $description .= " for " . htmlspecialchars($activity['farmer_name']);
-                                            }
-                                            if ($activity['assistance_type'] == 'Seeds' && !empty($activity['seed_type'])) {
-                                                $description .= " (" . htmlspecialchars($activity['seed_type']) . ")";
-                                            } elseif ($activity['assistance_type'] == 'Equipment' && !empty($activity['engine_type'])) {
-                                                $description .= " (" . htmlspecialchars($activity['engine_type']) . ")";
-                                            }
-                                            if (!empty($activity['qr_code_data'])) {
-                                                $description .= " (QR Issued)";
-                                            }
                                         } elseif ($activity['status'] == 'Rejected') {
                                             $icon = 'fa-users-slash';
                                             $text_color = 'text-danger';
-                                            $description = "Rejected: " . htmlspecialchars($activity['assistance_type']);
-                                            if (!empty($activity['farmer_name'])) {
-                                                $description .= " for " . htmlspecialchars($activity['farmer_name']);
-                                            }
                                         } else { // Pending
                                             $icon = 'fa-hourglass-half';
                                             $text_color = 'text-warning';
-                                            $description = "Pending: " . htmlspecialchars($activity['assistance_type']) . " request";
-                                            if (!empty($activity['farmer_name'])) {
-                                                $description .= " from " . htmlspecialchars($activity['farmer_name']);
-                                            }
+                                        }
+                                        
+                                        $description = htmlspecialchars($activity['assistance_type']) . " request";
+                                        if (!empty($activity['farmer_name'])) {
+                                            $description .= " from " . htmlspecialchars($activity['farmer_name']);
+                                        }
+                                        
+                                        // Specific details for display
+                                        $details = '';
+                                        if ($activity['assistance_type'] == 'Seeds' && !empty($activity['seed_type'])) {
+                                            $details .= " (" . htmlspecialchars($activity['seed_type']) . ")";
+                                        } elseif ($activity['assistance_type'] == 'Equipment' && !empty($activity['engine_type'])) {
+                                            $details .= " (" . htmlspecialchars($activity['engine_type']) . ")";
+                                        }
+                                        if (!empty($activity['qr_code_data']) && $activity['status'] == 'Approved') {
+                                            $details .= " (QR Issued)";
                                         }
                                         ?>
-                                        <li><i class="fas <?php echo $icon; ?> <?php echo $text_color; ?> me-2"></i><?php echo $description; ?></li>
+                                        <li>
+                                            <i class="fas <?php echo $icon; ?> <?php echo $text_color; ?> me-2"></i>
+                                            <?php echo $description; ?> 
+                                            <span class="status-badge <?php echo $status_class; ?> ms-1"><?php echo htmlspecialchars($activity['status']); ?></span>
+                                            <?php echo $details; ?>
+                                        </li>
                                     <?php endforeach; ?>
                                 <?php endif; ?>
                             </ul>
@@ -571,6 +663,46 @@ $conn->close(); // Close the database connection here, after all queries.
 
     <!-- Bootstrap Script -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- JavaScript for Sidebar Toggle (CONSISTENT FUNCTIONALITY) -->
+    <script>
+        const sidebar = document.querySelector('.sidebar');
+        const mainContent = document.querySelector('main');
+        const header = document.querySelector('.card-header-custom');
+        const toggleBtn = document.getElementById('sidebarToggleBtn');
+        
+        function collapseSidebar() {
+            sidebar.classList.add('collapsed');
+            mainContent.classList.add('collapsed');
+            header.classList.add('collapsed');
+            localStorage.setItem('sidebarCollapsed', 'true'); // Save state
+        }
+
+        function openSidebar() {
+            sidebar.classList.remove('collapsed');
+            mainContent.classList.remove('collapsed');
+            header.classList.remove('collapsed');
+            localStorage.setItem('sidebarCollapsed', 'false'); // Save state
+        }
+
+        // Apply saved state on page load
+        const isCollapsed = localStorage.getItem('sidebarCollapsed');
+        if (isCollapsed === 'true') {
+            // Apply collapsed state without saving back to localStorage
+            sidebar.classList.add('collapsed');
+            mainContent.classList.add('collapsed');
+            header.classList.add('collapsed');
+        } 
+
+        // Toggle button functionality (now uses state saving)
+        toggleBtn.addEventListener('click', function() {
+            if (sidebar.classList.contains('collapsed')) {
+                openSidebar();
+            } else {
+                collapseSidebar();
+            }
+        });
+    </script>
 </body>
 
 </html>

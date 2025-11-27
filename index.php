@@ -1,256 +1,514 @@
-<?php
-session_start();
-
-$servername = "localhost";
-$db_username = "root"; 
-$db_password = "";     
-$dbname = "cap101"; 
-
-$conn = new mysqli($servername, $db_username, $db_password, $dbname);
-
-if ($conn->connect_error) {
-    error_log("Database connection failed: " . $conn->connect_error);
-}
-?>
-
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Homepage</title>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agriconnect - Your Gateway to Agricultural Services</title>
     <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet"
-        integrity="sha384-LN+7fdVzj6u52u30Kp6M/trliBMCMKTyK833zpbD+pXdCLuTusPj697FH4R/5mcr" crossorigin="anonymous">
-    <!-- FONT -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap"
-        rel="stylesheet">
-
-    <!-- icon -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
-        crossorigin="anonymous" referrerpolicy="no-referrer">
-
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
             font-family: 'Poppins', sans-serif;
-            background-color: #f0f2f5; /* Light gray background, matching login */
-            display: flex;
-            flex-direction: column;
+            background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 25%, #a5d6a7 50%, #81c784 75%, #66bb6a 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
             min-height: 100vh;
-        }
-
-        .headerHome {
-            background-color: #19860f !important; /* Green header, matching login accents */
-            padding: 1rem 0 !important;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        .headerHome .navbar-brand {
-            margin-right: auto;
-            display: flex; /* Use flex to align logo and text */
-            align-items: center;
-        }
-
-        .headerHome .navbar-brand img {
-            height: 50px;
-            width: auto;
-            margin-right: 15px;
-        }
-
-        .headerHome .navbar-brand .logo-text {
-            color: #fff;
-            font-weight: 600;
-            font-size: 1.8rem; /* Slightly larger for prominence */
-        }
-
-        .hero-section {
-            flex-grow: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 4rem 0; /* More vertical padding */
-            background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('https://via.placeholder.com/1920x1080/c8e6c9/19860f?text=Green+Farm+Landscape') no-repeat center center/cover; /* Darker overlay for better text contrast */
-            position: relative;
-        }
-
-        .container.my-5 {
-            max-width: 1100px; /* Slightly wider container */
-            position: relative;
-            z-index: 10; /* Ensure content is above background overlay */
-        }
-
-        .card {
-            border: none;
-            border-radius: 0.75rem; /* Matching login page's border-radius */
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); /* Matching login page's shadow */
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-            overflow: hidden;
-            min-height: 400px; /* Fixed height for consistency */
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
-            background-color: #fff; /* Explicit white background */
+            padding: 40px 20px 0 20px;
+            position: relative;
+            overflow-x: hidden;
         }
 
-        .card:hover {
-            transform: translateY(-8px); /* More pronounced hover effect */
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); /* Stronger shadow on hover */
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
         }
 
-        .card-body {
-            padding: 2rem; /* Increased padding */
-            text-align: center;
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-
-        .card-title {
-            font-size: 1.5rem; /* Larger title */
-            font-weight: 700;
-            color: #19860f; /* Green title, matching login h1 */
-            margin-bottom: 1.5rem; /* More space below title */
-        }
-
-        .card-img-top {
+        /* Animated background particles */
+        .particles {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
-            height: 180px;
-            object-fit: contain;
-            padding: 15px; /* Slightly more padding around image */
-            background-color: #fdfdfd;
-            border-bottom: 1px solid #eee;
-            margin-top: auto; /* Push image to bottom if content is short */
+            height: 100%;
+            overflow: hidden;
+            z-index: 0;
         }
 
-        .btn-outline-primary {
+        .particle {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            animation: float 20s infinite ease-in-out;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) translateX(0); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-100vh) translateX(100px); opacity: 0; }
+        }
+
+        .header-section {
+            text-align: center;
+            color: white;
+            margin-bottom: 80px;
+            position: relative;
+            z-index: 1;
+            animation: fadeInDown 1s ease-out;
+        }
+
+        .back-to-home-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
             color: #19860f;
-            border-color: #19860f;
-            border-radius: 0.5rem; /* Matching login page button radius */
+            border: 2px solid #19860f;
+            padding: 10px 20px;
+            border-radius: 25px;
+            text-decoration: none;
             font-weight: 600;
-            padding: 0.75rem 1.5rem;
-            transition: all 0.2s ease;
-            margin: 0 2rem 2rem 2rem; /* Consistent margins for buttons */
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 10;
         }
 
-        .btn-outline-primary:hover {
-            background-color: #19860f;
-            color: #fff;
-            box-shadow: 0 2px 8px rgba(25, 134, 15, 0.4);
+        .back-to-home-btn:hover {
+            background: #19860f;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(25, 134, 15, 0.3);
+        }
+
+        .back-to-home-btn i {
+            font-size: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .back-to-home-btn {
+                top: 10px;
+                left: 10px;
+                padding: 8px 16px;
+                font-size: 0.85rem;
+            }
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header-section h1 {
+            font-size: 4rem;
+            font-weight: 800;
+            margin-bottom: 20px;
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.3);
+            letter-spacing: -1px;
+            color: #ffffff;
+        }
+
+        .header-section p {
+            font-size: 1.4rem;
+            font-weight: 400;
+            opacity: 0.95;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+            max-width: 700px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        .login-cards-container {
+            max-width: 1300px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            flex-wrap: wrap;
+            padding: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .login-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 25px;
+            padding: 50px 35px;
+            text-align: center;
+            flex: 1;
+            min-width: 320px;
+            max-width: 380px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2),
+                        0 5px 15px rgba(0, 0, 0, 0.1);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid transparent;
+            animation: fadeInUp 0.8s ease-out backwards;
+        }
+
+        .login-card:nth-child(1) { animation-delay: 0.1s; }
+        .login-card:nth-child(2) { animation-delay: 0.2s; }
+        .login-card:nth-child(3) { animation-delay: 0.3s; }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: left 0.5s;
+        }
+
+        .login-card:hover::before {
+            left: 100%;
+        }
+
+        .login-card:hover {
+            transform: translateY(-15px) scale(1.02);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3),
+                        0 10px 25px rgba(0, 0, 0, 0.15);
+            border-color: rgba(76, 153, 69, 0.3);
+        }
+
+        .login-card-icon {
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(135deg, #4C9945 0%, #19860f 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 30px;
+            font-size: 2.8rem;
+            color: white;
+            box-shadow: 0 10px 25px rgba(76, 153, 69, 0.3);
+            transition: all 0.4s ease;
+            position: relative;
+        }
+
+        .login-card:hover .login-card-icon {
+            transform: scale(1.1) rotate(5deg);
+            box-shadow: 0 15px 35px rgba(76, 153, 69, 0.4);
+        }
+
+        .login-card-icon::after {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: -5px;
+            right: -5px;
+            bottom: -5px;
+            border-radius: 50%;
+            border: 3px solid rgba(76, 153, 69, 0.2);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.1);
+                opacity: 0.7;
+            }
+        }
+
+        .login-card h2 {
+            color: #4C9945;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 18px;
+            transition: color 0.3s ease;
+            letter-spacing: 0.5px;
+        }
+
+        .login-card:hover h2 {
+            color: #19860f;
+        }
+
+        .login-card p {
+            color: #555;
+            font-size: 1rem;
+            line-height: 1.7;
+            margin-bottom: 30px;
+            flex-grow: 1;
+            transition: color 0.3s ease;
+        }
+
+        .login-card:hover p {
+            color: #333;
+        }
+
+        .login-card-illustration {
+            width: 100%;
+            height: 160px;
+            margin-top: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, rgba(76, 153, 69, 0.05) 0%, rgba(25, 134, 15, 0.05) 100%);
+            border-radius: 15px;
+            transition: all 0.4s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .login-card:hover .login-card-illustration {
+            background: linear-gradient(135deg, rgba(76, 153, 69, 0.1) 0%, rgba(25, 134, 15, 0.1) 100%);
+            transform: scale(1.05);
+        }
+
+        .login-card-illustration i {
+            font-size: 4.5rem;
+            color: #4C9945;
+            transition: all 0.4s ease;
+            z-index: 1;
+        }
+
+        .login-card:hover .login-card-illustration i {
+            transform: scale(1.2) rotate(-5deg);
+            color: #19860f;
         }
 
         .footer {
-            background-color: #19860f !important; /* Green footer */
-            color: #fff;
-            padding: 1.25rem 0; /* Slightly more padding */
-            text-align: center; /* Center copyright */
-            box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
+            background-color: #ffffff;
+            color: #000000;
+            text-align: center;
+            padding: 20px;
+            margin-top: auto;
+            width: calc(100% + 40px);
+            margin-left: -20px;
+            margin-right: -20px;
+            position: relative;
+            z-index: 1;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
         }
+
         .footer p {
-            margin-bottom: 0;
-            font-size: 0.95rem;
+            margin: 0;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #000000;
         }
 
-        /* Adjustments for smaller screens */
+        /* Responsive Design */
+        @media (max-width: 992px) {
+            .header-section h1 {
+                font-size: 3rem;
+            }
+
+            .header-section p {
+                font-size: 1.2rem;
+            }
+
+            .login-cards-container {
+                gap: 30px;
+            }
+        }
+
         @media (max-width: 768px) {
-            .hero-section .card {
-                margin-bottom: 2rem; /* Add more space between cards on mobile */
+            body {
+                padding: 30px 15px 0;
             }
-            .headerHome .navbar-brand .logo-text {
-                font-size: 1.5rem;
+            
+            .footer {
+                width: calc(100% + 30px);
+                margin-left: -15px;
+                margin-right: -15px;
             }
-            .headerHome .navbar-brand img {
-                height: 45px;
+
+            .header-section {
+                margin-bottom: 50px;
             }
-            .card-title {
-                font-size: 1.3rem;
+
+            .header-section h1 {
+                font-size: 2.5rem;
             }
-            .card-body {
-                padding: 1.5rem;
+
+            .header-section p {
+                font-size: 1.1rem;
             }
-            .btn-outline-primary {
-                margin: 0 1.5rem 1.5rem 1.5rem;
+
+            .login-cards-container {
+                flex-direction: column;
+                align-items: center;
+                gap: 25px;
+            }
+
+            .login-card {
+                max-width: 100%;
+                padding: 40px 30px;
             }
         }
 
-        @media (max-width: 576px) {
-            .login-container h1 {
-                font-size: 1.5rem;
+        @media (max-width: 480px) {
+            .header-section h1 {
+                font-size: 2rem;
             }
-            .card-img-top {
-                height: 150px;
+
+            .header-section p {
+                font-size: 1rem;
+            }
+
+            .login-card {
+                padding: 35px 25px;
+                min-width: 100%;
+            }
+
+            .login-card-icon {
+                width: 85px;
+                height: 85px;
+                font-size: 2.3rem;
+            }
+
+            .login-card h2 {
+                font-size: 1.3rem;
             }
         }
     </style>
 </head>
-
 <body>
+    <!-- Animated Background Particles -->
+    <div class="particles" id="particles"></div>
 
-    <header class="headerHome">
-        <div class="container">
-            <nav class="navbar navbar-expand-lg navbar-dark p-0">
-                <a href="index.php" class="navbar-brand">
-                    <img src="photos/Department_of_Agriculture_of_the_Philippines.png" alt="Department of Agriculture Logo">
-                    <span class="logo-text">Province of Antique</span>
-                </a>
-            </nav>
-        </div>
-    </header>
+    <!-- Header Section -->
+    <div class="header-section">
+        <a href="home.php" class="back-to-home-btn">
+            <i class="fas fa-arrow-left"></i>
+            <span>Back to Landing Page</span>
+        </a>
+        <h1>Welcome to Agriconnect</h1>
+        <p>Your Gateway to Agricultural Services and Management</p>
+    </div>
 
-    <!-- Hero Section -->
-    <main class="hero-section">
-        <div class="container">
-            <div class="row justify-content-center gx-4 gy-4"> 
-                
-                <div class="col-sm-10 col-md-6 col-lg-4 d-flex">
-                    <div class="card w-100">
-                        <div class="card-body">
-                            <h5 class="card-title">FARMERS LOGIN</h5>
-                        </div>
-                        <img src="photos/PAgri.png" class="card-img-top" alt="Farmer Icon">
-                        <a href="pages/farmers-login.php" class="btn btn-outline-primary">Log-in Here</a>
-                    </div>
-                </div>
-
-                <div class="col-sm-10 col-md-6 col-lg-4 d-flex">
-                    <div class="card w-100">
-                        <div class="card-body">
-                            <h5 class="card-title">MUNICIPAL AGRICULTURIST'S LOGIN</h5>
-                        </div>
-                        <img src="photos/MAgri.png" class="card-img-top" alt="Municipal Agriculturist Icon">
-                        <a href="pages/municipal-login.php" class="btn btn-outline-primary">Log-in Here</a>
-                    </div>
-                </div>
-                
-                <div class="col-sm-10 col-md-6 col-lg-4 d-flex">
-                    <div class="card w-100">
-                        <div class="card-body">
-                            <h5 class="card-title">SYSTEM ADMIN LOGIN</h5>
-                        </div>
-                        <img src="photos/SAdmin.png" class="card-img-top" alt="System Admin Icon">
-                        <a href="pages/admin-login.php" class="btn btn-outline-primary">Log-in Here</a>
-                    </div>
-                </div>
+    <!-- Login Cards Section -->
+    <div class="login-cards-container">
+        <!-- Farmers Login Card -->
+        <a href="pages/farmers-login.php" class="login-card">
+            <div class="login-card-icon">
+                <i class="fas fa-user-friends"></i>
             </div>
-        </div>
-    </main>
+            <h2>FARMERS LOGIN</h2>
+            <p>Access your farming dashboard, apply for subsidies, and manage your agricultural profile.</p>
+            <div class="login-card-illustration">
+                <i class="fas fa-seedling"></i>
+            </div>
+        </a>
 
-    <footer class="footer text-white">
-        <div class="container">
-            <p>&copy; BSIT-4. All Rights Reserved.</p>
-        </div>
-    </footer>
+        <!-- Municipal Agriculturist's Login Card -->
+        <a href="pages/municipal-login.php" class="login-card">
+            <div class="login-card-icon">
+                <i class="fas fa-building"></i>
+            </div>
+            <h2>MUNICIPAL AGRICULTURIST'S LOGIN</h2>
+            <p>Review applications, manage subsidies, and oversee agricultural programs in your municipality.</p>
+            <div class="login-card-illustration">
+                <i class="fas fa-clipboard-check"></i>
+            </div>
+        </a>
 
-    <!--SCRIPTS BOOTSTRAP -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"
-        integrity="sha384-ndDqU0Gzau9qJ1lfW4pNLlhNTkCfHzAVBReH9diLvGRem5+R9g2FzA8ZGN954O5Q"
-        crossorigin="anonymous"></script>
+        <!-- System Admin Login Card -->
+        <a href="pages/admin-login.php" class="login-card">
+            <div class="login-card-icon">
+                <i class="fas fa-shield-alt"></i>
+            </div>
+            <h2>SYSTEM ADMIN LOGIN</h2>
+            <p>Manage system settings, users, and oversee all administrative functions of the platform.</p>
+            <div class="login-card-illustration">
+                <i class="fas fa-laptop-code"></i>
+            </div>
+        </a>
+    </div>
 
+    <!-- Footer -->
+    <div class="footer">
+        <p>© BSIT-4. All Rights Reserved.</p>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Create animated background particles
+        function createParticles() {
+            const particlesContainer = document.getElementById('particles');
+            const particleCount = 20;
+
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                
+                const size = Math.random() * 10 + 5;
+                particle.style.width = size + 'px';
+                particle.style.height = size + 'px';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 20 + 's';
+                particle.style.animationDuration = (Math.random() * 10 + 15) + 's';
+                
+                particlesContainer.appendChild(particle);
+            }
+        }
+
+        // Initialize particles on page load
+        document.addEventListener('DOMContentLoaded', createParticles);
+
+        // Add smooth scroll behavior
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
 </body>
-
 </html>

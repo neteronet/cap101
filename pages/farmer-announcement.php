@@ -85,24 +85,24 @@ $conn->close();
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet" />
 
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <!-- Google Fonts (UPDATED FOR CONSISTENCY) -->
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
 
-    <!-- Custom Styles -->
+    <!-- Custom Styles (MODIFIED FOR CONSISTENCY) -->
     <style>
         body {
             font-family: "Poppins", sans-serif;
             background: #f8f9fa;
-            font-size: 16px; /* Matched to dashboard */
-            line-height: 1.6; /* Matched to dashboard */
-            color: #333; /* Matched to dashboard */
+            font-size: 16px;
+            line-height: 1.6;
+            color: #212529; /* Consistent dark text color */
             margin: 0;
         }
 
-        /* Sidebar - Matched to dashboard */
+        /* --- Sidebar Styles (Consistent Design) --- */
         .sidebar {
             position: fixed;
             top: 0;
@@ -112,14 +112,32 @@ $conn->close();
             background: #19860f;
             padding: 1rem 0;
             overflow-y: auto;
-            font-size: 14px; /* Matched to dashboard */
+            font-size: 14px;
             z-index: 1050;
             border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            transition: left 0.3s ease;
+            /* CONSISTENCY */
+            font-family: "Be Vietnam Pro", sans-serif;
+        }
+
+        .sidebar.collapsed {
+            left: -250px;
+        }
+
+        .sidebar-menu-label {
+            color: rgba(255, 255, 255, 0.7); /* Slightly transparent white */
+            padding: 0 1rem 0.5rem 1rem; /* Padding to align with links */
+            font-size: 0.75rem; /* Small text */
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .sidebar .nav-link {
             color: #fff;
-            padding: 0.6rem 1rem; /* Matched to dashboard */
+            padding: 0.6rem 1rem;
             width: 100%;
             box-sizing: border-box;
             border-radius: 0;
@@ -128,10 +146,9 @@ $conn->close();
             text-decoration: none;
         }
 
-
         .sidebar .nav-link i {
-            margin-right: 8px; /* Matched to dashboard */
-            font-size: 1rem; /* Matched to dashboard */
+            margin-right: 8px;
+            font-size: 1rem;
         }
 
         .sidebar .nav-link.active {
@@ -141,144 +158,157 @@ $conn->close();
         }
 
         .sidebar .nav-link:hover:not(.active) {
-            background-color: #146c0b; /* Matched to dashboard */
+            background-color: #146c0b;
             color: #fff;
         }
 
+        /* MODIFIED: Header Brand (Logo and Text) */
         .sidebar .header-brand {
             display: flex;
-            flex-direction: column;
+            flex-direction: row;
             align-items: center;
+            justify-content: flex-start;
             text-decoration: none;
-            margin-bottom: 1rem;
+            margin-bottom: 2rem;
+            padding: 0 1rem;
         }
 
         .sidebar .header-brand img {
-            width: 100%;
-            max-width: 120px; /* Matched to dashboard */
+            width: auto;
+            max-width: 40px;
             height: auto;
             background: #19860f;
-            padding: 5px;
+            padding: 2px;
             border-radius: 4px;
         }
 
         .sidebar .header-brand div {
-            font-size: 14px; /* Matched to dashboard */
-            font-weight: 600;
+            font-size: 18px;
+            font-weight: 700;
             color: #fff;
-            text-align: center;
-            margin-top: 6px;
+            margin-top: 0;
+            margin-left: 8px;
         }
 
-        /* Header - Matched to dashboard */
+        .sidebar .nav {
+            flex: 1;
+            margin: 0;
+            padding: 0;
+        }
+
+        .sidebar .sidebar-logout {
+            margin-top: auto;
+            padding-top: 0.3rem;
+            padding-bottom: 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* --- Fixed Top Header (Consistent Design) --- */
         .card-header-custom {
             position: fixed;
             top: 0;
             left: 250px;
             right: 0;
-            height: 56px; /* Matched to dashboard */
+            height: 56px;
             background-color: #fff;
             color: #19860f;
-            padding: 0 1.25rem; /* Matched to dashboard */
+            padding: 0 1.25rem;
             font-weight: 500;
-            font-size: 1rem; /* Matched to dashboard */
+            font-size: 1rem;
             display: flex;
             align-items: center;
-            justify-content: flex-end; /* Adjusted for logout button alignment */
+            justify-content: space-between; /* To put toggle on left and text on right */
             z-index: 1060;
             border-bottom: 1px solid #ddd;
+            transition: left 0.3s ease;
+            /* CONSISTENCY */
+            font-family: "Be Vietnam Pro", sans-serif;
         }
 
-        .header-brand span { /* This style is for the "Hi, username" in the top header, which is now green */
-            font-size: 1rem;
+        .card-header-custom.collapsed {
+            left: 0;
+        }
+
+        #sidebarToggleBtn {
+            color: #0f5132;
+        }
+
+        #sidebarToggleBtn:hover {
+            color: #146c0b;
+        }
+
+        /* --- Typography Consistency --- */
+        h1, h2, h3, h4, h5, h6, .card-title, .modal-title, .page-title {
+            /* CONSISTENCY: Set headings/titles font */
+            font-family: "Be Vietnam Pro", sans-serif;
+            color: #0f5132; /* Dark Green */
+        }
+
+        /* CONSISTENCY: Page Title Size */
+        .page-title {
+            font-size: 1.5rem; /* Reduced from 1.8rem for consistency */
             font-weight: 600;
-            color: #19860f;
+            color: #0f5132; 
+            margin-bottom: 0.5rem; /* Reduced for consistency */
         }
-
-        /* Logout Button - Matched to dashboard */
-        .logout-btn {
-            background: #ff4b2b;
-            color: #fff;
-            border: none;
-            padding: 6px 14px; /* Matched to dashboard */
-            font-size: 14px; /* Matched to dashboard */
-            border-radius: 20px; /* Matched to dashboard */
-            transition: background 0.2s ease;
-            cursor: pointer;
+        
+        /* CONSISTENCY: Card Title Size */
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600; /* Added slight boldness for consistency */
+            margin-bottom: 0.75rem;
         }
-
-        .logout-btn:hover {
-            background: #e04325;
+        
+        /* CONSISTENCY: Standard Card Text Size */
+        .card-text, .card-body p:not(.card-title), .list-unstyled li {
+            font-size: 0.9375rem; /* ~15px for consistency */
         }
-
+        .card-text.small, .list-unstyled.small li, .card-text.text-muted.small {
+            font-size: 0.875rem !important; /* Keep 14px for small elements */
+        }
+        
         /* Themed Buttons - Matched to dashboard */
         .btn-theme {
             background-color: #19860f;
             color: #fff;
-            font-size: 15px; /* Matched to dashboard */
-            padding: 10px 20px; /* Matched to dashboard */
-            border-radius: 4px; /* Matched to dashboard */
-            border: none; /* Ensure no default border */
-            transition: all 0.3s ease; /* Added transition */
+            font-size: 15px;
+            padding: 10px 20px;
+            border-radius: 4px;
+            border: none;
+            transition: all 0.3s ease;
+            /* CONSISTENCY */
+            font-family: "Be Vietnam Pro", sans-serif;
+            border-color: #19860f;
         }
 
         .btn-theme:hover {
             background-color: #146c0b;
-            color: #fff; /* Ensure text color remains white */
-            transform: translateY(-1px); /* Slight lift on hover */
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Soft shadow on hover */
+            color: #fff;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            border-color: #146c0b;
         }
 
         main {
             margin-left: 250px; /* Matched sidebar width */
-            padding: 1rem 2rem 2rem 2rem; /* Matched to dashboard */
-            padding-top: 72px; /* Adjusted for fixed header height */
+            padding: 72px 2rem 2rem 2rem; /* Adjusted padding-top for fixed header height */
             background: #f8f9fa;
             min-height: 100vh;
+            transition: margin-left 0.3s ease;
         }
 
-        .page-title {
-            font-size: 1.8rem; /* Matched to dashboard */
-            font-weight: 600; /* Matched to dashboard */
-            color: #19860f;
-            margin-bottom: 1rem; /* Matched to dashboard */
+        main.collapsed {
+            margin-left: 0;
         }
 
         .card {
             border-radius: 0.5rem; /* Matched to dashboard */
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05); /* Matched to dashboard */
             margin-bottom: 1rem; /* Matched to dashboard */
+            border: 1px solid #ddd; /* Matched to dashboard */
         }
 
-        .card-title {
-            color: #19860f;
-            font-size: 1.25rem; /* Matched to dashboard */
-            margin-bottom: 0.75rem;
-        }
-
-        .status-badge { /* Although not directly used for announcements, kept for consistency */
-            padding: 0.3em 0.6em; /* Matched to dashboard */
-            border-radius: 0.4rem; /* Matched to dashboard */
-            font-size: 13px; /* Matched to dashboard */
-            font-weight: 500;
-        }
-
-        .status-pending {
-            background-color: #ffc107;
-            color: #856404;
-        }
-
-        .status-approved {
-            background-color: #28a745;
-            color: #fff;
-        }
-
-        .status-rejected {
-            background-color: #dc3545;
-            color: #fff;
-        }
-
-        /* Announcement Specific Styles (Adjusted for consistency) */
+        /* Announcement Specific Styles (Kept as is, inheriting new typography) */
         .announcement-card {
             transition: transform 0.2s ease, box-shadow 0.2s ease;
             cursor: pointer;
@@ -299,7 +329,7 @@ $conn->close();
 
 
         .announcement-date {
-            font-size: 0.85rem;
+            font-size: 0.875rem; /* Consistent small font size */
             color: #6c757d;
         }
 
@@ -307,8 +337,10 @@ $conn->close();
             font-size: 0.75rem;
             font-weight: 600;
             padding: 0.2em 0.6em;
-            border-radius: 0.3rem;
+            border-radius: 0.4rem; /* Slightly larger border-radius for badge consistency */
             margin-left: 10px;
+            /* CONSISTENCY: Explicitly set font for badges */
+            font-family: "Be Vietnam Pro", sans-serif;
         }
         /* Dynamic background colors for category badges */
         .category-advisory { background-color: #fff3cd; color: #664d03; }
@@ -337,10 +369,11 @@ $conn->close();
         /* Adjust input group for consistent height */
         .input-group .form-control,
         .input-group .btn {
-            height: calc(1.5em + 1rem + 2px); /* Standard Bootstrap input height (form-control-lg) */
-            font-size: 1rem; /* Adjusted for consistency */
-            padding: 0.5rem 1rem; /* Adjusted for consistency */
-            border-radius: 0.25rem; /* Standard Bootstrap radius */
+            /* Matched height calculation from dashboard styles */
+            height: calc(1.5em + 1rem + 2px); 
+            font-size: 1rem;
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
         }
         .input-group .form-control {
             border-top-right-radius: 0;
@@ -349,57 +382,75 @@ $conn->close();
         .input-group .btn {
             border-top-left-radius: 0;
             border-bottom-left-radius: 0;
+            /* Ensures button is Be Vietnam Pro */
+            font-family: "Be Vietnam Pro", sans-serif; 
         }
-        .form-select.btn-theme { /* Styling for the dropdown filter */
-            height: calc(1.5em + 1rem + 2px); /* Match input group height */
+        .form-select.btn-theme {
+            /* Matched height calculation from dashboard styles */
+            height: calc(1.5em + 1rem + 2px); 
             font-size: 1rem;
-            padding: 0.5rem 1rem 0.5rem 0.75rem; /* Adjust padding for dropdown arrow */
-            border: 1px solid #19860f; /* Add border for consistency */
+            padding: 0.5rem 1rem 0.5rem 0.75rem;
+            border: 1px solid #19860f;
             background-color: #19860f;
             color: #fff;
             border-radius: 0.25rem;
-            appearance: none; /* Remove default arrow */
+            appearance: none;
             background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
             background-repeat: no-repeat;
             background-position: right 0.75rem center;
             background-size: 16px 12px;
+            /* CONSISTENCY */
+            font-family: "Be Vietnam Pro", sans-serif; 
         }
         .form-select.btn-theme:hover {
             background-color: #146c0b;
             border-color: #146c0b;
         }
+        /* Dashboard-like helper text */
+        .dashboard-description {
+            font-size: 0.875rem; /* 14px */
+        }
     </style>
 </head>
 <body>
-    <!-- Sidebar -->
+    <!-- Sidebar (Consistent Design) -->
     <nav class="sidebar">
         <a href="ProvincialAgriHome.html" class="header-brand">
-            <img src="../photos/Department_of_Agriculture_of_the_Philippines.png" alt="Province of Antique" />
-            <div>Province of Antique</div>
+            <!-- Changed logo source and text to match the reference dashboard -->
+            <img src="../photos/logo.png" alt="Department of Agriculture Logo" />
+            <div>Agriconnect</div>
         </a>
+
+        <div class="sidebar-menu-label">Main Menu</div>
+
         <ul class="nav flex-column">
             <li class="nav-item"><a href="farmer-dashboard.php" class="nav-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
             <li class="nav-item"><a href="farmer-apply_for_assistance.php" class="nav-link"><i class="fas fa-hand-holding-usd"></i>Apply for Assistance</a></li>
             <li class="nav-item"><a href="farmer-planting_status.php" class="nav-link"><i class="fas fa-leaf"></i> Planting Status</a></li>
             <li class="nav-item"><a href="farmer-claim_history.php" class="nav-link"><i class="fas fa-history"></i> Claim History</a></li>
-            <!-- Removed link to Progress Tracking -->
             <li class="nav-item"><a href="farmer-announcement.php" class="nav-link active"><i class="fas fa-bullhorn"></i> Announcements</a></li>
             <li class="nav-item"><a href="farmer-my_profile.php" class="nav-link"><i class="fas fa-user-circle"></i> My Profile</a></li>
         </ul>
+
+        <div class="sidebar-logout">
+            <a href="farmers-logout.php" class="nav-link">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
     </nav>
 
-    <!-- Header -->
-    <div class="card-header card-header-custom">
-        <span class="me-3">Hi, <strong><?php echo htmlspecialchars($display_name); ?></strong></span>
-        <button class="logout-btn" onclick="location.href='farmers-logout.php'">
-            <i class="fas fa-sign-out-alt me-1"></i> Logout
+    <!-- Header (Consistent Design) -->
+    <div class="card-header card-header-custom d-flex justify-content-between align-items-center">
+        <button id="sidebarToggleBtn" class="btn btn-link p-0 text-dark" title="Toggle Sidebar" style="font-size: 1.5rem;">
+            <i class="fas fa-bars"></i>
         </button>
+        <span class="me-3">Hi, <strong><?php echo htmlspecialchars($display_name); ?></strong></span>
     </div>
 
     <!-- Main Content -->
     <main>
-        <h1 class="page-title"> </i>Announcements & Updates</h1>
-        <p class="text-muted mb-4">
+        <h1 class="page-title"><i></i>Announcements & Updates</h1>
+        <p class="text-muted mb-4 dashboard-description">
             Stay informed with the latest news, advisories, and program updates from the Provincial Agriculture Office.
         </p>
 
@@ -425,8 +476,10 @@ $conn->close();
         <div class="row" id="announcementList">
             <?php if (empty($announcements)): ?>
                 <div class="col-12">
-                    <div class="alert alert-info" role="alert">
-                        No announcements available at the moment. Please check back later!
+                    <div class="card p-4">
+                        <div class="alert alert-info mb-0" role="alert">
+                            No announcements available at the moment. Please check back later!
+                        </div>
                     </div>
                 </div>
             <?php else: ?>
@@ -497,6 +550,7 @@ $conn->close();
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            // --- Announcement Modal Logic (Existing) ---
             const announcementDetailModal = document.getElementById('announcementDetailModal');
             announcementDetailModal.addEventListener('show.bs.modal', function (event) {
                 const button = event.relatedTarget; // Button that triggered the modal
@@ -530,7 +584,7 @@ $conn->close();
                 }
             });
 
-            // Filtering and Searching Functionality
+            // --- Filtering and Searching Functionality (Existing) ---
             const announcementSearch = document.getElementById('announcementSearch');
             const announcementFilter = document.getElementById('announcementFilter');
             const announcementList = document.getElementById('announcementList');
@@ -566,6 +620,45 @@ $conn->close();
 
             // Initial filter call to ensure correct display if a filter is pre-selected or search bar is not empty
             filterAnnouncements();
+
+            // --- Sidebar Toggle Logic (CONSISTENT DESIGN) ---
+            // JavaScript to toggle sidebar collapse and preserve state using localStorage
+            const sidebar = document.querySelector('.sidebar');
+            const mainContent = document.querySelector('main');
+            const header = document.querySelector('.card-header-custom');
+            const toggleBtn = document.getElementById('sidebarToggleBtn');
+
+            function collapseSidebar() {
+                sidebar.classList.add('collapsed');
+                mainContent.classList.add('collapsed');
+                header.classList.add('collapsed');
+                localStorage.setItem('sidebarCollapsed', 'true'); // Save state
+            }
+
+            function openSidebar() {
+                sidebar.classList.remove('collapsed');
+                mainContent.classList.remove('collapsed');
+                header.classList.remove('collapsed');
+                localStorage.setItem('sidebarCollapsed', 'false'); // Save state
+            }
+
+            // --- IMPROVEMENT: Apply saved state on page load ---
+            const isCollapsed = localStorage.getItem('sidebarCollapsed');
+            if (isCollapsed === 'true') {
+                // Apply collapsed state without saving back to localStorage
+                sidebar.classList.add('collapsed');
+                mainContent.classList.add('collapsed');
+                header.classList.add('collapsed');
+            } 
+
+            // Toggle button functionality (now uses state saving)
+            toggleBtn.addEventListener('click', function() {
+                if (sidebar.classList.contains('collapsed')) {
+                    openSidebar();
+                } else {
+                    collapseSidebar();
+                }
+            });
         });
     </script>
 </body>

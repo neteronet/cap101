@@ -12,9 +12,6 @@ if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
 $user_id = $_SESSION['user_id'];
 $display_name = 'Mao'; // Default fallback
 
-// --- IMPROVED NAME FETCHING ---
-// Always try to fetch the name from the database for accuracy.
-// This ensures that if the session name is outdated or not set, the DB name is used.
 $stmt_name = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
 if ($stmt_name) {
     $stmt_name->bind_param("i", $user_id);
@@ -99,7 +96,25 @@ $count_stmt = $conn->prepare($count_sql);
 
 if ($count_stmt) {
     if (!empty($params)) {
-        $count_stmt->bind_param($param_types, ...$params);
+        // Need to reset params array for count query as it uses different types/structure
+        $count_params = [];
+        $count_param_types = "";
+        
+        // Re-build params for count query (excluding limit/offset)
+        if (!empty($search_query)) {
+            $count_params[] = "%" . $search_query . "%";
+            $count_params[] = "%" . $search_query . "%";
+            $count_param_types .= "ss";
+        }
+        if ($category_filter !== 'all') {
+            $count_params[] = $category_filter;
+            $count_param_types .= "s";
+        }
+        
+        if (!empty($count_params)) {
+            // Using call_user_func_array with references is safer, but spread operator (...) works in PHP 5.6+ and is cleaner.
+            $count_stmt->bind_param($count_param_types, ...$count_params);
+        }
     }
     $count_stmt->execute();
     $count_result = $count_stmt->get_result();
@@ -113,6 +128,21 @@ if ($count_stmt) {
 }
 
 // Query to fetch announcements for the current page
+// Re-prepare params for the main query including LIMIT/OFFSET
+$params = [];
+$param_types = "";
+
+if (!empty($search_query)) {
+    $params[] = "%" . $search_query . "%";
+    $params[] = "%" . $search_query . "%";
+    $param_types .= "ss";
+}
+
+if ($category_filter !== 'all') {
+    $params[] = $category_filter;
+    $param_types .= "s";
+}
+
 $sql = "SELECT id, title, category, content, image_url, publish_date, 'Published' AS status
         FROM announcements " . $where_sql . "
         ORDER BY publish_date DESC
@@ -125,7 +155,14 @@ if ($stmt) {
     $params[] = $offset;
     $params[] = $items_per_page;
 
-    $stmt->bind_param($param_types, ...$params);
+    // Use call_user_func_array for binding parameters dynamically
+    // The bind_param takes a reference to the array elements, so we need to ensure the arguments are passed as references
+    if (!empty($params)) {
+        // Since $params contains the search/filter values AND the limit/offset values,
+        // we can bind them all at once.
+        $stmt->bind_param($param_types, ...$params);
+    }
+
     $stmt->execute();
     $result = $stmt->get_result();
 
@@ -155,22 +192,24 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
 
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Google Fonts (Updated for Consistency) -->
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 
-    <!-- Custom Styles -->
+    <!-- Custom Styles (UPDATED FOR CONSISTENCY) -->
     <style>
         body {
+            /* MODIFIED: Changed font-family to Poppins for body/content text */
             font-family: "Poppins", sans-serif;
             background: #f8f9fa;
             font-size: 16px;
             line-height: 1.6;
-            color: #333;
+            color: #212529;
             margin: 0;
         }
 
+        /* --- Sidebar Styles (CONSISTENT WITH FARMER DASHBOARD) --- */
         .sidebar {
             position: fixed;
             top: 0;
@@ -183,6 +222,23 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
             font-size: 14px;
             z-index: 1050;
             border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            transition: left 0.3s ease;
+            font-family: "Be Vietnam Pro", sans-serif;
+        }
+        
+        .sidebar.collapsed {
+            left: -250px;
+        }
+        
+        .sidebar-menu-label {
+            color: rgba(255, 255, 255, 0.7);
+            padding: 0 1rem 0.5rem 1rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .sidebar .nav-link {
@@ -214,29 +270,45 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
 
         .sidebar .header-brand {
             display: flex;
-            flex-direction: column;
+            flex-direction: row;
             align-items: center;
+            justify-content: flex-start;
             text-decoration: none;
-            margin-bottom: 1rem;
+            margin-bottom: 2rem;
+            padding: 0 1rem;
         }
 
         .sidebar .header-brand img {
-            width: 100%;
-            max-width: 120px;
+            width: auto;
+            max-width: 40px;
             height: auto;
             background: #19860f;
-            padding: 5px;
+            padding: 2px;
             border-radius: 4px;
         }
 
         .sidebar .header-brand div {
-            font-size: 14px;
-            font-weight: 600;
+            font-size: 18px;
+            font-weight: 700;
             color: #fff;
-            text-align: center;
-            margin-top: 6px;
+            margin-top: 0;
+            margin-left: 8px;
+        }
+        
+        .sidebar .nav {
+            flex: 1;
+            margin: 0;
+            padding: 0;
         }
 
+        .sidebar .sidebar-logout {
+            margin-top: auto;
+            padding-top: 0.3rem;
+            padding-bottom: 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* --- Fixed Top Header (CONSISTENT WITH FARMER DASHBOARD) --- */
         .card-header-custom {
             position: fixed;
             top: 0;
@@ -253,173 +325,111 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
             justify-content: space-between;
             z-index: 1060;
             border-bottom: 1px solid #ddd;
+            transition: left 0.3s ease;
+            font-family: "Be Vietnam Pro", sans-serif;
         }
 
-        .header-brand span {
-            font-size: 1rem;
-            font-weight: 600;
-            color: #19860f;
+        .card-header-custom.collapsed {
+            left: 0;
         }
 
-        .logout-btn {
-            background: #ff4b2b;
-            color: #fff;
-            border: none;
-            padding: 6px 14px;
-            font-size: 14px;
-            border-radius: 20px;
-            transition: background 0.2s ease;
-            cursor: pointer;
+        #sidebarToggleBtn {
+            color: #0f5132; /* Darker green */
         }
 
-        .logout-btn:hover {
-            background: #e04325;
+        #sidebarToggleBtn:hover {
+            color: #146c0b;
         }
 
-        .btn-theme {
+        /* --- Main Content Area --- */
+        main {
+            margin-left: 250px;
+            padding: 72px 2rem 2rem 2rem; /* Adjusted top padding for fixed header */
+            background: #f8f9fa;
+            min-height: 100vh;
+            transition: margin-left 0.3s ease;
+        }
+
+        main.collapsed {
+            margin-left: 0;
+        }
+        
+        /* 5. Typography Consistency: Headings */
+        h1, h2, h3, h4, h5, h6, .card-title, .modal-title, .page-title {
+            font-family: "Be Vietnam Pro", sans-serif;
+            color: #0f5132; /* Dark Green */
+        }
+        
+        /* NEW: Style for the Page Title */
+        .page-title {
+            font-size: 1.5rem; 
+            font-weight: 600; 
+            margin-bottom: 0.5rem;
+        }
+
+        .dashboard-description {
+            font-size: 0.875rem; /* 14px */
+        }
+
+        /* NEW: Explicit Card Title Size for Consistency */
+        .card-title {
+            font-size: 1.25rem; 
+            font-weight: 600; 
+        }
+
+        /* NEW: Explicit Standard Card Text Size for Consistency (0.9375rem = 15px) */
+        .card-text, .card-body p:not(.card-title), .list-unstyled li, .form-control, .form-select {
+            font-size: 0.9375rem; 
+        }
+
+        /* 2. Button and Alert Unification: Button Theme */
+        .btn-theme, .add-announcement-btn {
             background-color: #19860f;
             color: #fff;
-            font-size: 15px;
-            padding: 10px 20px;
-            border-radius: 4px;
-        }
-
-        .btn-theme:hover {
-            background-color: #146c0b;
-        }
-
-        .add-announcement-btn {
-            background-color: #19860f;
-            color: #fff;
-            padding: 8px 15px;
-            border-radius: 5px;
+            border-color: #19860f;
+            font-family: "Be Vietnam Pro", sans-serif;
+            font-size: 0.9375rem; /* 15px */
+            padding: 8px 15px; /* Consistent padding */
             text-decoration: none;
-            font-size: 15px;
             display: inline-flex;
             align-items: center;
+            border-radius: 0.25rem;
         }
 
-        .add-announcement-btn:hover {
+        .btn-theme:hover, .add-announcement-btn:hover {
             background-color: #146c0b;
+            border-color: #146c0b;
             color: #fff;
         }
-
+        
         .add-announcement-btn i {
             margin-right: 5px;
         }
-
-        main {
-            margin-left: 250px;
-            padding: 1rem 2rem 2rem 2rem;
-            padding-top: 72px;
-            /* Adjust for fixed header */
-            background: #f8f9fa;
-            min-height: 100vh;
-        }
-
-        .container-fluid {
-            max-width: 1200px;
-        }
-
-        .page-title {
-            font-size: 1.8rem;
-            font-weight: 600;
-            color: #19860f;
-            margin-bottom: 1rem;
-        }
+        
+        /* REMOVED: Custom .logout-btn styling block for consistency with farmer dashboard header */
 
         .card {
             border-radius: 0.5rem;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
             margin-bottom: 1rem;
+            border: 1px solid #ddd;
         }
-
-        .card-title {
-            color: #19860f;
-            font-size: 1.25rem;
-            margin-bottom: 0.75rem;
-        }
-
+        
         .status-badge {
             padding: 0.3em 0.6em;
             border-radius: 0.4rem;
             font-size: 13px;
             font-weight: 500;
             text-transform: capitalize;
-            /* Make status look nicer */
+            font-family: "Be Vietnam Pro", sans-serif;
         }
 
         .status-published {
-            background-color: #28a745;
-            /* Success green */
+            background-color: #198754; /* Success green */
             color: #fff;
         }
 
-        .status-draft {
-            background-color: #ffc107;
-            /* Warning yellow */
-            color: #856404;
-        }
-
-        .table thead th {
-            background-color: #f2f2f2;
-            color: #555;
-            font-weight: 600;
-            border-bottom: 2px solid #ddd;
-        }
-
-        .table tbody tr:hover {
-            background-color: #f0f8f0;
-        }
-
-        .btn-info {
-            background-color: #17a2b8;
-            border-color: #17a2b8;
-        }
-
-        .btn-info:hover {
-            background-color: #138496;
-            border-color: #138496;
-        }
-
-        .btn-primary {
-            background-color: #007bff;
-            border-color: #007bff;
-        }
-
-        .btn-primary:hover {
-            background-color: #0056b3;
-            border-color: #0056b3;
-        }
-
-        .btn-warning {
-            background-color: #ffc107;
-            border-color: #ffc107;
-            color: #212529;
-            /* Dark text for warning */
-        }
-
-        .btn-warning:hover {
-            background-color: #e0a800;
-            border-color: #e0a800;
-        }
-
-        .btn-danger {
-            background-color: #dc3545;
-            border-color: #dc3545;
-        }
-
-        .btn-danger:hover {
-            background-color: #c82333;
-            border-color: #c82333;
-        }
-
-        .modal-body img {
-            max-width: 100%;
-            height: auto;
-            border-radius: 0.3rem;
-        }
-
+        /* Category Labels - Ensure consistent font/size */
         .category-label {
             padding: 0.25em 0.6em;
             border-radius: 0.3rem;
@@ -427,39 +437,23 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
             font-weight: 600;
             color: #fff;
             text-transform: capitalize;
+            font-family: "Be Vietnam Pro", sans-serif; /* Consistent font */
+            margin-left: 5px; /* Added spacing */
         }
 
-        .category-advisory {
-            background-color: #007bff;
+        /* Action Buttons - Consistency */
+        .btn-info, .btn-primary, .btn-danger, .btn-warning {
+            font-family: "Be Vietnam Pro", sans-serif;
+            font-size: 0.875rem; /* 14px for small actions */
+            padding: 0.375rem 0.75rem;
         }
-
-        /* Blue */
-        .category-program {
-            background-color: #6f42c1;
-        }
-
-        /* Purple */
-        .category-alert {
-            background-color: #dc3545;
-        }
-
-        /* Red */
-        .category-general {
-            background-color: #6c757d;
-        }
-
-        /* Gray */
-        .category-agriculture {
-            background-color: #28a745;
-        }
-
-        /* Green, for your example */
-
+        
         .pagination-container {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-top: 1.5rem;
+            font-family: "Be Vietnam Pro", sans-serif;
         }
 
         .page-info {
@@ -467,59 +461,50 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
             color: #6c757d;
         }
 
-        /* New Card Body Design for Announcements */
-        .announcement-card-body {
-            display: flex;
-            flex-direction: column;
-        }
-
+        /* Announcement List Styles */
         .announcement-item {
             display: flex;
             align-items: flex-start;
-            /* Align image and text at the top */
-            padding: 15px 0;
+            padding: 15px 0; 
             border-bottom: 1px solid #eee;
         }
-
+        
         .announcement-item:last-child {
             border-bottom: none;
         }
-
+        
         .announcement-image-container {
-            flex-shrink: 0;
-            /* Prevent image from shrinking */
-            width: 120px;
-            /* Fixed width for image */
-            height: 80px;
-            /* Fixed height for image */
-            margin-right: 15px;
-            border-radius: 5px;
+            width: 100px;
+            height: 70px;
             overflow: hidden;
-            background-color: #f0f0f0;
-            /* Placeholder background */
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            flex-shrink: 0;
+            margin-right: 15px;
+            border-radius: 4px;
+            border: 1px solid #eee;
         }
-
+        
         .announcement-image-container img {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            /* Cover the container */
         }
-
+        
         .announcement-image-container .no-image-placeholder {
-            color: #bbb;
-            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            background-color: #f1f1f1;
+            color: #6c757d;
+            font-size: 0.75rem;
             text-align: center;
         }
 
         .announcement-content-area {
             flex-grow: 1;
-            /* Allow content to take remaining space */
         }
-
+        
         .announcement-header {
             display: flex;
             justify-content: space-between;
@@ -528,51 +513,44 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
         }
 
         .announcement-title {
-            font-size: 1.15rem;
+            font-size: 1.05rem; /* Slightly smaller for list items */
             font-weight: 600;
-            color: #19860f;
+            color: #0f5132; /* Use dark green for consistency */
             margin-bottom: 0;
+            flex-grow: 1;
         }
-
+        
         .announcement-meta {
-            font-size: 0.85rem;
-            color: #777;
-        }
-
-        .announcement-category {
-            margin-left: 10px;
+            font-size: 0.875rem;
+            color: #6c757d;
+            margin-bottom: 5px;
         }
 
         .announcement-description {
-            font-size: 0.95rem;
-            color: #555;
-            margin-top: 5px;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            font-size: 0.875rem; /* 14px for description text */
+            color: #495057;
+            margin-bottom: 10px;
         }
-
-        .announcement-actions {
-            margin-top: 10px;
-            text-align: right;
-            /* Align action buttons to the right */
+        
+        .announcement-actions .btn-sm {
+            margin-right: 5px;
         }
-
-        .announcement-actions .btn {
-            margin-left: 5px;
-        }
+        
     </style>
 </head>
 
 <body>
-    <!-- Sidebar -->
+    <!-- Sidebar (CONSISTENT DESIGN) -->
     <nav class="sidebar">
+        <!-- Logo and Text (Consistent with farmer-dashboard.php) -->
         <a href="municipal-dashboard.php" class="header-brand">
-            <img src="../photos/Department_of_Agriculture_of_the_Philippines.png" alt="Province of Antique" />
-            <div>Province of Antique</div>
+            <img src="../photos/logo.png" alt="Department of Agriculture Logo" />
+            <div>Agriconnect</div>
         </a>
+        
+        <!-- Menu Label (Consistent) -->
+        <div class="sidebar-menu-label">Main Menu</div>
+
         <ul class="nav flex-column">
             <li class="nav-item"><a href="municipal-dashboard.php" class="nav-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
             <li class="nav-item"><a href="municipal-subsidy_management.php" class="nav-link"><i class="fas fa-hand-holding-usd"></i> Subsidy Management</a></li>
@@ -582,25 +560,38 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
             <li class="nav-item"><a href="municipal-farmer_profiles.php" class="nav-link"><i class="fas fa-users"></i> Farmer Profiles</a></li>
             <li class="nav-item"><a href="municipal-announcements.php" class="nav-link active"><i class="fas fa-bullhorn"></i> Announcements</a></li>
         </ul>
+        
+        <!-- Logout Section (Consistent) -->
+        <div class="sidebar-logout">
+            <a href="municipal-logout.php" class="nav-link">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
     </nav>
 
-    <!-- Header -->
-    <div class="card-header card-header-custom d-flex justify-content-end align-items-center">
-        <span class="me-3">Hi, <strong><?php echo htmlspecialchars($display_name); ?></strong></span>
-        <button class="logout-btn" onclick="location.href='municipal-logout.php'">
-            <i class="fas fa-sign-out-alt me-1"></i> Logout
+    <!-- Header (CONSISTENT DESIGN - MATCHING FARMER DASHBOARD) -->
+    <div class="card-header card-header-custom d-flex justify-content-between align-items-center">
+        <!-- Sidebar Toggle Button (Consistent) -->
+        <button id="sidebarToggleBtn" class="btn btn-link p-0 text-dark" title="Toggle Sidebar" style="font-size: 1.5rem;">
+            <i class="fas fa-bars"></i>
         </button>
+        <!-- Greeting -->
+        <span class="me-3">Hi, <strong><?php echo htmlspecialchars($display_name); ?></strong></span>
     </div>
 
-    <!-- Main Content -->
+    <!-- Main Content (UPDATED PADDING/MARGIN) -->
     <main>
         <div class="container-fluid">
-            <div class="d-flex justify-content-between align-items-center mb-4">
+            <!-- Page Title and Description (Consistent Typography) -->
+            <h1 class="page-title">Announcements Management</h1>
+            <p class="text-muted mb-4 dashboard-description">
+                Manage, publish, and view all public announcements for the community.
+            </p>
 
+            <div class="d-flex justify-content-between align-items-center mb-4">
                 <div class="add-announcement-btn-container">
-                    <!-- Link to a dummy add announcement page -->
                     <a href="municipal-add_announcement.php" class="add-announcement-btn">
-                        <i class="fas fa-plus-circle"></i> Add Announcement
+                        <i class="fas fa-plus-circle"></i> Add New Announcement
                     </a>
                 </div>
             </div>
@@ -636,7 +627,6 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
                                     <option value="program" <?php echo ($category_filter == 'program') ? 'selected' : ''; ?>>Program</option>
                                     <option value="alert" <?php echo ($category_filter == 'alert') ? 'selected' : ''; ?>>Alert</option>
                                     <option value="general" <?php echo ($category_filter == 'general') ? 'selected' : ''; ?>>General Updates</option>
-                                    <!-- Add the 'Agriculture' category from your example DB if needed -->
                                     <option value="agriculture" <?php echo ($category_filter == 'agriculture') ? 'selected' : ''; ?>>Agriculture</option>
                                 </select>
                                 <?php if (!empty($search_query)): ?>
@@ -659,18 +649,28 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
                                     </div>
                                     <div class="announcement-content-area">
                                         <div class="announcement-header">
-                                            <h5 class="announcement-title"><?php echo htmlspecialchars($announcement['title']); ?></h5>
+                                            <h5 class="announcement-title me-3"><?php echo htmlspecialchars($announcement['title']); ?></h5>
                                             <div class="d-flex align-items-center">
                                                 <span class="status-badge status-<?php echo strtolower(htmlspecialchars($announcement['status'])); ?>">
                                                     <?php echo htmlspecialchars($announcement['status']); ?>
                                                 </span>
-                                                <span class="category-label announcement-category category-<?php echo strtolower(htmlspecialchars($announcement['category'])); ?>">
+                                                <span class="category-label announcement-category category-<?php echo strtolower(htmlspecialchars($announcement['category'])); ?>"
+                                                      style="background-color: 
+                                                            <?php 
+                                                                // Simple category color logic
+                                                                $cat = strtolower($announcement['category']);
+                                                                if ($cat == 'advisory') echo '#0d6efd'; // Primary blue
+                                                                else if ($cat == 'program') echo '#198754'; // Success green
+                                                                else if ($cat == 'alert') echo '#dc3545'; // Danger red
+                                                                else if ($cat == 'agriculture') echo '#ffc107'; // Warning yellow
+                                                                else echo '#6c757d'; // Secondary grey
+                                                            ?>;">
                                                     <?php echo htmlspecialchars($announcement['category']); ?>
                                                 </span>
                                             </div>
                                         </div>
                                         <p class="announcement-meta">Published: <?php echo date('M d, Y', strtotime($announcement['publish_date'])); ?></p>
-                                        <p class="announcement-description"><?php echo htmlspecialchars($announcement['content']); ?></p>
+                                        <p class="announcement-description"><?php echo htmlspecialchars(substr($announcement['content'], 0, 150)); ?>...</p>
                                         <div class="announcement-actions">
                                             <button type="button" class="btn btn-info btn-sm"
                                                 data-bs-toggle="modal" data-bs-target="#announcementDetailModal"
@@ -712,7 +712,19 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
                                         <span aria-hidden="true">&laquo;</span>
                                     </a>
                                 </li>
-                                <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                                <?php 
+                                    // Limit the number of pages shown for cleaner UI (e.g., 5 pages centered around current page)
+                                    $start_page = max(1, $page - 2);
+                                    $end_page = min($total_pages, $page + 2);
+
+                                    if ($page - 2 < 1) {
+                                        $end_page = min($total_pages, $end_page + (1 - ($page - 2)));
+                                    }
+                                    if ($page + 2 > $total_pages) {
+                                        $start_page = max(1, $start_page - (($page + 2) - $total_pages));
+                                    }
+                                ?>
+                                <?php for ($i = $start_page; $i <= $end_page; $i++): ?>
                                     <li class="page-item <?php echo ($page == $i) ? 'active' : ''; ?>">
                                         <a class="page-link" href="?page=<?php echo $i; ?>&search=<?php echo urlencode($search_query); ?>&category=<?php echo urlencode($category_filter); ?>"><?php echo $i; ?></a>
                                     </li>
@@ -783,6 +795,44 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Sidebar Toggle Logic (Consistent with farmer-dashboard.php)
+            const sidebar = document.querySelector('.sidebar');
+            const mainContent = document.querySelector('main');
+            const header = document.querySelector('.card-header-custom');
+            const toggleBtn = document.getElementById('sidebarToggleBtn');
+            
+            function collapseSidebar() {
+                sidebar.classList.add('collapsed');
+                mainContent.classList.add('collapsed');
+                header.classList.add('collapsed');
+                localStorage.setItem('sidebarCollapsed', 'true'); // Save state
+            }
+
+            function openSidebar() {
+                sidebar.classList.remove('collapsed');
+                mainContent.classList.remove('collapsed');
+                header.classList.remove('collapsed');
+                localStorage.setItem('sidebarCollapsed', 'false'); // Save state
+            }
+
+            // Apply saved state on page load
+            const isCollapsed = localStorage.getItem('sidebarCollapsed');
+            if (isCollapsed === 'true') {
+                // Apply collapsed state without saving back to localStorage
+                sidebar.classList.add('collapsed');
+                mainContent.classList.add('collapsed');
+                header.classList.add('collapsed');
+            } 
+
+            // Toggle button functionality
+            toggleBtn.addEventListener('click', function() {
+                if (sidebar.classList.contains('collapsed')) {
+                    openSidebar();
+                } else {
+                    collapseSidebar();
+                }
+            });
+            
             // Announcement Detail Modal Logic
             const announcementDetailModal = document.getElementById('announcementDetailModal');
             announcementDetailModal.addEventListener('show.bs.modal', function(event) {
@@ -801,10 +851,24 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
                     .querySelector('#modalAnnouncementContent');
 
                 modalTitle.textContent = title;
-                modalDate.textContent = date;
+                modalDate.textContent = `Published: ${date}`;
                 modalCategory.textContent = category;
-                // Update category class based on fetched data
-                modalCategory.className = `category-label category-${category.toLowerCase().replace(/\s+/g, '')}`;
+                
+                // Update category class/style based on fetched data
+                let catClass = `category-label`;
+                let catStyle = '';
+                const catLower = category.toLowerCase();
+                
+                // Apply style based on category
+                if (catLower == 'advisory') catStyle = 'background-color: #0d6efd;';
+                else if (catLower == 'program') catStyle = 'background-color: #198754;';
+                else if (catLower == 'alert') catStyle = 'background-color: #dc3545;';
+                else if (catLower == 'agriculture') catStyle = 'background-color: #ffc107;'; // Note: yellow on white might be hard to read
+                else catStyle = 'background-color: #6c757d;';
+                
+                modalCategory.className = catClass; // Reset classes
+                modalCategory.setAttribute('style', catStyle);
+                
                 modalContent.textContent = content;
 
                 if (image && image !== 'null' && image !== '') {
@@ -830,16 +894,17 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
                 categoryFilter.addEventListener('change', function() {
                     const form = this.closest('form');
                     const currentSearch = new URLSearchParams(window.location.search).get('search');
-                    if (currentSearch) {
-                        let searchInput = form.querySelector('input[name="search"]');
-                        if (!searchInput) {
-                            searchInput = document.createElement('input');
-                            searchInput.type = 'hidden';
-                            searchInput.name = 'search';
-                            form.appendChild(searchInput);
-                        }
-                        searchInput.value = currentSearch;
+                    // Check if hidden search input exists, if not, create it
+                    let searchInput = form.querySelector('input[name="search"]');
+                    if (!searchInput) {
+                        searchInput = document.createElement('input');
+                        searchInput.type = 'hidden';
+                        searchInput.name = 'search';
+                        form.appendChild(searchInput);
                     }
+                    // Only set value if search query is present
+                    searchInput.value = currentSearch || '';
+                    
                     form.submit();
                 });
             }

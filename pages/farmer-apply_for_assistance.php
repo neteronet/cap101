@@ -231,21 +231,24 @@ if ($conn && $conn->ping()) {
     <title>Farmer Account - Assistance Status / Application</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet" />
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <!-- Google Fonts (UPDATED FOR CONSISTENCY) -->
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+    
     <style>
-        /* Your CSS styles remain the same */
+        /* --- START OF CONSISTENT DESIGN STYLES (COPIED FROM DASHBOARD) --- */
         body {
+            /* MODIFIED: Changed font-family to Poppins for body/content text */
             font-family: "Poppins", sans-serif;
             background: #f8f9fa;
             font-size: 16px;
             line-height: 1.6;
-            color: #333;
+            color: #212529;
             margin: 0;
         }
 
+        /* --- Sidebar Styles --- */
         .sidebar {
             position: fixed;
             top: 0;
@@ -258,6 +261,34 @@ if ($conn && $conn->ping()) {
             font-size: 14px;
             z-index: 1050;
             border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            transition: left 0.3s ease;
+            /* MODIFIED: Explicitly set sidebar font to Be Vietnam Pro for UI/Nav consistency */
+            font-family: "Be Vietnam Pro", sans-serif; 
+        }
+
+        .sidebar-menu-label {
+            color: rgba(255, 255, 255, 0.7);
+            /* Slightly transparent white */
+            padding: 0 1rem 0.5rem 1rem;
+            /* Padding to align with links */
+            font-size: 0.75rem;
+            /* Small text */
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            /* Inherits Be Vietnam Pro from .sidebar */
+        }
+
+        .sidebar.collapsed {
+            left: -250px;
+        }
+
+        .sidebar .nav {
+            flex: 1;
+            margin: 0;
+            padding: 0;
         }
 
         .sidebar .nav-link {
@@ -270,6 +301,7 @@ if ($conn && $conn->ping()) {
             align-items: center;
             text-decoration: none;
             transition: all 0.2s ease-in-out;
+            /* Inherits Be Vietnam Pro from .sidebar */
         }
 
         .sidebar .nav-link i {
@@ -287,32 +319,44 @@ if ($conn && $conn->ping()) {
             background-color: #146c0b;
             color: #fff;
         }
-
+        
+        /* MODIFIED: Header Brand (Logo and Text) */
         .sidebar .header-brand {
             display: flex;
-            flex-direction: column;
+            flex-direction: row;
             align-items: center;
+            justify-content: flex-start;
             text-decoration: none;
-            margin-bottom: 1rem;
+            margin-bottom: 2rem;
+            padding: 0 1rem;
         }
 
         .sidebar .header-brand img {
-            width: 100%;
-            max-width: 120px;
+            width: auto;
+            max-width: 40px;
             height: auto;
             background: #19860f;
-            padding: 5px;
+            padding: 2px;
             border-radius: 4px;
         }
 
         .sidebar .header-brand div {
-            font-size: 14px;
-            font-weight: 600;
+            font-size: 18px;
+            font-weight: 700;
             color: #fff;
-            text-align: center;
-            margin-top: 6px;
+            margin-top: 0;
+            margin-left: 8px;
+        }
+        /* END MODIFIED */
+
+        .sidebar .sidebar-logout {
+            margin-top: auto;
+            padding-top: 0.3rem;
+            padding-bottom: 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
         }
 
+        /* --- Fixed Top Header --- */
         .card-header-custom {
             position: fixed;
             top: 0;
@@ -329,29 +373,42 @@ if ($conn && $conn->ping()) {
             justify-content: space-between;
             z-index: 1060;
             border-bottom: 1px solid #ddd;
+            transition: left 0.3s ease;
+            /* MODIFIED: Explicitly set header font to Be Vietnam Pro for UI consistency */
+            font-family: "Be Vietnam Pro", sans-serif;
         }
 
-        .card-header-custom .header-brand span {
-            font-size: 1rem;
-            font-weight: 600;
-            color: #19860f;
+        .card-header-custom.collapsed {
+            left: 0;
         }
 
+        #sidebarToggleBtn {
+            color: #0f5132;
+        }
+
+        #sidebarToggleBtn:hover {
+            color: #146c0b;
+        }
+
+        /* --- Main Content Area --- */
+        main {
+            margin-left: 250px;
+            padding: 72px 2rem 2rem 2rem;
+            background: #f8f9fa;
+            min-height: 100vh;
+            transition: margin-left 0.3s ease;
+        }
+
+        main.collapsed {
+            margin-left: 0;
+        }
+        
+        /* Hide the old button structure */
         .logout-btn {
-            background: #ff4b2b;
-            color: #fff;
-            border: none;
-            padding: 6px 14px;
-            font-size: 14px;
-            border-radius: 20px;
-            transition: background 0.2s ease;
-            cursor: pointer;
+            display: none; 
         }
 
-        .logout-btn:hover {
-            background: #e04325;
-        }
-
+        /* --- Theme Buttons/Colors (from Dashboard) --- */
         .btn-theme {
             background-color: #19860f;
             color: #fff;
@@ -359,6 +416,8 @@ if ($conn && $conn->ping()) {
             padding: 10px 20px;
             border-radius: 4px;
             transition: all 0.2s ease;
+            border: 1px solid #19860f;
+            font-family: "Be Vietnam Pro", sans-serif; /* Consistent UI font */
         }
 
         .btn-theme:hover {
@@ -366,51 +425,73 @@ if ($conn && $conn->ping()) {
             color: #fff;
             transform: translateY(-1px);
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border: 1px solid #146c0b;
         }
 
-        main {
-            margin-left: 250px;
-            padding: 1rem 2rem 2rem 2rem;
-            padding-top: 72px;
-            background: #f8f9fa;
-            min-height: 100vh;
-        }
-
-        .container {
-            max-width: 1200px;
-        }
-
+        /* --- Typography Consistency: Headings and Titles (from Dashboard) --- */
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6,
+        .card-title,
         .page-title {
-            font-size: 1.8rem;
+            font-family: "Be Vietnam Pro", sans-serif;
+            color: #0f5132;
+        }
+        
+        /* MODIFIED: Page Title size/color to match Dashboard */
+        .page-title {
+            font-size: 1.5rem; /* Changed from 1.8rem to 1.5rem */
             font-weight: 600;
-            color: #19860f;
+            color: #0f5132; /* Changed from #19860f to #0f5132 */
             margin-bottom: 1rem;
             display: flex;
             align-items: center;
         }
 
-        .page-title i {
-            margin-right: 10px;
-        }
-
-        .card {
-            border-radius: 0.5rem;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-            margin-bottom: 1.5rem;
-            border: none;
-        }
-
+        /* NEW: Standard Card Title - Explicitly set size to match Dashboard's 1.25rem */
         .card-title {
-            color: #19860f;
             font-size: 1.25rem;
             font-weight: 600;
+            color: #0f5132;
             margin-bottom: 0.75rem;
             display: flex;
             align-items: center;
         }
 
+        /* NEW: Status Card H2 - To ensure consistent typography for status messages */
+        .card h2 {
+            font-family: "Be Vietnam Pro", sans-serif;
+            font-size: 1.5rem; /* Consistent with page-title size */
+            font-weight: 600;
+        }
+
         .card-title i {
             margin-right: 8px;
+        }
+
+        /* NEW: Explicit Standard Content Text Size (0.9375rem = 15px) for consistency */
+        .card-body p:not(.card-title), 
+        .form-label, 
+        .form-text,
+        .card-text {
+            /* Inherits Poppins from body */
+            font-size: 0.9375rem; /* ~15px */
+        }
+
+        /* NEW: Form element size consistency */
+        .form-select, .form-control {
+            font-size: 0.9375rem;
+        }
+        
+        /* --- Utility & Component Styles --- */
+        .card {
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            margin-bottom: 1.5rem;
+            border: 1px solid #ddd; /* Added border for consistency */
         }
 
         .qr-code {
@@ -428,6 +509,7 @@ if ($conn && $conn->ping()) {
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
         }
 
+        /* Custom alert style for info box (Updated font-size) */
         .alert-info-custom {
             background-color: #e6f2e6;
             color: #157a0d;
@@ -437,7 +519,7 @@ if ($conn && $conn->ping()) {
             margin-bottom: 1.5rem;
             display: flex;
             align-items: center;
-            font-size: 0.95rem;
+            font-size: 0.9375rem; /* Changed from 0.95rem to 0.9375rem for 15px consistency */
         }
 
         .alert-info-custom i {
@@ -452,44 +534,67 @@ if ($conn && $conn->ping()) {
             margin-bottom: 0.5rem;
             display: flex;
             align-items: center;
+            /* Inherits Poppins from body and font-size from new addition */
         }
 
         .form-label i {
             margin-right: 8px;
             color: #19860f;
         }
+        /* --- END OF CONSISTENT DESIGN STYLES --- */
     </style>
 
 
 </head>
 
 <body>
+    <!-- Sidebar (UPDATED STRUCTURE) -->
     <nav class="sidebar">
+        <!-- New Header Brand (Logo and Text) -->
         <a href="ProvincialAgriHome.html" class="header-brand">
-            <img src="../photos/Department_of_Agriculture_of_the_Philippines.png" alt="Province of Antique" />
-            <div>Province of Antique</div>
+            <img src="../photos/logo.png" alt="Province of Antique" />
+            <div>Agriconnect</div>
         </a>
+
+        <div class="sidebar-menu-label">Main Menu</div>
+
         <ul class="nav flex-column">
             <li class="nav-item"><a href="farmer-dashboard.php" class="nav-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+            <!-- Active link is here -->
             <li class="nav-item"><a href="farmer-apply_for_assistance.php" class="nav-link active"><i class="fas fa-hand-holding-usd"></i>Apply for Assistance</a></li>
             <li class="nav-item"><a href="farmer-planting_status.php" class="nav-link"><i class="fas fa-leaf"></i> Planting Status</a></li>
             <li class="nav-item"><a href="farmer-claim_history.php" class="nav-link"><i class="fas fa-history"></i> Claim History</a></li>
-            <!-- Removed link to Progress Tracking -->
             <li class="nav-item"><a href="farmer-announcement.php" class="nav-link"><i class="fas fa-bullhorn"></i> Announcements</a></li>
             <li class="nav-item"><a href="farmer-my_profile.php" class="nav-link"><i class="fas fa-user-circle"></i> My Profile</a></li>
         </ul>
+        
+        <!-- Logout Link (Moved to bottom of sidebar) -->
+        <div class="sidebar-logout">
+            <a href="farmers-logout.php" class="nav-link">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
     </nav>
 
-    <div class="card-header card-header-custom d-flex justify-content-end align-items-center">
-        <span class="me-3">Hi, <strong><?php echo $display_name; ?></strong></span>
-        <button class="logout-btn" onclick="location.href='farmers-logout.php'">
-            <i class="fas fa-sign-out-alt me-1"></i> Logout
+    <!-- Header (UPDATED STRUCTURE) -->
+    <div class="card-header card-header-custom d-flex justify-content-between align-items-center">
+        <!-- New Toggle Button -->
+        <button id="sidebarToggleBtn" class="btn btn-link p-0 text-dark" title="Toggle Sidebar" style="font-size: 1.5rem;">
+            <i class="fas fa-bars"></i>
         </button>
+        <!-- User Info -->
+        <span class="me-3">Hi, <strong><?php echo $display_name; ?></strong></span>
+        <!-- Old logout button removed, moved to sidebar -->
     </div>
 
     <!-- Main Content Area -->
     <main>
         <div class="container">
+
+            <!-- Added Page Title for Consistency -->
+            <h1 class="page-title">
+                <i></i>Assistance Application & Status
+            </h1>
 
             <?php if (!empty($message)): ?>
                 <div class="alert alert-<?php echo $message_type; ?> alert-dismissible fade show" role="alert">
@@ -523,7 +628,7 @@ if ($conn && $conn->ping()) {
                     <p class="text-danger small mt-2">
                         **DO NOT SHARE THIS CODE PUBLICLY.** It is linked to your assistance claim.
                     </p>
-                    <button class="btn btn-success col-lg-4 col-md-6 mx-auto mt-3" onclick="downloadQRCode('<?php echo urlencode($approved_qr_code); ?>', '<?php echo htmlspecialchars($farmer_id_display); ?>')">
+                    <button class="btn btn-theme col-lg-4 col-md-6 mx-auto mt-3" onclick="downloadQRCode('<?php echo urlencode($approved_qr_code); ?>', '<?php echo htmlspecialchars($farmer_id_display); ?>')" style="background-color: #198754; border-color: #198754;">
                         <i class="fas fa-download me-2"></i> Download QR Code
                     </button>
                 </div>
@@ -586,27 +691,27 @@ if ($conn && $conn->ping()) {
                                     </label>
 <select class="form-select" id="seedType" name="seedType">
     <option value="">-- Select Seed Type --</option>
-    <option value="pechay" <?php echo ($seedType == 'pechay') ? 'selected' : ''; ?>>Hybrid Rice</option>
-    <option value="kangkong" <?php echo ($seedType == 'kangkong') ? 'selected' : ''; ?>>Inbred Rice</option>
-    <option value="pechay" <?php echo ($seedType == 'pechay') ? 'selected' : ''; ?>>Hybrid Corn</option>
-    <option value="kangkong" <?php echo ($seedType == 'kangkong') ? 'selected' : ''; ?>>Inbred Corn</option>
-    <option value="pechay" <?php echo ($seedType == 'pechay') ? 'selected' : ''; ?>>pechay</option>
-    <option value="kangkong" <?php echo ($seedType == 'kangkong') ? 'selected' : ''; ?>>kangkong</option>
-    <option value="mustasa" <?php echo ($seedType == 'mustasa') ? 'selected' : ''; ?>>mustasa</option>
-    <option value="alugbati" <?php echo ($seedType == 'alugbati') ? 'selected' : ''; ?>>alugbati</option>
-    <option value="malunggay" <?php echo ($seedType == 'malunggay') ? 'selected' : ''; ?>>malunggay</option>
-    <option value="sitaw" <?php echo ($seedType == 'sitaw') ? 'selected' : ''; ?>>sitaw</option>
-    <option value="ampalaya" <?php echo ($seedType == 'ampalaya') ? 'selected' : ''; ?>>ampalaya</option>
-    <option value="okra" <?php echo ($seedType == 'okra') ? 'selected' : ''; ?>>okra</option>
-    <option value="talong" <?php echo ($seedType == 'talong') ? 'selected' : ''; ?>>talong</option>
-    <option value="kamatis" <?php echo ($seedType == 'kamatis') ? 'selected' : ''; ?>>kamatis</option>
-    <option value="sibuyas" <?php echo ($seedType == 'sibuyas') ? 'selected' : ''; ?>>sibuyas</option>
-    <option value="kadyos" <?php echo ($seedType == 'kadyos') ? 'selected' : ''; ?>>kadyos</option>
-    <option value="kamote" <?php echo ($seedType == 'kamote') ? 'selected' : ''; ?>>kamote</option>
-    <option value="gabi" <?php echo ($seedType == 'gabi') ? 'selected' : ''; ?>>gabi</option>
-    <option value="carrots" <?php echo ($seedType == 'carrots') ? 'selected' : ''; ?>>carrots</option>
-    <option value="redish" <?php echo ($seedType == 'redish') ? 'selected' : ''; ?>>redish</option>
-    <option value="cassava" <?php echo ($seedType == 'cassava') ? 'selected' : ''; ?>>cassava</option>
+    <option value="Hybrid Rice" <?php echo ($seedType == 'Hybrid Rice') ? 'selected' : ''; ?>>Hybrid Rice</option>
+    <option value="Inbred Rice" <?php echo ($seedType == 'Inbred Rice') ? 'selected' : ''; ?>>Inbred Rice</option>
+    <option value="Hybrid Corn" <?php echo ($seedType == 'Hybrid Corn') ? 'selected' : ''; ?>>Hybrid Corn</option>
+    <option value="Inbred Corn" <?php echo ($seedType == 'Inbred Corn') ? 'selected' : ''; ?>>Inbred Corn</option>
+    <option value="pechay" <?php echo ($seedType == 'pechay') ? 'selected' : ''; ?>>Pechay</option>
+    <option value="kangkong" <?php echo ($seedType == 'kangkong') ? 'selected' : ''; ?>>Kangkong</option>
+    <option value="mustasa" <?php echo ($seedType == 'mustasa') ? 'selected' : ''; ?>>Mustasa</option>
+    <option value="alugbati" <?php echo ($seedType == 'alugbati') ? 'selected' : ''; ?>>Alugbati</option>
+    <option value="malunggay" <?php echo ($seedType == 'malunggay') ? 'selected' : ''; ?>>Malunggay</option>
+    <option value="sitaw" <?php echo ($seedType == 'sitaw') ? 'selected' : ''; ?>>Sitaw</option>
+    <option value="ampalaya" <?php echo ($seedType == 'ampalaya') ? 'selected' : ''; ?>>Ampalaya</option>
+    <option value="okra" <?php echo ($seedType == 'okra') ? 'selected' : ''; ?>>Okra</option>
+    <option value="talong" <?php echo ($seedType == 'talong') ? 'selected' : ''; ?>>Talong</option>
+    <option value="kamatis" <?php echo ($seedType == 'kamatis') ? 'selected' : ''; ?>>Kamatis</option>
+    <option value="sibuyas" <?php echo ($seedType == 'sibuyas') ? 'selected' : ''; ?>>Sibuyas</option>
+    <option value="kadyos" <?php echo ($seedType == 'kadyos') ? 'selected' : ''; ?>>Kadyos</option>
+    <option value="kamote" <?php echo ($seedType == 'kamote') ? 'selected' : ''; ?>>Kamote</option>
+    <option value="gabi" <?php echo ($seedType == 'gabi') ? 'selected' : ''; ?>>Gabi</option>
+    <option value="carrots" <?php echo ($seedType == 'carrots') ? 'selected' : ''; ?>>Carrots</option>
+    <option value="redish" <?php echo ($seedType == 'redish') ? 'selected' : ''; ?>>Redish</option>
+    <option value="cassava" <?php echo ($seedType == 'cassava') ? 'selected' : ''; ?>>Cassava</option>
 </select>
                                 </div>
                                 <div class="mb-4">
@@ -705,6 +810,46 @@ if ($conn && $conn->ping()) {
                 // Event listener for changes in the assistance type dropdown
                 assistanceTypeSelect.addEventListener('change', toggleDynamicFields);
             }
+            
+            // --- START: Sidebar Toggle Logic (UPDATED TO USE localStorage) ---
+            const sidebar = document.querySelector('.sidebar');
+            const mainContent = document.querySelector('main');
+            const header = document.querySelector('.card-header-custom');
+            const toggleBtn = document.getElementById('sidebarToggleBtn');
+            
+            function collapseSidebar() {
+                sidebar.classList.add('collapsed');
+                mainContent.classList.add('collapsed');
+                header.classList.add('collapsed');
+                localStorage.setItem('sidebarCollapsed', 'true'); // Save state to localStorage
+            }
+
+            function openSidebar() {
+                sidebar.classList.remove('collapsed');
+                mainContent.classList.remove('collapsed');
+                header.classList.remove('collapsed');
+                localStorage.setItem('sidebarCollapsed', 'false'); // Save state to localStorage
+            }
+
+            // Apply saved state on page load
+            const isCollapsed = localStorage.getItem('sidebarCollapsed');
+            if (isCollapsed === 'true') {
+                sidebar.classList.add('collapsed');
+                mainContent.classList.add('collapsed');
+                header.classList.add('collapsed');
+            }
+
+
+            if(toggleBtn) {
+                toggleBtn.addEventListener('click', function() {
+                    if (sidebar.classList.contains('collapsed')) {
+                        openSidebar();
+                    } else {
+                        collapseSidebar();
+                    }
+                });
+            }
+            // --- END: Sidebar Toggle Logic ---
         });
     </script>
 </body>
