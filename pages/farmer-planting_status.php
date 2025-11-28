@@ -314,7 +314,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         // --- ENHANCED PHOTO UPLOAD LOGIC ---
         if (isset($_FILES['photoUpload']) && $_FILES['photoUpload']['error'] !== UPLOAD_ERR_NO_FILE) {
-            
+
             if ($_FILES['photoUpload']['error'] != UPLOAD_ERR_OK) {
                 // Handle non-OK errors (e.g., file too large for PHP config)
                 $error_message = "File upload failed with error code: " . $_FILES['photoUpload']['error'] . ". Check file size and server limits.";
@@ -328,13 +328,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         error_log("Failed to create directory: " . $target_dir);
                     }
                 }
-                
+
                 if (empty($error_message)) { // Proceed only if directory is fine
                     $file_name = uniqid() . "_" . basename($_FILES["photoUpload"]["name"]);
                     $target_file = $target_dir . $file_name;
                     $imageFileType = strtolower(pathinfo($target_file, PATHINFO_EXTENSION));
                     $check = @getimagesize($_FILES["photoUpload"]["tmp_name"]);
-                    
+
                     if ($check === false) {
                         $error_message = "File upload failed: Uploaded file is not a valid image.";
                     } elseif ($_FILES["photoUpload"]["size"] > 5000000) { // 5MB limit
@@ -356,7 +356,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
             // Ensure photo_path is NULL if file upload failed
             if (!$file_upload_success) {
-                $photo_path = NULL; 
+                $photo_path = NULL;
             }
         }
         // --- END ENHANCED PHOTO UPLOAD LOGIC ---
@@ -421,10 +421,10 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
     <title>Farmer Account - Planting Status & Tracking</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
-    
+
     <!-- Google Fonts (UPDATED for consistency) -->
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
+
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <!-- Custom Styles -->
@@ -455,18 +455,22 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
             flex-direction: column;
             transition: left 0.3s ease;
             /* CONSISTENT FONT */
-            font-family: "Be Vietnam Pro", sans-serif; 
+            font-family: "Be Vietnam Pro", sans-serif;
         }
-        
+
         /* >>> INSERTION: Sidebar Menu Label Style <<< */
         .sidebar-menu-label {
-            color: rgba(255, 255, 255, 0.7); /* Slightly transparent white */
-            padding: 0 1rem 0.5rem 1rem; /* Padding to align with links */
-            font-size: 0.75rem; /* Small text */
+            color: rgba(255, 255, 255, 0.7);
+            /* Slightly transparent white */
+            padding: 0 1rem 0.5rem 1rem;
+            /* Padding to align with links */
+            font-size: 0.75rem;
+            /* Small text */
             font-weight: 500;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
+
         /* >>> END INSERTION <<< */
 
         .sidebar.collapsed {
@@ -499,37 +503,44 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
             background-color: #146c0b;
             color: #fff;
         }
-        
+
         /* >>> MODIFIED: Header Brand (Logo and Text) <<< */
         .sidebar .header-brand {
             /* Changed from column to row */
             display: flex;
             flex-direction: row;
             align-items: center;
-            justify-content: flex-start; /* Aligns content to the start */
+            justify-content: flex-start;
+            /* Aligns content to the start */
             text-decoration: none;
             margin-bottom: 2rem;
-            padding: 0 1rem; /* Added padding to align with links */
+            padding: 0 1rem;
+            /* Added padding to align with links */
         }
 
         .sidebar .header-brand img {
             /* Reduced size significantly */
             width: auto;
-            max-width: 40px; 
+            max-width: 40px;
             height: auto;
             background: #19860f;
-            padding: 2px; /* Reduced padding */
+            padding: 2px;
+            /* Reduced padding */
             border-radius: 4px;
         }
 
         .sidebar .header-brand div {
             /* Adjusted font size and spacing to place it beside the logo */
-            font-size: 18px; 
-            font-weight: 700; /* Increased weight for prominence */
+            font-size: 18px;
+            font-weight: 700;
+            /* Increased weight for prominence */
             color: #fff;
-            margin-top: 0; /* Removed previous vertical margin */
-            margin-left: 8px; /* Spacing between logo and text */
+            margin-top: 0;
+            /* Removed previous vertical margin */
+            margin-left: 8px;
+            /* Spacing between logo and text */
         }
+
         /* >>> END MODIFIED <<< */
 
         .sidebar .nav {
@@ -560,7 +571,7 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
             display: flex;
             /* CONSISTENT ALIGNMENT */
             align-items: center;
-            justify-content: space-between; 
+            justify-content: space-between;
             /* CONSISTENT FONT */
             z-index: 1060;
             border-bottom: 1px solid #ddd;
@@ -571,6 +582,148 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
         .card-header-custom.collapsed {
             left: 0;
         }
+
+        #sidebarToggleBtn {
+            color: #0f5132;
+        }
+
+        #sidebarToggleBtn:hover {
+            color: #146c0b;
+        }
+
+        /* ----------------------------------------------------------- */
+        /* --- Notification Bell Styling for Consistency (IMPROVED) --- */
+        /* ----------------------------------------------------------- */
+        .notification-bell-container {
+            position: relative;
+            display: inline-block;
+        }
+
+        .notification-bell {
+            /* Base color matching the sidebar toggle button for consistency */
+            color: #0f5132;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.25rem; /* Slightly larger for prominence */
+            padding: 0;
+            line-height: 1;
+            transition: color 0.2s ease;
+        }
+
+        .notification-bell:hover {
+            color: #146c0b; /* Darker theme hover color */
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -5px;
+            right: -10px;
+            padding: 0.15em 0.45em;
+            border-radius: 50%;
+            background-color: #dc3545; /* Danger Red for unread count (consistent with status-rejected) */
+            color: white;
+            font-size: 0.6rem;
+            line-height: 1;
+            min-width: 18px;
+            text-align: center;
+            font-family: "Be Vietnam Pro", sans-serif;
+        }
+
+        .notification-badge.hidden {
+            display: none;
+        }
+
+        .notification-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            width: 320px;
+            background-color: #fff;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            border-radius: 0.5rem;
+            margin-top: 8px;
+            z-index: 1070;
+            display: none;
+            /* Consistent font for UI elements */
+            font-family: "Be Vietnam Pro", sans-serif;
+            font-size: 0.875rem; /* Small font size */
+        }
+
+        .notification-dropdown.show {
+            display: block;
+        }
+
+        .notification-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .notification-header h6 {
+            margin: 0;
+            font-size: 1rem;
+            color: #0f5132; /* Dark Green for heading consistency */
+            font-weight: 600;
+        }
+
+        .mark-all-read {
+            color: #19860f; /* Theme Green for action link */
+            background: none;
+            border: none;
+            font-size: 0.75rem;
+            cursor: pointer;
+            padding: 0;
+            text-decoration: underline;
+        }
+
+        .mark-all-read:hover {
+            color: #146c0b; /* Darker Theme Green on hover */
+        }
+
+        .notification-list {
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 0; /* Remove internal padding, items will have it */
+        }
+
+        .notification-item {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #f8f9fa; /* Very light separator */
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .notification-item:hover {
+            background-color: #f1f1f1;
+        }
+
+        .notification-item.unread {
+            background-color: #f7fff6; /* Very light theme-related background for unread */
+            border-left: 3px solid #19860f; /* Theme green indicator */
+            padding-left: calc(1rem - 3px); /* Adjust padding due to border */
+            font-weight: 500;
+        }
+
+        .notification-item.unread p {
+            color: #0f5132; /* Darker text for unread content */
+        }
+
+        .notification-item p {
+            margin: 0;
+            line-height: 1.4;
+        }
+
+        .notification-item strong {
+            font-weight: 600;
+        }
+
+        .notification-item:last-child {
+            border-bottom: none;
+        }
+        /* --- END Notification Bell Styling --- */
 
         /* --- Main Content Area --- */
         main {
@@ -626,8 +779,9 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
         .card-title,
         .modal-title {
             /* CONSISTENT FONT */
-            font-family: "Be Vietnam Pro", sans-serif; 
-            color: #0f5132; /* Dark Green */
+            font-family: "Be Vietnam Pro", sans-serif;
+            color: #0f5132;
+            /* Dark Green */
         }
 
         /* 1. Color Palette Standardization: Pagination Active State */
@@ -636,8 +790,10 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
             border-color: #19860f !important;
             color: #fff !important;
         }
+
         .pagination .page-item.active .page-link:focus {
-            box-shadow: 0 0 0 0.25rem rgba(25, 134, 15, 0.5) !important; /* Theme Green shadow */
+            box-shadow: 0 0 0 0.25rem rgba(25, 134, 15, 0.5) !important;
+            /* Theme Green shadow */
         }
 
         /* 2. Button and Alert Unification: Button Theme (UPDATED for font consistency) */
@@ -654,7 +810,7 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
             border-color: #146c0b;
             color: #fff;
         }
-        
+
         /* 2. Button and Alert Unification: Outline Button Theme (UPDATED for font consistency) */
         .btn-outline-theme {
             color: #19860f;
@@ -662,12 +818,14 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
             /* CONSISTENT FONT */
             font-family: "Be Vietnam Pro", sans-serif;
         }
+
         .btn-outline-theme:hover,
         .btn-outline-theme:active {
             background-color: #146c0b;
             color: #fff;
             border-color: #146c0b;
         }
+
         .btn-outline-theme:focus {
             box-shadow: 0 0 0 0.25rem rgba(25, 134, 15, 0.5);
         }
@@ -737,12 +895,31 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
         }
 
         /* Bootstrap default badge overrides for consistency */
-        .badge.bg-info { background-color: #0dcaf0 !important; color: #052C65; }
-        .badge.bg-success { background-color: #198754 !important; }
-        .badge.bg-secondary { background-color: #6c757d !important; }
-        .badge.bg-primary { background-color: #0d6efd !important; }
-        .badge.bg-warning { background-color: #ffc107 !important; color: #000; }
-        .badge.bg-danger { background-color: #dc3545 !important; }
+        .badge.bg-info {
+            background-color: #0dcaf0 !important;
+            color: #052C65;
+        }
+
+        .badge.bg-success {
+            background-color: #198754 !important;
+        }
+
+        .badge.bg-secondary {
+            background-color: #6c757d !important;
+        }
+
+        .badge.bg-primary {
+            background-color: #0d6efd !important;
+        }
+
+        .badge.bg-warning {
+            background-color: #ffc107 !important;
+            color: #000;
+        }
+
+        .badge.bg-danger {
+            background-color: #dc3545 !important;
+        }
 
         #sidebarToggleBtn {
             color: #0f5132;
@@ -751,7 +928,7 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
         #sidebarToggleBtn:hover {
             color: #146c0b;
         }
-        
+
         /* 3. Modal Theming Finalization: General Modal Styles */
         .modal {
             z-index: 1070 !important;
@@ -763,23 +940,29 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
 
         /* Modal Header Unification */
         .modal-header {
-            background-color: #19860f; /* Theme Green */
+            background-color: #19860f;
+            /* Theme Green */
             color: white;
             border-top-left-radius: 12px;
             border-top-right-radius: 12px;
         }
+
         .modal-header .modal-title {
-            color: white !important; /* Ensure white text */
+            color: white !important;
+            /* Ensure white text */
         }
 
         .modal-header .btn-close {
-            filter: invert(1) grayscale(100%) brightness(200%); /* Inverted (White) Close Button */
+            filter: invert(1) grayscale(100%) brightness(200%);
+            /* Inverted (White) Close Button */
         }
-        
+
         /* Modal Footer Unification */
         .modal-footer {
-            background-color: #f8f9fa; /* Light background */
-            border-top: 1px solid #eee; /* Light grey border */
+            background-color: #f8f9fa;
+            /* Light background */
+            border-top: 1px solid #eee;
+            /* Light grey border */
         }
 
         /* Design: Make the modal look cleaner and more distinct (General) */
@@ -790,7 +973,7 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
         }
 
         /* ... (rest of the existing modal styles for updateStatusModal) ... */
-        
+
         /* Style the radio label container when selected */
         .option-label {
             cursor: pointer;
@@ -1016,7 +1199,7 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
             <img src="../photos/logo.png" alt="Department of Agriculture Logo" />
             <div>Agriconnect</div>
         </a>
-        
+
         <!-- START NEW INSERTION: Main Menu Label -->
         <div class="sidebar-menu-label">Main Menu</div>
         <!-- END NEW INSERTION -->
@@ -1036,12 +1219,35 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
         </div>
     </nav>
 
-    <!-- Header (fixed to top right) (HTML structure is correct, CSS handles consistency) -->
+    <!-- Header (fixed to top right) (NOW CONSISTENT WITH DASHBOARD) -->
     <div class="card-header card-header-custom d-flex justify-content-between align-items-center">
+        <!-- Sidebar Toggle Button (Consistent) -->
         <button id="sidebarToggleBtn" class="btn btn-link p-0 text-dark" title="Toggle Sidebar" style="font-size: 1.5rem;">
             <i class="fas fa-bars"></i>
         </button>
-        <span class="me-3">Hi, <strong><?php echo htmlspecialchars($display_name); ?></strong></span>
+        <!-- Right side alignment wrapper -->
+        <div class="d-flex align-items-center">
+            <!-- Greeting -->
+            <span class="me-3">Hi, <strong><?php echo htmlspecialchars($display_name); ?></strong></span>
+
+            <!-- Notification Bell (ADDED FOR CONSISTENCY) -->
+            <div class="notification-bell-container me-3">
+                <button class="notification-bell" id="notificationBell" onclick="toggleNotificationDropdown()">
+                    <i class="fas fa-bell"></i>
+                    <span class="notification-badge hidden" id="notificationBadge">0</span>
+                </button>
+                <div class="notification-dropdown" id="notificationDropdown">
+                    <div class="notification-header">
+                        <h6><i class="fas fa-bell me-2"></i>Notifications</h6>
+                        <button class="mark-all-read" onclick="markAllAsRead()">Mark all as read</button>
+                    </div>
+                    <div class="notification-list" id="notificationList">
+                        <div class="notification-loading">Loading notifications...</div>
+                    </div>
+                </div>
+            </div>
+            <!-- End Notification Bell -->
+        </div>
     </div>
 
     <!-- Content -->
@@ -1061,7 +1267,7 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
             <?php endif; ?>
 
             <div class="row">
-                
+
                 <!-- Planting Status Card (Form) - MODIFIED to col-md-12 -->
                 <div class="col-md-12 mb-4">
                     <div class="card h-100 shadow-sm">
@@ -1704,7 +1910,7 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
             sidebar.classList.add('collapsed');
             mainContent.classList.add('collapsed');
             header.classList.add('collapsed');
-        } 
+        }
 
         // Toggle button functionality (now uses state saving)
         toggleBtn.addEventListener('click', function() {
@@ -1715,6 +1921,57 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
             }
         });
         // --- END Sidebar Toggle Logic ---
+
+        // --- Notification Bell JavaScript (CONSISTENT WITH DASHBOARD) ---
+        function toggleNotificationDropdown() {
+            document.getElementById('notificationDropdown').classList.toggle('show');
+            // Basic logic to hide the badge on open (in a real app, this would be an API call)
+            document.getElementById('notificationBadge').classList.add('hidden');
+        }
+
+        // Close the dropdown if the user clicks outside of it
+        window.onclick = function(event) {
+            if (!event.target.matches('.notification-bell-container') && !event.target.closest('.notification-bell-container')) {
+                var dropdowns = document.getElementsByClassName("notification-dropdown");
+                for (var i = 0; i < dropdowns.length; i++) {
+                    var openDropdown = dropdowns[i];
+                    if (openDropdown.classList.contains('show')) {
+                        openDropdown.classList.remove('show');
+                    }
+                }
+            }
+        }
+        
+        function markAllAsRead() {
+            // Placeholder for real logic (e.g., AJAX call)
+            console.log("Marked all notifications as read.");
+            document.getElementById('notificationList').innerHTML = '<div class="notification-item text-center text-muted small py-2">No new notifications.</div>';
+        }
+
+        // Simulate initial notification load (in a real app, this would be an API call)
+        document.addEventListener('DOMContentLoaded', () => {
+             // Simulate loading with 2 unread announcements
+             const list = document.getElementById('notificationList');
+             const badge = document.getElementById('notificationBadge');
+
+             list.innerHTML = `
+                <div class="notification-item unread">
+                    <p class="mb-1">Your loan application has been <strong>Approved</strong>!</p>
+                    <span class="text-muted small">5 minutes ago</span>
+                </div>
+                <div class="notification-item unread">
+                    <p class="mb-1">New advisory on pest control for Rice crops.</p>
+                    <span class="text-muted small">2 hours ago</span>
+                </div>
+                <div class="notification-item">
+                    <p class="mb-1">Claim for Seed Subsidy is <strong>Ready</strong>.</p>
+                    <span class="text-muted small">Yesterday</span>
+                </div>
+             `;
+             badge.textContent = 2; // Set count
+             badge.classList.remove('hidden'); // Show badge
+        });
+        // --- END Notification Bell JavaScript ---
     </script>
 </body>
 

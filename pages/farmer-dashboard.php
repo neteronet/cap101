@@ -1,7 +1,7 @@
 <?php
 session_start(); // Start the session at the very beginning of the script
 
-// --- HELPER FUNCTION: Status to CSS Class Mapping ---
+// --- HELPER FUNCTION: Status to CSS Class Mapping (FROM CODE A) ---
 function get_status_class($status) {
     $status = strtolower($status);
     if (strpos($status, 'pending') !== false || strpos($status, 'review') !== false) {
@@ -70,9 +70,9 @@ if ($stmt_name) {
     exit();
 }
 
-// --- Fetch Latest Announcements ---
+// --- Fetch Latest Announcements (up to 5 for carousel - FROM CODE B) ---
 $announcements = [];
-$stmt_announcements = $conn->prepare("SELECT title, content, publish_date FROM announcements ORDER BY publish_date DESC LIMIT 1");
+$stmt_announcements = $conn->prepare("SELECT title, content, publish_date FROM announcements ORDER BY publish_date DESC LIMIT 5");
 if ($stmt_announcements) {
     $stmt_announcements->execute();
     $stmt_announcements->bind_result($title, $content, $publish_date);
@@ -90,20 +90,17 @@ if ($stmt_announcements) {
 }
 // --- End Fetch Latest Announcements ---
 
-// --- Fetch Latest Crop Monitoring Status for the logged-in user ---
+// --- Fetch Latest Crop Monitoring Status for the logged-in user (FROM CODE B/A) ---
 $latest_crop_status = null;
-// You'll need a 'planting_status' or similar table for this
-// Assuming a table 'farmer_crops' with columns: crop_id, user_id, crop_name, status, last_update_date
-// And 'crop_identifier' is 'crop_name' for this example. Adjust table/column names as per your DB schema.
-$stmt_crop_status = $conn->prepare("SELECT crop_identifier, status, update_date FROM planting_status WHERE user_id = ? ORDER BY update_date DESC LIMIT 1");
+// Using farmer_crops table and crop_name column as per Code B, mapping to crop_identifier key as per Code A's usage
+$stmt_crop_status = $conn->prepare("SELECT crop_name, status, update_date FROM farmer_crops WHERE user_id = ? ORDER BY update_date DESC LIMIT 1");
 if ($stmt_crop_status) {
     $stmt_crop_status->bind_param("i", $user_id); // Assuming user_id is an integer
     $stmt_crop_status->execute();
-    // Assuming 'crop_identifier' and 'update_date' exist in 'planting_status'
     $stmt_crop_status->bind_result($crop_name, $status, $update_date);
     if ($stmt_crop_status->fetch()) {
         $latest_crop_status = [
-            'crop_identifier' => $crop_name,
+            'crop_identifier' => $crop_name, // Mapped to crop_identifier for card display consistency
             'status' => $status,
             'update_date' => $update_date
         ];
@@ -115,7 +112,7 @@ if ($stmt_crop_status) {
 }
 // --- End Fetch Latest Crop Monitoring Status ---
 
-// --- NEW: Fetch Latest Assistance Applications Status for the logged-in user (Subsidy Status Card) ---
+// --- NEW: Fetch Latest Assistance Applications Status (FROM CODE A) ---
 $latest_applications = [];
 // Assuming table is 'assistance_applications' with columns: assistance_type, status, application_date
 $stmt_applications = $conn->prepare("SELECT assistance_type, status FROM assistance_applications WHERE user_id = ? ORDER BY application_date DESC LIMIT 3");
@@ -138,7 +135,7 @@ if ($stmt_applications) {
 // --- END NEW FETCH ---
 
 
-// --- NEW: Check for Pending Assistance Applications to restrict new applications (THE REQUIRED LOGIC) ---
+// --- NEW: Check for Pending Assistance Applications to restrict new applications (FROM CODE A) ---
 $has_pending_application = false;
 // We check for *any* application that has a status of 'Pending'
 $stmt_check_pending = $conn->prepare("SELECT COUNT(*) FROM assistance_applications WHERE user_id = ? AND status = 'Pending'");
@@ -174,18 +171,16 @@ $conn->close(); // Close the connection after all database operations
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet" />
 
-    <!-- Google Fonts -->
-    <!-- MODIFIED: Changed font pairing to Be Vietnam Pro (Headings/UI) and Poppins (Body/Content) -->
+    <!-- Google Fonts (FROM CODE A) -->
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-   <!-- REMOVED redundant Inter link and replaced with the combined Montserrat/Poppins link above for clean setup -->
-   
-    <!-- Custom Styles (Copied from farmer-planting_status.php for consistency) -->
+    <!-- Notification Bell Component (FROM CODE B) -->
+    <?php include '../includes/notification_bell.php'; ?>
+
+    <!-- Custom Styles (FROM CODE A, fully integrated) -->
     <style>
         body {
             /* MODIFIED: Changed font-family to Poppins for body/content text */
@@ -214,9 +209,9 @@ $conn->close(); // Close the connection after all database operations
             flex-direction: column;
             transition: left 0.3s ease;
             /* MODIFIED: Explicitly set sidebar font to Be Vietnam Pro for UI/Nav consistency */
-            font-family: "Be Vietnam Pro", sans-serif; 
+            font-family: "Be Vietnam Pro", sans-serif;
         }
-        
+
         /* >>> INSERTION: Sidebar Menu Label Style <<< */
         .sidebar-menu-label {
             color: rgba(255, 255, 255, 0.7);
@@ -381,46 +376,59 @@ $conn->close(); // Close the connection after all database operations
         h6,
         .card-title,
         .modal-title,
-        .page-title { /* ADDED .page-title HERE */
+        .page-title {
+            /* ADDED .page-title HERE */
             /* MODIFIED: Explicitly set headings/titles font to Be Vietnam Pro */
             font-family: "Be Vietnam Pro", sans-serif;
             color: #0f5132;
             /* Dark Green */
         }
-        
+
         /* NEW: Style for the Page Title (Dashboard) */
         .page-title {
-            font-size: 1.5rem; /* Reduced from default H1 (2.5rem) to be less dominating */
-            font-weight: 600; /* Made it slightly bold for prominence */
+            font-size: 1.5rem;
+            /* Reduced from default H1 (2.5rem) to be less dominating */
+            font-weight: 600;
+            /* Made it slightly bold for prominence */
             margin-bottom: 0.5rem;
         }
+
         /* END NEW */
-        
+
         /* NEW: Style for the Dashboard Description Paragraph */
         .dashboard-description {
-            font-size: 0.875rem; /* 14px */
+            font-size: 0.875rem;
+            /* 14px */
         }
+
         /* END NEW */
-        
+
         /* NEW: Explicit Card Title Size for Consistency */
         .card-title {
-            font-size: 1.25rem; /* Standard H5 size, but explicitly set */
-            font-weight: 600; /* Added slight boldness */
+            font-size: 1.25rem;
+            /* Standard H5 size, but explicitly set */
+            font-weight: 600;
+            /* Added slight boldness */
         }
+
         /* END NEW */
-        
+
         /* NEW: Explicit Standard Card Text Size for Consistency (0.9375rem = 15px) */
-        .card-text, 
-        .card-body p:not(.card-title), 
+        .card-text,
+        .card-body p:not(.card-title),
         .list-unstyled li {
             /* Inherits Poppins from body */
-            font-size: 0.9375rem; /* ~15px for better readability in main content */
+            font-size: 0.9375rem;
+            /* ~15px for better readability in main content */
         }
-        .card-text.small, 
-        .list-unstyled.small li, 
+
+        .card-text.small,
+        .list-unstyled.small li,
         .card-text.text-muted.small {
-            font-size: 0.875rem !important; /* Keep 14px for elements explicitly marked as small */
+            font-size: 0.875rem !important;
+            /* Keep 14px for elements explicitly marked as small */
         }
+
         /* END NEW */
 
         /* 2. Button and Alert Unification: Button Theme */
@@ -437,12 +445,14 @@ $conn->close(); // Close the connection after all database operations
             border-color: #146c0b;
             color: #fff;
         }
-        
+
         /* Disabled Button Styling */
         .btn-theme.disabled {
-            background-color: #7ab372; /* Lighter shade of theme color for disabled */
+            background-color: #7ab372;
+            /* Lighter shade of theme color for disabled */
             border-color: #7ab372;
-            pointer-events: none; /* Ensure no click */
+            pointer-events: none;
+            /* Ensure no click */
             opacity: 0.65;
         }
 
@@ -472,7 +482,7 @@ $conn->close(); // Close the connection after all database operations
             margin-bottom: 1rem;
             border: 1px solid #ddd;
         }
-        
+
         /* Custom status badge classes */
         .status-badge {
             padding: 0.3em 0.6em;
@@ -486,25 +496,39 @@ $conn->close(); // Close the connection after all database operations
 
         /* Re-mapping status badges to Bootstrap colors for theme consistency */
         .status-pending {
-            background-color: #ffc107 !important; /* Warning */
+            background-color: #ffc107 !important;
+            /* Warning */
             color: #664d03 !important;
         }
 
         .status-approved {
-            background-color: #198754 !important; /* Success */
+            background-color: #198754 !important;
+            /* Success */
             color: #fff !important;
         }
 
         .status-rejected {
-            background-color: #dc3545 !important; /* Danger */
+            background-color: #dc3545 !important;
+            /* Danger */
             color: #fff !important;
         }
-        
+
         /* Bootstrap default badge overrides for consistency */
-        .text-info { color: #0dcaf0 !important; }
-        .text-success { color: #198754 !important; }
-        .text-warning { color: #ffc107 !important; }
-        .text-danger { color: #dc3545 !important; }
+        .text-info {
+            color: #0dcaf0 !important;
+        }
+
+        .text-success {
+            color: #198754 !important;
+        }
+
+        .text-warning {
+            color: #ffc107 !important;
+        }
+
+        .text-danger {
+            color: #dc3545 !important;
+        }
 
         /* --- ADDED CUSTOM ALERT STYLES FROM planting_status.php FOR CONSISTENCY --- */
         .alert-custom-warning {
@@ -519,30 +543,30 @@ $conn->close(); // Close the connection after all database operations
             /* MODIFIED: setting explicitly to Be Vietnam Pro for UI consistency */
             font-family: "Be Vietnam Pro", sans-serif;
             /* >>> ADJUSTMENT FOR CONSISTENT FONT SIZE <<< */
-            font-size: 0.9375rem; 
+            font-size: 0.9375rem;
         }
 
         .alert-custom-warning i {
             margin-top: .2rem;
         }
-        
+
         .alert-heading {
             color: inherit;
         }
+
         /* --- END ADDED CUSTOM ALERT STYLES --- */
 
         .alert-warning {
-            /* Removing previous override to rely on the custom alert class */
             /* If standard alert-warning is still used, this will remain in case the custom one is not used */
             color: #664d03;
             background-color: #fff3cd;
             border-color: #ffecb5;
         }
-        
+
         .alert-warning strong {
             color: #664d03;
         }
-        
+
         #sidebarToggleBtn {
             color: #0f5132;
         }
@@ -551,15 +575,162 @@ $conn->close(); // Close the connection after all database operations
             color: #146c0b;
         }
 
+        /* Carousel control adjustments for visibility in custom card theme */
+        .carousel-control-prev-icon,
+        .carousel-control-next-icon {
+            filter: invert(100%) grayscale(100%); /* Makes them dark on light background */
+        }
+        
+        .carousel-control-prev, 
+        .carousel-control-next {
+            width: 8%; /* Reduced width */
+        }
+
+        /* ----------------------------------------------------------- */
+        /* --- Notification Bell Styling for Consistency (IMPROVED) --- */
+        /* ----------------------------------------------------------- */
+        .notification-bell-container {
+            position: relative;
+            display: inline-block;
+        }
+
+        .notification-bell {
+            /* Base color matching the sidebar toggle button for consistency */
+            color: #0f5132;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.25rem; /* Slightly larger for prominence */
+            padding: 0;
+            line-height: 1;
+            transition: color 0.2s ease;
+        }
+
+        .notification-bell:hover {
+            color: #146c0b; /* Darker theme hover color */
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -5px;
+            right: -10px;
+            padding: 0.15em 0.45em;
+            border-radius: 50%;
+            background-color: #dc3545; /* Danger Red for unread count (consistent with status-rejected) */
+            color: white;
+            font-size: 0.6rem;
+            line-height: 1;
+            min-width: 18px;
+            text-align: center;
+            font-family: "Be Vietnam Pro", sans-serif;
+        }
+
+        .notification-badge.hidden {
+            display: none;
+        }
+
+        .notification-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            width: 320px;
+            background-color: #fff;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            border-radius: 0.5rem;
+            margin-top: 8px;
+            z-index: 1070;
+            display: none;
+            /* Consistent font for UI elements */
+            font-family: "Be Vietnam Pro", sans-serif;
+            font-size: 0.875rem; /* Small font size */
+        }
+
+        .notification-dropdown.show {
+            display: block;
+        }
+
+        .notification-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .notification-header h6 {
+            margin: 0;
+            font-size: 1rem;
+            color: #fff; /* Dark Green for heading consistency */
+            font-weight: 600;
+        }
+
+        .mark-all-read {
+            color: #19860f; /* Theme Green for action link */
+            background: none;
+            border: none;
+            font-size: 0.75rem;
+            cursor: pointer;
+            padding: 0;
+            text-decoration: underline;
+        }
+
+        .mark-all-read:hover {
+            color: #146c0b; /* Darker Theme Green on hover */
+        }
+
+        .notification-list {
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 0; /* Remove internal padding, items will have it */
+        }
+
+        .notification-item {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #f8f9fa; /* Very light separator */
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .notification-item:hover {
+            background-color: #f1f1f1;
+        }
+
+        .notification-item.unread {
+            background-color: #f7fff6; /* Very light theme-related background for unread */
+            border-left: 3px solid #19860f; /* Theme green indicator */
+            padding-left: calc(1rem - 3px); /* Adjust padding due to border */
+            font-weight: 500;
+        }
+
+        .notification-item.unread p {
+            color: #0f5132; /* Darker text for unread content */
+        }
+
+        .notification-item p {
+            margin: 0;
+            line-height: 1.4;
+        }
+
+        .notification-item strong {
+            font-weight: 600;
+        }
+
+        .notification-item:last-child {
+            border-bottom: none;
+        }
+        /* --- END Notification Bell Styling --- */
+
     </style>
 
 </head>
+
 <body>
 
-    <!-- Sidebar (CONSISTENT DESIGN) -->
+    <!-- Sidebar (FROM CODE A) -->
     <nav class="sidebar">
-        <!-- Logo and Text (Consistent with planting-status.php) -->
+        <!-- Logo and Text (Consistent with Code A) -->
         <a href="ProvincialAgriHome.html" class="header-brand">
+            <!-- Using the better logo and name from Code A structure -->
             <img src="../photos/logo.png" alt="Department of Agriculture Logo" />
             <div>Agriconnect</div>
         </a>
@@ -575,7 +746,7 @@ $conn->close(); // Close the connection after all database operations
             <li class="nav-item"><a href="farmer-announcement.php" class="nav-link"><i class="fas fa-bullhorn"></i> Announcements</a></li>
             <li class="nav-item"><a href="farmer-my_profile.php" class="nav-link"><i class="fas fa-user-circle"></i> My Profile</a></li>
         </ul>
-        <!-- Logout Section (Consistent) -->
+        <!-- Logout Section (Consistent - Moved from Header in Code B) -->
         <div class="sidebar-logout">
             <a href="farmers-logout.php" class="nav-link">
                 <i class="fas fa-sign-out-alt"></i> Logout
@@ -583,14 +754,35 @@ $conn->close(); // Close the connection after all database operations
         </div>
     </nav>
 
-    <!-- Header (CONSISTENT DESIGN) -->
+    <!-- Header (FROM CODE A/B Combination) -->
     <div class="card-header card-header-custom d-flex justify-content-between align-items-center">
-        <!-- Sidebar Toggle Button (Consistent) -->
+        <!-- Sidebar Toggle Button (FROM CODE A) -->
         <button id="sidebarToggleBtn" class="btn btn-link p-0 text-dark" title="Toggle Sidebar" style="font-size: 1.5rem;">
             <i class="fas fa-bars"></i>
         </button>
-        <!-- Greeting -->
-        <span class="me-3">Hi, <strong><?php echo htmlspecialchars($display_name); ?></strong></span>
+        <!-- Right side alignment wrapper -->
+        <div class="d-flex align-items-center">
+            <!-- Greeting (Consistent) -->
+            <span class="me-3">Hi, <strong><?php echo htmlspecialchars($display_name); ?></strong></span>
+
+            <!-- Notification Bell (FROM CODE B) -->
+            <div class="notification-bell-container me-3">
+                <button class="notification-bell" id="notificationBell" onclick="toggleNotificationDropdown()">
+                    <i class="fas fa-bell"></i>
+                    <span class="notification-badge hidden" id="notificationBadge">0</span>
+                </button>
+                <div class="notification-dropdown" id="notificationDropdown">
+                    <div class="notification-header">
+                        <h6><i class="fas fa-bell me-2"></i>Notifications</h6>
+                        <button class="mark-all-read" onclick="markAllAsRead()">Mark all as read</button>
+                    </div>
+                    <div class="notification-list" id="notificationList">
+                        <div class="notification-loading">Loading notifications...</div>
+                    </div>
+                </div>
+            </div>
+            <!-- Logout Button Removed from Header (moved to sidebar) -->
+        </div>
     </div>
 
     <!-- Main Content -->
@@ -603,7 +795,7 @@ $conn->close(); // Close the connection after all database operations
             </p>
 
             <div class="row">
-                <!-- Announcements Card (UPDATED CLASSES) -->
+                <!-- Announcements Card with Carousel (FROM CODE B, with CODE A styling) -->
                 <div class="col-md-6 col-lg-4">
                     <div class="card h-100 shadow-sm">
                         <div class="card-body d-flex flex-column">
@@ -611,27 +803,56 @@ $conn->close(); // Close the connection after all database operations
                             <p class="card-text text-muted small">
                                 Stay updated with government programs, advisories, and disaster alerts here.
                             </p>
-                            <ul class="list-unstyled small mb-3">
-                                <?php if (!empty($announcements)) : ?>
-                                    <?php foreach ($announcements as $announcement) : ?>
-                                        <li>
-                                            <i class="fas fa-circle-info text-info me-2"></i>
-                                            <strong><?php echo htmlspecialchars($announcement['title']); ?></strong>
-                                            <br>
-                                            <span class="text-muted"><?php echo date('F j, Y', strtotime($announcement['publish_date'])); ?></span>
-                                            <p class="mb-0"><?php echo htmlspecialchars(substr($announcement['content'], 0, 70)); ?>...</p>
-                                        </li>
-                                    <?php endforeach; ?>
-                                <?php else : ?>
-                                    <li>No recent announcements.</li>
-                                <?php endif; ?>
-                            </ul>
+
+                            <?php if (!empty($announcements)) : ?>
+                                <?php
+                                $chunks = array_chunk($announcements, 3);
+                                ?>
+                                <div id="announcementCarousel" class="carousel slide flex-grow-1" data-bs-ride="carousel" data-bs-interval="8000">
+                                    <div class="carousel-inner">
+                                        <?php foreach ($chunks as $chunkIndex => $chunk) : ?>
+                                            <div class="carousel-item <?php echo $chunkIndex === 0 ? 'active' : ''; ?>">
+                                                <ul class="list-unstyled small mb-0">
+                                                    <?php foreach ($chunk as $announcement) : ?>
+                                                        <li class="mb-3">
+                                                            <i class="fas fa-circle-info text-info me-2"></i>
+                                                            <strong><?php echo htmlspecialchars($announcement['title']); ?></strong>
+                                                            <br>
+                                                            <span class="text-muted d-block">
+                                                                <?php echo date('F j, Y', strtotime($announcement['publish_date'])); ?>
+                                                            </span>
+                                                            <p class="mb-0">
+                                                                <?php echo htmlspecialchars(substr($announcement['content'], 0, 80)); ?>...
+                                                            </p>
+                                                        </li>
+                                                    <?php endforeach; ?>
+                                                </ul>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    </div>
+
+                                    <?php if (count($announcements) > 3) : ?>
+                                        <!-- Carousel controls only if more than 3 announcements -->
+                                        <button class="carousel-control-prev" type="button" data-bs-target="#announcementCarousel" data-bs-slide="prev">
+                                            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                            <span class="visually-hidden">Previous</span>
+                                        </button>
+                                        <button class="carousel-control-next" type="button" data-bs-target="#announcementCarousel" data-bs-slide="next">
+                                            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                            <span class="visually-hidden">Next</span>
+                                        </button>
+                                    <?php endif; ?>
+                                </div>
+                            <?php else : ?>
+                                <p class="text-muted small mb-3 flex-grow-1">No recent announcements.</p>
+                            <?php endif; ?>
+
                             <a href="farmer-announcement.php" class="btn btn-theme mt-auto">View All Announcements</a>
                         </div>
                     </div>
                 </div>
 
-                <!-- Subsidy Status Card (NOW DYNAMICALLY FETCHED) -->
+                <!-- Subsidy Status Card (Dynamic Data from CODE A) -->
                 <div class="col-md-6 col-lg-4">
                     <div class="card h-100 shadow-sm">
                         <div class="card-body d-flex flex-column">
@@ -639,28 +860,28 @@ $conn->close(); // Close the connection after all database operations
                             <p class="card-text text-muted small">
                                 Check the status of your latest assistance applications.
                             </p>
-                            <div class="mb-3">
+                            <div class="mb-3 flex-grow-1">
                                 <!-- Dynamic Application Statuses -->
                                 <?php if (!empty($latest_applications)) : ?>
                                     <?php foreach ($latest_applications as $app) : ?>
-                                        <p class="mb-1">
-                                            <?php echo $app['type']; ?>: 
+                                        <p class="mb-1 card-text">
+                                            <?php echo $app['type']; ?>:
                                             <span class="status-badge <?php echo get_status_class($app['status']); ?>">
                                                 <?php echo $app['status']; ?>
                                             </span>
                                         </p>
                                     <?php endforeach; ?>
                                 <?php else : ?>
-                                    <p class="mb-1 text-muted">No recent applications found.</p>
+                                    <p class="mb-1 text-muted card-text">No recent applications found.</p>
                                 <?php endif; ?>
                             </div>
-                            <!-- Updated link to claim history for consistency with sidebar -->
+                            <!-- Updated link to claim history (as per CODE A) -->
                             <a href="farmer-claim_history.php" class="btn btn-theme mt-auto">Go to Claim History</a>
                         </div>
                     </div>
                 </div>
 
-                <!-- Crop Monitoring Card (UPDATED CLASSES) -->
+                <!-- Crop Monitoring Card (FROM CODE A/B) -->
                 <div class="col-md-6 col-lg-4">
                     <div class="card h-100 shadow-sm">
                         <div class="card-body d-flex flex-column">
@@ -668,9 +889,9 @@ $conn->close(); // Close the connection after all database operations
                             <p class="card-text text-muted small">
                                 Keep track of your crop's progress and update planting status.
                             </p>
-                            <ul class="list-unstyled small mb-3">
+                            <ul class="list-unstyled small mb-3 flex-grow-1">
                                 <?php if (!empty($latest_crop_status)) : ?>
-                                    <li>
+                                    <li class="card-text">
                                         <i class="fas fa-calendar-check text-success me-2"></i>
                                         Last update for <strong><?php echo htmlspecialchars($latest_crop_status['crop_identifier']); ?></strong>:
                                         <span class="fw-bold"><?php echo htmlspecialchars($latest_crop_status['status']); ?></span>
@@ -678,16 +899,16 @@ $conn->close(); // Close the connection after all database operations
                                         <span class="text-muted small ms-4">(<?php echo date('F j, Y', strtotime($latest_crop_status['update_date'])); ?>)</span>
                                     </li>
                                 <?php else : ?>
-                                    <li>No crop monitoring data available. Add your first crop!</li>
+                                    <li class="card-text">No crop monitoring data available. Add your first crop!</li>
                                 <?php endif; ?>
-                                <li><i class="fas fa-hourglass-half text-warning me-2"></i>Reminder: Regularly update your crop status.</li>
+                                <li class="card-text"><i class="fas fa-hourglass-half text-warning me-2"></i>Reminder: Regularly update your crop status.</li>
                             </ul>
                             <a href="farmer-planting_status.php" class="btn btn-theme mt-auto">View Crop Details</a>
                         </div>
                     </div>
                 </div>
 
-                <!-- Apply for Assistance Card (UPDATED LOGIC AND CLASSES) -->
+                <!-- Apply for Assistance Card (Conditional Logic from CODE A) -->
                 <div class="col-md-12 col-lg-12 mt-4">
                     <div class="card h-100 shadow-sm">
                         <div class="card-body d-flex flex-column">
@@ -698,9 +919,9 @@ $conn->close(); // Close the connection after all database operations
                             <p class="card-text">
                                 <span class="fw-bold">Available Programs:</span> Seed Subsidy Program, Agricultural Loan Assistance, Farm Equipment Grant.
                             </p>
-                            
+
                             <?php if ($has_pending_application) : ?>
-                                <!-- MODIFIED: Changed to use the consistent alert-custom-warning class and structure -->
+                                <!-- Alert structure from CODE A -->
                                 <div class="alert-custom-warning mt-3 mb-3" role="alert">
                                     <i class="fas fa-exclamation-triangle"></i>
                                     <div>
@@ -712,7 +933,7 @@ $conn->close(); // Close the connection after all database operations
                             <?php else : ?>
                                 <a href="farmer-apply_for_assistance.php" class="btn btn-theme mt-auto">Start New Application</a>
                             <?php endif; ?>
-                            
+
                         </div>
                     </div>
                 </div>
@@ -723,7 +944,7 @@ $conn->close(); // Close the connection after all database operations
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- JavaScript for Sidebar Toggle (FIXED FOR NAVIGATION) -->
+    <!-- JavaScript for Sidebar Toggle (FROM CODE A) -->
     <script>
         // JavaScript to toggle sidebar collapse and preserve state using localStorage
         const sidebar = document.querySelector('.sidebar');
@@ -753,7 +974,7 @@ $conn->close(); // Close the connection after all database operations
             sidebar.classList.add('collapsed');
             mainContent.classList.add('collapsed');
             header.classList.add('collapsed');
-        } 
+        }
 
         // Toggle button functionality (now uses state saving)
         toggleBtn.addEventListener('click', function() {
@@ -764,8 +985,57 @@ $conn->close(); // Close the connection after all database operations
             }
         });
 
-        // The 'Optional: Collapse sidebar on link click' block has been removed
-        // to prevent the unwanted 'movement' upon navigation.
+        // Retain notification bell JavaScript from Code B (assuming it was available from '../includes/notification_bell.php' or was standard setup)
+        // If the bell logic is missing, it should be added here or in the included file.
+        // Assuming minimal setup for notification bell based on Code B's HTML:
+        function toggleNotificationDropdown() {
+            document.getElementById('notificationDropdown').classList.toggle('show');
+            // Basic logic to hide the badge on open (in a real app, this would be an API call)
+            document.getElementById('notificationBadge').classList.add('hidden');
+        }
+
+        // Close the dropdown if the user clicks outside of it
+        window.onclick = function(event) {
+            if (!event.target.matches('.notification-bell-container') && !event.target.closest('.notification-bell-container')) {
+                var dropdowns = document.getElementsByClassName("notification-dropdown");
+                for (var i = 0; i < dropdowns.length; i++) {
+                    var openDropdown = dropdowns[i];
+                    if (openDropdown.classList.contains('show')) {
+                        openDropdown.classList.remove('show');
+                    }
+                }
+            }
+        }
+        
+        function markAllAsRead() {
+            // Placeholder for real logic (e.g., AJAX call)
+            console.log("Marked all notifications as read.");
+            document.getElementById('notificationList').innerHTML = '<div class="notification-item text-center text-muted small py-2">No new notifications.</div>';
+        }
+
+        // Simulate initial notification load (in a real app, this would be an API call)
+        document.addEventListener('DOMContentLoaded', () => {
+             // Simulate loading with 2 unread announcements
+             const list = document.getElementById('notificationList');
+             const badge = document.getElementById('notificationBadge');
+
+             list.innerHTML = `
+                <div class="notification-item unread">
+                    <p class="mb-1">Your loan application has been <strong>Approved</strong>!</p>
+                    <span class="text-muted small">5 minutes ago</span>
+                </div>
+                <div class="notification-item unread">
+                    <p class="mb-1">New advisory on pest control for Rice crops.</p>
+                    <span class="text-muted small">2 hours ago</span>
+                </div>
+                <div class="notification-item">
+                    <p class="mb-1">Claim for Seed Subsidy is <strong>Ready</strong>.</p>
+                    <span class="text-muted small">Yesterday</span>
+                </div>
+             `;
+             badge.textContent = 2; // Set count
+             badge.classList.remove('hidden'); // Show badge
+        });
     </script>
 </body>
 

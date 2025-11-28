@@ -4,6 +4,12 @@ session_start();
 include '../includes/connection.php'; // Ensure this path is correct
 
 $error = '';
+$password_reset_success = '';
+
+// Check for password reset success message
+if (isset($_GET['password_reset']) && $_GET['password_reset'] == '1') {
+    $password_reset_success = 'Password has been reset successfully. Please login with your new password.';
+}
 
 if (isset($_POST['login'])) {
     $username_input = $_POST['username'];
@@ -148,11 +154,17 @@ $conn->close();
 <body>
     <main class="login-container">
         <form class="w-100" method="POST">
-            <img class="logo" src="../photos/Department_of_Agriculture_of_the_Philippines.png" alt="Official Seal">
+            <img class="logo" src="../photos/logo.png">
             <h1 class="mb-4">FARMERS LOGIN</h1>
 
             <?php if (!empty($error)) : ?>
                 <div class="error-message"><?php echo htmlspecialchars($error); ?></div>
+            <?php endif; ?>
+
+            <?php if (!empty($password_reset_success)) : ?>
+                <div class="alert alert-success" role="alert">
+                    <i class="fas fa-check-circle me-2"></i><?php echo htmlspecialchars($password_reset_success); ?>
+                </div>
             <?php endif; ?>
 
             <div class="form-floating mb-3">
@@ -169,7 +181,13 @@ $conn->close();
 
             <button class="btn btn-primary w-100 mb-3" type="submit" name="login">Login</button>
 
-            <a href="../index.php" class="back-to-home">
+            <div class="text-center mb-3">
+                <a href="forgot-password.php" class="back-to-home" style="font-size: 0.9rem;">
+                    <i class="fas fa-key me-2"></i>Forgot Password?
+                </a>
+            </div>
+
+            <a href="../home.php" class="back-to-home">
                 <i class="fas fa-arrow-left me-2"></i>Back to Home
             </a>
         </form>

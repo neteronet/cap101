@@ -237,6 +237,140 @@ $conn->close();
             color: #146c0b;
         }
 
+        /* ----------------------------------------------------------- */
+        /* --- Notification Bell Styling for Consistency (IMPROVED) --- */
+        /* ----------------------------------------------------------- */
+        .notification-bell-container {
+            position: relative;
+            display: inline-block;
+        }
+
+        .notification-bell {
+            /* Base color matching the sidebar toggle button for consistency */
+            color: #0f5132;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.25rem; /* Slightly larger for prominence */
+            padding: 0;
+            line-height: 1;
+            transition: color 0.2s ease;
+        }
+
+        .notification-bell:hover {
+            color: #146c0b; /* Darker theme hover color */
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -5px;
+            right: -10px;
+            padding: 0.15em 0.45em;
+            border-radius: 50%;
+            background-color: #dc3545; /* Danger Red for unread count (consistent with status-rejected) */
+            color: white;
+            font-size: 0.6rem;
+            line-height: 1;
+            min-width: 18px;
+            text-align: center;
+            font-family: "Be Vietnam Pro", sans-serif;
+        }
+
+        .notification-badge.hidden {
+            display: none;
+        }
+
+        .notification-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            width: 320px;
+            background-color: #fff;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            border-radius: 0.5rem;
+            margin-top: 8px;
+            z-index: 1070;
+            display: none;
+            /* Consistent font for UI elements */
+            font-family: "Be Vietnam Pro", sans-serif;
+            font-size: 0.875rem; /* Small font size */
+        }
+
+        .notification-dropdown.show {
+            display: block;
+        }
+
+        .notification-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .notification-header h6 {
+            margin: 0;
+            font-size: 1rem;
+            color: #0f5132; /* Dark Green for heading consistency */
+            font-weight: 600;
+        }
+
+        .mark-all-read {
+            color: #19860f; /* Theme Green for action link */
+            background: none;
+            border: none;
+            font-size: 0.75rem;
+            cursor: pointer;
+            padding: 0;
+            text-decoration: underline;
+        }
+
+        .mark-all-read:hover {
+            color: #146c0b; /* Darker Theme Green on hover */
+        }
+
+        .notification-list {
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 0; /* Remove internal padding, items will have it */
+        }
+
+        .notification-item {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #f8f9fa; /* Very light separator */
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .notification-item:hover {
+            background-color: #f1f1f1;
+        }
+
+        .notification-item.unread {
+            background-color: #f7fff6; /* Very light theme-related background for unread */
+            border-left: 3px solid #19860f; /* Theme green indicator */
+            padding-left: calc(1rem - 3px); /* Adjust padding due to border */
+            font-weight: 500;
+        }
+
+        .notification-item.unread p {
+            color: #0f5132; /* Darker text for unread content */
+        }
+
+        .notification-item p {
+            margin: 0;
+            line-height: 1.4;
+        }
+
+        .notification-item strong {
+            font-weight: 600;
+        }
+
+        .notification-item:last-child {
+            border-bottom: none;
+        }
+        /* --- END Notification Bell Styling --- */
+
         /* --- Typography Consistency --- */
         h1, h2, h3, h4, h5, h6, .card-title, .modal-title, .page-title {
             /* CONSISTENCY: Set headings/titles font */
@@ -248,7 +382,7 @@ $conn->close();
         .page-title {
             font-size: 1.5rem; /* Reduced from 1.8rem for consistency */
             font-weight: 600;
-            color: #0f5132; 
+            color: #0f5132;
             margin-bottom: 0.5rem; /* Reduced for consistency */
         }
         
@@ -439,12 +573,35 @@ $conn->close();
         </div>
     </nav>
 
-    <!-- Header (Consistent Design) -->
+    <!-- Header (Consistent Design - MODIFIED to include Notification Bell) -->
     <div class="card-header card-header-custom d-flex justify-content-between align-items-center">
+        <!-- Sidebar Toggle Button (Consistent) -->
         <button id="sidebarToggleBtn" class="btn btn-link p-0 text-dark" title="Toggle Sidebar" style="font-size: 1.5rem;">
             <i class="fas fa-bars"></i>
         </button>
-        <span class="me-3">Hi, <strong><?php echo htmlspecialchars($display_name); ?></strong></span>
+        <!-- Right side alignment wrapper -->
+        <div class="d-flex align-items-center">
+            <!-- Greeting -->
+            <span class="me-3">Hi, <strong><?php echo htmlspecialchars($display_name); ?></strong></span>
+
+            <!-- Notification Bell (ADDED FOR CONSISTENCY) -->
+            <div class="notification-bell-container me-3">
+                <button class="notification-bell" id="notificationBell" onclick="toggleNotificationDropdown()">
+                    <i class="fas fa-bell"></i>
+                    <span class="notification-badge hidden" id="notificationBadge">0</span>
+                </button>
+                <div class="notification-dropdown" id="notificationDropdown">
+                    <div class="notification-header">
+                        <h6><i class="fas fa-bell me-2"></i>Notifications</h6>
+                        <button class="mark-all-read" onclick="markAllAsRead()">Mark all as read</button>
+                    </div>
+                    <div class="notification-list" id="notificationList">
+                        <div class="notification-loading">Loading notifications...</div>
+                    </div>
+                </div>
+            </div>
+            <!-- End Notification Bell -->
+        </div>
     </div>
 
     <!-- Main Content -->
@@ -460,7 +617,7 @@ $conn->close();
                     <input type="text" class="form-control" placeholder="Search announcements..." id="announcementSearch" />
                     <button class="btn btn-theme" type="button"><i class="fas fa-search"></i> Search</button>
                 </div>
-            </div>
+            </div>  
             <div class="col-md-4">
                 <select class="form-select btn-theme" id="announcementFilter">
                     <option value="all">All Categories</option>
@@ -549,7 +706,66 @@ $conn->close();
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // --- Notification Bell Functions (ADDED FOR CONSISTENCY) ---
+        function toggleNotificationDropdown() {
+            document.getElementById('notificationDropdown').classList.toggle('show');
+            // When opening the dropdown, mark all notifications as seen by removing the unread class and hiding the badge
+            if (document.getElementById('notificationDropdown').classList.contains('show')) {
+                document.querySelectorAll('.notification-item.unread').forEach(item => {
+                    item.classList.remove('unread');
+                });
+                document.getElementById('notificationBadge').classList.add('hidden');
+            }
+        }
+
+        function markAllAsRead() {
+            // Placeholder for real logic (e.g., AJAX call)
+            console.log("Marked all notifications as read.");
+            document.getElementById('notificationList').innerHTML = '<div class="notification-item text-center text-muted small py-2">No new notifications.</div>';
+            document.getElementById('notificationBadge').classList.add('hidden');
+            document.getElementById('notificationDropdown').classList.remove('show');
+        }
+
+        // Close the dropdown if the user clicks outside of it
+        window.onclick = function(event) {
+            if (!event.target.matches('.notification-bell-container') && !event.target.closest('.notification-bell-container')) {
+                var dropdowns = document.getElementsByClassName("notification-dropdown");
+                for (var i = 0; i < dropdowns.length; i++) {
+                    var openDropdown = dropdowns[i];
+                    if (openDropdown.classList.contains('show')) {
+                        openDropdown.classList.remove('show');
+                    }
+                }
+            }
+        }
+        // --- END Notification Bell Functions ---
+
         document.addEventListener('DOMContentLoaded', function () {
+            // --- Notification Simulation (ADDED FOR CONSISTENCY) ---
+            const list = document.getElementById('notificationList');
+            const badge = document.getElementById('notificationBadge');
+
+            if (list && badge) {
+                // Simulate loading with 2 unread notifications (linking to relevant pages)
+                list.innerHTML = `
+                    <a href="farmer-apply_for_assistance.php" class="notification-item unread text-decoration-none text-dark">
+                        <p class="mb-1">Your loan application has been <strong>Approved</strong>!</p>
+                        <span class="text-muted small">5 minutes ago</span>
+                    </a>
+                    <a href="farmer-announcement.php" class="notification-item unread text-decoration-none text-dark">
+                        <p class="mb-1">New advisory on pest control for Rice crops.</p>
+                        <span class="text-muted small">2 hours ago</span>
+                    </a>
+                    <a href="farmer-claim_history.php" class="notification-item text-decoration-none text-dark">
+                        <p class="mb-1">Claim for Seed Subsidy is <strong>Ready</strong>.</p>
+                        <span class="text-muted small">Yesterday</span>
+                    </a>
+                `;
+                badge.textContent = 2; // Set count
+                badge.classList.remove('hidden'); // Show badge
+            }
+            // --- END Notification Simulation ---
+
             // --- Announcement Modal Logic (Existing) ---
             const announcementDetailModal = document.getElementById('announcementDetailModal');
             announcementDetailModal.addEventListener('show.bs.modal', function (event) {
@@ -594,6 +810,9 @@ $conn->close();
             function filterAnnouncements() {
                 const searchTerm = announcementSearch.value.toLowerCase();
                 const filterCategory = announcementFilter.value.toLowerCase(); // Ensure lowercase for comparison
+
+                // Re-select items in case of DOM manipulation if needed, but in this case, a static list is fine
+                announcementItems = announcementList.querySelectorAll('.announcement-item');
 
                 announcementItems.forEach(item => {
                     const title = item.querySelector('.card-title').textContent.toLowerCase();

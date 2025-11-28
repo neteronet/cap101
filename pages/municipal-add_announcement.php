@@ -1,6 +1,10 @@
 <?php
 session_start();
-include '../includes/connection.php'; // Ensure this path is correct
+
+// NOTE: Ensure the path to connection.php is correct based on your file structure.
+// If municipal-add_announcement.php is in 'municipal/' and connection.php is in 'includes/', 
+// then '../includes/connection.php' is correct.
+include '../includes/connection.php'; 
 
 // Redirect if user_id is not set or not an integer
 if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
@@ -8,109 +12,322 @@ if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
     exit();
 }
 
-// START: INSERT CODE for File Upload Handling
-$target_dir = "../uploads/announcements/"; // Define target directory relative to this script's location
-$uploaded_image_path = ""; // Initialize the variable for the uploaded file path
+$user_id = $_SESSION['user_id'];
+$display_name = 'Municipal User'; // Default fallback
 
-// Check for file upload before the main POST check
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES['announcementImages']) && $_FILES['announcementImages']['error'] == 0) {
-    
-    // Check if the uploads directory exists, if not, create it
-    if (!is_dir($target_dir)) {
-        mkdir($target_dir, 0777, true);
+// Fetch user name (optional, but good for display consistency)
+$stmt_name = $conn->prepare("SELECT name FROM users WHERE user_id = ?");
+if ($stmt_name) {
+    $stmt_name->bind_param("i", $user_id);
+    $stmt_name->execute();
+    $stmt_name->bind_result($db_name);
+    $stmt_name->fetch();
+    if ($db_name) {
+        $display_name = htmlspecialchars($db_name); // Sanitize immediately
     }
-    
-    $file_name = basename($_FILES["announcementImages"]["name"]);
-    // Create a unique file name using current timestamp and sanitizing the original name
-    $unique_file_name = time() . "_" . preg_replace("/[^A-Za-z0-9.]/", "_", $file_name); 
-    $target_file = $target_dir . $unique_file_name;
-    $imageFileType = strtolower(pathinfo($target_file, PATHINFO_EXTENSION));
-
-    // Simple file type validation
-    $uploadOk = 1;
-    if($imageFileType != "jpg" && $imageFileType != "png" && $imageFileType != "jpeg" && $imageFileType != "gif" ) {
-        $_SESSION['message'] = "Sorry, only JPG, JPEG, PNG & GIF files are allowed for the image.";
-        $_SESSION['message_type'] = "danger";
-        $uploadOk = 0;
-    }
-
-    if ($uploadOk == 1 && move_uploaded_file($_FILES["announcementImages"]["tmp_name"], $target_file)) {
-        // File successfully uploaded. Store the path relative to the site root for DB
-        $uploaded_image_path = "uploads/announcements/" . $unique_file_name; 
-    } else if ($uploadOk == 1) {
-        // Handle move error (if validation passed but move failed)
-        $_SESSION['message'] = "Sorry, there was an error uploading your file.";
-        $_SESSION['message_type'] = "danger";
-        // To prevent insertion, we can exit or set a flag, but for now, we let the logic flow.
-    }
+    $stmt_name->close();
+} else {
+    error_log("Failed to prepare statement for user name: " . $conn->error);
 }
-// END: INSERT CODE for File Upload Handling
 
+// Define available categories
+$categories = [
+    'advisory',
+    'program',
+    'alert',
+    'general',
+    'agriculture'
+];
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $title = $_POST['announcementTitle'];
-    $category = $_POST['announcementCategory'];
-    $content = $_POST['announcementContent'];
-    $image_url = $_POST['announcementImage']; // This line is kept but $_POST['announcementImage'] will be empty due to input type change
+// Define Max File Size (2MB in bytes)
+$max_file_size = 2 * 1024 * 1024;
 
-    // START: INSERT/APPEND line to use uploaded path
-    if (!empty($uploaded_image_path)) {
-        $image_url = $uploaded_image_path; // Overwrite $image_url with the file path
-    } else {
-         // If no file was uploaded, $image_url is empty string, which is fine for the optional field
-         $image_url = ''; 
-    }
-    // END: INSERT/APPEND line to use uploaded path
+// --- Handle Announcement Submission ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $title = trim($_POST['title'] ?? '');
+    $category = trim($_POST['category'] ?? '');
+    $content = trim($_POST['content'] ?? '');
+    
+    // RENAMED: $image_url changed to $photo_path
+    $photo_path = null; // Will store the path to the uploaded photo
 
-    // Prepare an insert statement (MODIFIED: changed column name from 'image_url' to 'images')
-    $stmt = $conn->prepare("INSERT INTO announcements (title, category, content, images, publish_date) VALUES (?, ?, ?, ?, NOW())");
-    $stmt->bind_param("ssss", $title, $category, $content, $image_url);
-
-    if ($stmt->execute()) {
-        $_SESSION['message'] = "Announcement published successfully!";
-        $_SESSION['message_type'] = "success";
-        // Redirect to prevent form resubmission
-        header("Location: municipal-add_announcement.php");
-        exit();
-    } else {
-        $_SESSION['message'] = "Error publishing announcement: " . $stmt->error;
+    // 1. Validation
+    if (empty($title) || empty($category) || empty($content)) {
+        $_SESSION['message'] = "Please fill in all required fields (Title, Category, Content).";
         $_SESSION['message_type'] = "danger";
-        header("Location: municipal-add_announcement.php");
-        exit();
-    }
+    } elseif (!in_array($category, $categories)) {
+        $_SESSION['message'] = "Invalid category selected.";
+        $_SESSION['message_type'] = "danger";
+    } else {
+        // Flag to check if we can proceed with DB insertion
+        $can_insert = true;
+        
+        // 2. Image Upload Handling
+        if (isset($_FILES['image']) && $_FILES['image']['error'] !== UPLOAD_ERR_NO_FILE) {
+            $file_info = $_FILES['image'];
+            
+            // Handle PHP upload errors
+            if ($file_info['error'] !== UPLOAD_ERR_OK) {
+                $error_msg = "Image upload failed. ";
+                switch ($file_info['error']) {
+                    case UPLOAD_ERR_INI_SIZE:
+                    case UPLOAD_ERR_FORM_SIZE:
+                        $error_msg .= "File is too large (check php.ini limits).";
+                        break;
+                    default:
+                        $error_msg .= "Unknown upload error (Code: " . $file_info['error'] . ").";
+                        break;
+                }
+                $_SESSION['message'] = $error_msg;
+                $_SESSION['message_type'] = "warning";
+                // CRITICAL: We still continue to DB insertion, but without photo_path set.
+            } else {
+                $file_tmp = $file_info['tmp_name'];
+                $file_name = $file_info['name'];
+                $file_size = $file_info['size'];
+                $file_ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
+                $allowed_ext = ['jpg', 'jpeg', 'png', 'gif'];
+                
+                // Define the upload directory relative to this script
+                $upload_dir = '../uploads/announcements/'; 
+                
+                // Max size check
+                if ($file_size > $max_file_size) {
+                    $_SESSION['message'] = "Image file is too large. Max file size is 2MB.";
+                    $_SESSION['message_type'] = "warning";
+                } elseif (!in_array($file_ext, $allowed_ext)) {
+                    $_SESSION['message'] = "Invalid image file type. Only JPG, JPEG, PNG, GIF are allowed.";
+                    $_SESSION['message_type'] = "warning"; 
+                } else {
+                    // Create the directory if it doesn't exist
+                    if (!is_dir($upload_dir)) {
+                        // Use error suppression and check result
+                        if (!@mkdir($upload_dir, 0777, true)) {
+                            error_log("Failed to create upload directory: " . $upload_dir . ". Check directory permissions.");
+                            $_SESSION['message'] = "Server configuration error: Cannot create upload directory. Ask administrator to check permissions.";
+                            $_SESSION['message_type'] = "danger";
+                            $can_insert = false; // Stop insertion if directory cannot be created
+                        }
+                    }
 
-    $stmt->close();
+                    if ($can_insert) {
+                        // Generate a unique file name
+                        $new_file_name = uniqid('announcement_', true) . '.' . $file_ext;
+                        $target_file = $upload_dir . $new_file_name;
+
+                        if (move_uploaded_file($file_tmp, $target_file)) {
+                            // Store the relative path for database storage
+                            // RENAMED: Storing path in $photo_path
+                            $photo_path = 'uploads/announcements/' . $new_file_name; 
+                        } else {
+                            // The most likely error: Permissions or path issue
+                            error_log("Failed to move uploaded file from {$file_tmp} to {$target_file}. Check file and directory permissions on {$upload_dir}.");
+                            $_SESSION['message'] = "Error uploading image file (Permissions/Path issue). Announcement published without image.";
+                            $_SESSION['message_type'] = "warning"; 
+                            // $photo_path remains null, continue to DB insertion
+                        }
+                    }
+                }
+            }
+        } // End of Image Handling
+
+        // 3. Database Insertion (Only proceed if basic validation passed and no critical error)
+        if ($can_insert) {
+            // NOTE: The DB schema uses `image`. This SQL query uses the correct column name `image`.
+            // The bind parameter will use the value from $photo_path.
+            $insert_sql = "INSERT INTO announcements (title, category, content, image, publish_date) VALUES (?, ?, ?, ?, NOW())";
+            
+            $stmt = $conn->prepare($insert_sql);
+
+            if ($stmt) {
+                // IMPORTANT FIX: Use an empty string '' if no photo was uploaded.
+                // RENAMED: Binding from $photo_path
+                $bind_image = $photo_path ?? ''; 
+                
+                // Bind parameters: title (s), category (s), content (s), image (s)
+                $stmt->bind_param("ssss", $title, $category, $content, $bind_image);
+
+                if ($stmt->execute()) {
+                    // Prepend message if an image warning was set
+                    $success_message = "Announcement <strong>" . htmlspecialchars($title) . "</strong> published successfully!";
+                    if (isset($_SESSION['message_type']) && $_SESSION['message_type'] === 'warning') {
+                        // Keep existing warning message and prepend success text
+                        $_SESSION['message'] = "WARNING: Image could not be uploaded, but the announcement was published. " . $_SESSION['message'];
+                    } else {
+                         $_SESSION['message'] = $success_message;
+                         $_SESSION['message_type'] = "success";
+                    }
+                    
+                    $stmt->close();
+                    $conn->close();
+                    header("Location: municipal-announcements.php");
+                    exit();
+                } else {
+                    // Log the database error
+                    error_log("DB Insert Error: " . $stmt->error);
+                    $_SESSION['message'] = "Database error: Failed to add announcement. " . $stmt->error;
+                    $_SESSION['message_type'] = "danger";
+                }
+                $stmt->close();
+            } else {
+                // Log the prepare statement error
+                error_log("Failed to prepare database statement: " . $conn->error);
+                $_SESSION['message'] = "Failed to prepare database statement: " . $conn->error;
+                $_SESSION['message_type'] = "danger";
+            }
+        }
+    }
+    
+    // Redirect on error/validation/non-critical image failure (POST-Redirect-GET)
+    header("Location: municipal-add_announcement.php");
+    exit();
 }
-$conn->close();
+
+// Close connection if it was not closed during successful POST redirect
+if (isset($conn)) {
+    $conn->close();
+}
+
+// Re-fetch message to display
+$message = $_SESSION['message'] ?? null;
+$message_type = $_SESSION['message_type'] ?? null;
+unset($_SESSION['message']);
+unset($_SESSION['message_type']);
+
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
-
+<!-- HTML remains the same -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Municipal Agri - Add Announcement</title>
+    <title>Municipal Account - Add Announcement</title>
+
     <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet" />
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Google Fonts (Updated for Consistency) -->
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <!-- Font Awesome for Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
-    <!-- Custom Styles (re-use from municipal-announcement.php, or link a shared CSS file) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+    <!-- Custom Styles (Matching municipal-announcements.php) -->
     <style>
+        /* CSS styles remain the same */
         body {
+            /* MODIFIED: Changed font-family to Poppins for body/content text */
             font-family: "Poppins", sans-serif;
             background: #f8f9fa;
             font-size: 16px;
             line-height: 1.6;
-            color: #333;
+            color: #212529;
             margin: 0;
         }
 
-        .card-header-custom {
+        /* --- Sidebar Styles (CONSISTENT WITH FARMER DASHBOARD) --- */
+        .sidebar {
+            position: fixed;
             top: 0;
             left: 0;
+            width: 250px;
+            height: 100vh;
+            background: #19860f;
+            padding: 1rem 0;
+            overflow-y: auto;
+            font-size: 14px;
+            z-index: 1050;
+            border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            transition: left 0.3s ease;
+            font-family: "Be Vietnam Pro", sans-serif;
+        }
+        
+        .sidebar.collapsed {
+            left: -250px;
+        }
+        
+        .sidebar-menu-label {
+            color: rgba(255, 255, 255, 0.7);
+            padding: 0 1rem 0.5rem 1rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .sidebar .nav-link {
+            color: #fff;
+            padding: 0.6rem 1rem;
+            width: 100%;
+            box-sizing: border-box;
+            border-radius: 0;
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+        }
+
+        .sidebar .nav-link i {
+            margin-right: 8px;
+            font-size: 1rem;
+        }
+
+        .sidebar .nav-link.active {
+            background-color: #fff;
+            color: #19860f;
+            font-weight: 600;
+        }
+
+        .sidebar .nav-link:hover:not(.active) {
+            background-color: #146c0b;
+            color: #fff;
+        }
+
+        .sidebar .header-brand {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: flex-start;
+            text-decoration: none;
+            margin-bottom: 2rem;
+            padding: 0 1rem;
+        }
+
+        .sidebar .header-brand img {
+            width: auto;
+            max-width: 40px;
+            height: auto;
+            background: #19860f;
+            padding: 2px;
+            border-radius: 4px;
+        }
+
+        .sidebar .header-brand div {
+            font-size: 18px;
+            font-weight: 700;
+            color: #fff;
+            margin-top: 0;
+            margin-left: 8px;
+        }
+        
+        .sidebar .nav {
+            flex: 1;
+            margin: 0;
+            padding: 0;
+        }
+
+        .sidebar .sidebar-logout {
+            margin-top: auto;
+            padding-top: 0.3rem;
+            padding-bottom: 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* --- Fixed Top Header (CONSISTENT WITH FARMER DASHBOARD) --- */
+        .card-header-custom {
+            position: fixed;
+            top: 0;
+            left: 250px;
             right: 0;
             height: 56px;
             background-color: #fff;
@@ -120,171 +337,198 @@ $conn->close();
             font-size: 1rem;
             display: flex;
             align-items: center;
-            justify-content: flex-start;
-            /* Align header content to the left */
+            justify-content: space-between;
             z-index: 1060;
             border-bottom: 1px solid #ddd;
+            transition: left 0.3s ease;
+            font-family: "Be Vietnam Pro", sans-serif;
         }
 
-        .header-brand span {
-            font-size: 1rem;
-            font-weight: 600;
-            color: #19860f;
+        .card-header-custom.collapsed {
+            left: 0;
         }
 
-        /* Original btn-sm-custom (no longer used for back button, but kept if other elements use it) */
-        .btn-sm-custom {
-            padding: 6px 14px;
-            font-size: 14px;
-            border-radius: 4px;
-            background-color: #6c757d;
-            color: #fff;
-            border: none;
-            transition: background-color 0.2s ease;
+        #sidebarToggleBtn {
+            color: #0f5132; /* Darker green */
         }
 
-        .btn-sm-custom:hover {
-            background-color: #5a6268;
-            color: #fff;
+        #sidebarToggleBtn:hover {
+            color: #146c0b;
         }
 
+        /* --- Main Content Area --- */
+        main {
+            margin-left: 250px;
+            padding: 72px 2rem 2rem 2rem; /* Adjusted top padding for fixed header */
+            background: #f8f9fa;
+            min-height: 100vh;
+            transition: margin-left 0.3s ease;
+        }
+
+        main.collapsed {
+            margin-left: 0;
+        }
+        
+        /* 5. Typography Consistency: Headings */
+        h1, h2, h3, h4, h5, h6, .card-title, .modal-title, .page-title {
+            font-family: "Be Vietnam Pro", sans-serif;
+            color: #0f5132; /* Dark Green */
+        }
+        
+        /* NEW: Style for the Page Title */
+        .page-title {
+            font-size: 1.5rem; 
+            font-weight: 600; 
+            margin-bottom: 0.5rem;
+        }
+
+        .dashboard-description {
+            font-size: 0.875rem; /* 14px */
+        }
+
+        /* NEW: Explicit Card Title Size for Consistency */
+        .card-title {
+            font-size: 1.25rem; 
+            font-weight: 600; 
+        }
+
+        /* NEW: Explicit Standard Card Text Size for Consistency (0.9375rem = 15px) */
+        .card-text, .card-body p:not(.card-title), .list-unstyled li, .form-control, .form-select {
+            font-size: 0.9375rem; 
+        }
+
+        /* 2. Button and Alert Unification: Button Theme */
         .btn-theme {
             background-color: #19860f;
             color: #fff;
-            font-size: 15px;
-            padding: 10px 20px;
-            /* This defines the desired size */
-            border-radius: 4px;
-            border: none;
-            transition: all 0.3s ease;
+            border-color: #19860f;
+            font-family: "Be Vietnam Pro", sans-serif;
+            font-size: 0.9375rem; /* 15px */
+            padding: 8px 15px; /* Consistent padding */
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            border-radius: 0.25rem;
         }
 
         .btn-theme:hover {
             background-color: #146c0b;
+            border-color: #146c0b;
             color: #fff;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
-
-        /* New class for the back button, based on btn-theme but with different color */
-        .btn-back-theme {
-            background-color: #6c757d;
-            /* Bootstrap secondary gray */
-        }
-
-        .btn-back-theme:hover {
-            background-color: #5a6268;
-            /* Darker gray on hover */
-            color: #fff;
-            /* Ensure text color remains white on hover */
-        }
-
-
-        main {
-            padding: 1rem 2rem 2rem 2rem;
-            padding-top: 22px;
-            background: #f8f9fa;
-            min-height: 100vh;
-        }
-
-        .container-fluid {
-            max-width: 1200px;
-        }
-
-        .page-title {
-            font-size: 1.8rem;
-            font-weight: 600;
-            color: #19860f;
-            margin-bottom: 1rem;
-        }
-
-        /* Adjust margin for the button group at the top */
-        .title-and-button-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
-            /* Space between title/button and the form */
-        }
-
-        .title-and-button-row .page-title {
-            margin-bottom: 0;
-            /* Remove bottom margin from title when in flex row */
-        }
-
+        
         .card {
             border-radius: 0.5rem;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
             margin-bottom: 1rem;
+            border: 1px solid #ddd;
         }
-
-        .card-title {
-            color: #19860f;
-            font-size: 1.25rem;
-            margin-bottom: 0.75rem;
+        
+        .form-label {
+            font-weight: 600;
+            color: #0f5132;
+        }
+        
+        .form-control, .form-select {
+            border-radius: 0.25rem;
+            padding: 0.5rem 0.75rem;
         }
     </style>
 </head>
 
 <body>
-    <!-- Main Content -->
+    <!-- Sidebar (CONSISTENT DESIGN) -->
+    <nav class="sidebar">
+        <!-- Logo and Text (Consistent with farmer-dashboard.php) -->
+        <a href="municipal-dashboard.php" class="header-brand">
+            <img src="../photos/logo.png" alt="Department of Agriculture Logo" />
+            <div>Agriconnect</div>
+        </a>
+        
+        <!-- Menu Label (Consistent) -->
+        <div class="sidebar-menu-label">Main Menu</div>
+
+        <ul class="nav flex-column">
+            <li class="nav-item"><a href="municipal-dashboard.php" class="nav-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+            <li class="nav-item"><a href="municipal-subsidy_management.php" class="nav-link"><i class="fas fa-hand-holding-usd"></i> Subsidy Management</a></li>
+            <li class="nav-item"><a href="municipal-qrcode_management.php" class="nav-link"><i class="fas fa-qrcode"></i> QR Code Management</a></li>
+            <li class="nav-item"><a href="municipal-crop_monitoring.php" class="nav-link"><i class="fas fa-seedling"></i> Crop Monitoring</a></li>
+            <li class="nav-item"><a href="municipal-reports_analytics.php" class="nav-link"><i class="fas fa-chart-line"></i> Reports & Analytics</a></li>
+            <li class="nav-item"><a href="municipal-farmer_profiles.php" class="nav-link"><i class="fas fa-users"></i> Farmer Profiles</a></li>
+            <li class="nav-item"><a href="municipal-announcements.php" class="nav-link active"><i class="fas fa-bullhorn"></i> Announcements</a></li>
+        </ul>
+        
+        <!-- Logout Section (Consistent) -->
+        <div class="sidebar-logout">
+            <a href="municipal-logout.php" class="nav-link">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
+    </nav>
+
+    <!-- Header (CONSISTENT DESIGN - MATCHING FARMER DASHBOARD) -->
+    <div class="card-header card-header-custom d-flex justify-content-between align-items-center">
+        <!-- Sidebar Toggle Button (Consistent) -->
+        <button id="sidebarToggleBtn" class="btn btn-link p-0 text-dark" title="Toggle Sidebar" style="font-size: 1.5rem;">
+            <i class="fas fa-bars"></i>
+        </button>
+        <!-- Greeting -->
+        <span class="me-3">Hi, <strong><?php echo htmlspecialchars($display_name); ?></strong></span>
+    </div>
+
+    <!-- Main Content (UPDATED PADDING/MARGIN) -->
     <main>
         <div class="container-fluid">
-            <!-- New row for title and back button -->
-            <div class="title-and-button-row">
-                <h1 class="page-title"><i class="fas fa-bullhorn me-3"></i>Create New Announcement</h1>
-                <!-- Changed classes here -->
-                <button type="button" class="btn btn-theme btn-back-theme" onclick="location.href='municipal-announcements.php'">
-                    <i class="fas fa-arrow-left me-2"></i>Back to Announcements
-                </button>
-            </div>
-
-            <p class="text-muted mb-4">
-                Fill out the form below to publish a new announcement for farmers.
+            <!-- Page Title and Description (Consistent Typography) -->
+            <h1 class="page-title">Create New Announcement</h1>
+            <p class="text-muted mb-4 dashboard-description">
+                Fill in the details below to publish a new announcement for the community.
             </p>
 
-            <?php if (isset($_SESSION['message'])): ?>
-                <div class="alert alert-<?php echo $_SESSION['message_type']; ?> alert-dismissible fade show" role="alert">
-                    <?php echo $_SESSION['message']; ?>
+            <?php if ($message): ?>
+                <div class="alert alert-<?php echo $message_type; ?> alert-dismissible fade show" role="alert">
+                    <?php echo $message; ?>
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
-                <?php
-                unset($_SESSION['message']);
-                unset($_SESSION['message_type']);
-                ?>
             <?php endif; ?>
 
             <div class="card mb-4">
                 <div class="card-body">
-                    <h5 class="card-title mb-4">Announcement Details</h5>
-                    <!-- MODIFIED: Added enctype for file uploads -->
-                    <form id="newAnnouncementForm" method="POST" action="" enctype="multipart/form-data">
+                    <!-- enctype="multipart/form-data" is required for file uploads -->
+                    <form method="POST" enctype="multipart/form-data" action="municipal-add_announcement.php">
+                        
                         <div class="mb-3">
-                            <label for="announcementTitle" class="form-label">Title <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="announcementTitle" name="announcementTitle" required>
+                            <label for="title" class="form-label">Announcement Title <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="title" name="title" required maxlength="255">
                         </div>
+
                         <div class="mb-3">
-                            <label for="announcementCategory" class="form-label">Category <span class="text-danger">*</span></label>
-                            <select class="form-select" id="announcementCategory" name="announcementCategory" required>
-                                <option value="">Select Category...</option>
-                                <option value="Advisory">Advisory</option>
-                                <option value="Program">Program</option>
-                                <option value="Alert">Alert</option>
-                                <option value="General">General Updates</option>
+                            <label for="category" class="form-label">Category <span class="text-danger">*</span></label>
+                            <select class="form-select" id="category" name="category" required>
+                                <option value="" disabled selected>Select a category</option>
+                                <?php foreach ($categories as $cat): ?>
+                                    <option value="<?php echo htmlspecialchars($cat); ?>"><?php echo ucwords($cat); ?></option>
+                                <?php endforeach; ?>
                             </select>
                         </div>
+
                         <div class="mb-3">
-                            <label for="announcementContent" class="form-label">Content <span class="text-danger">*</span></label>
-                            <textarea class="form-control" id="announcementContent" name="announcementContent" rows="8" required></textarea>
+                            <label for="content" class="form-label">Content <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="content" name="content" rows="8" required></textarea>
                         </div>
-                        <!-- MODIFIED: Changed input type and name for file upload, and updated label text -->
-                        <div class="mb-3">
-                            <label for="announcementImage" class="form-label">Add Image (Optional)</label>
-                            <input type="file" class="form-control" id="announcementImage" name="announcementImages" accept="image/*">
-                            <small class="form-text text-muted">Select an image file to include with your announcement.</small>
+                        
+                        <div class="mb-4">
+                            <!-- Input name is 'image' to match the $_FILES['image'] access -->
+                            <label for="image" class="form-label">Image Upload (Optional)</label>
+                            <input type="file" class="form-control" id="image" name="image" accept="image/jpeg,image/png,image/gif">
+                            <div class="form-text">Max file size 2MB. Only JPG, PNG, GIF allowed.</div>
                         </div>
+
                         <div class="d-flex justify-content-end">
-                            <button type="submit" class="btn btn-theme"><i class="fas fa-paper-plane me-2"></i>Publish Announcement</button>
+                            <a href="municipal-announcements.php" class="btn btn-secondary me-2">Cancel</a>
+                            <button type="submit" class="btn btn-theme">
+                                <i class="fas fa-bullhorn me-2"></i> Publish Announcement
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -294,6 +538,47 @@ $conn->close();
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Sidebar Toggle Logic (Consistent with municipal-announcements.php)
+            const sidebar = document.querySelector('.sidebar');
+            const mainContent = document.querySelector('main');
+            const header = document.querySelector('.card-header-custom');
+            const toggleBtn = document.getElementById('sidebarToggleBtn');
+            
+            function collapseSidebar() {
+                sidebar.classList.add('collapsed');
+                mainContent.classList.add('collapsed');
+                header.classList.add('collapsed');
+                localStorage.setItem('sidebarCollapsed', 'true'); // Save state
+            }
+
+            function openSidebar() {
+                sidebar.classList.remove('collapsed');
+                mainContent.classList.remove('collapsed');
+                header.classList.remove('collapsed');
+                localStorage.setItem('sidebarCollapsed', 'false'); // Save state
+            }
+
+            // Apply saved state on page load
+            const isCollapsed = localStorage.getItem('sidebarCollapsed');
+            if (isCollapsed === 'true') {
+                // Apply collapsed state without saving back to localStorage
+                sidebar.classList.add('collapsed');
+                mainContent.classList.add('collapsed');
+                header.classList.add('collapsed');
+            } 
+
+            // Toggle button functionality
+            toggleBtn.addEventListener('click', function() {
+                if (sidebar.classList.contains('collapsed')) {
+                    openSidebar();
+                } else {
+                    collapseSidebar();
+                }
+            });
+        });
+    </script>
 </body>
 
-</html>
+</html>     

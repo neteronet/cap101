@@ -143,7 +143,32 @@ if ($category_filter !== 'all') {
     $param_types .= "s";
 }
 
-$sql = "SELECT id, title, category, content, image_url, publish_date, 'Published' AS status
+// *** MODIFICATION 1: Try both 'image_url' and 'image' columns for compatibility ***
+// First, check which column exists in the database
+$image_column = 'image_url'; // Default
+try {
+    $check_column = $conn->query("SHOW COLUMNS FROM announcements LIKE 'image%'");
+    if ($check_column && $check_column->num_rows > 0) {
+        $columns = [];
+        while ($col = $check_column->fetch_assoc()) {
+            $columns[] = $col['Field'];
+        }
+        // Prefer 'image_url' if it exists, otherwise use 'image'
+        if (in_array('image_url', $columns)) {
+            $image_column = 'image_url';
+        } elseif (in_array('image', $columns)) {
+            $image_column = 'image';
+        }
+    } else {
+        // If no image column found, log warning but continue
+        error_log("WARNING: No image column found in announcements table. Using default 'image_url'.");
+    }
+} catch (Exception $e) {
+    // If query fails, log error and use default
+    error_log("ERROR checking image column: " . $e->getMessage() . ". Using default 'image_url'.");
+}
+
+$sql = "SELECT id, title, category, content, {$image_column} as image_path, publish_date, 'Published' AS status
         FROM announcements " . $where_sql . "
         ORDER BY publish_date DESC
         LIMIT ?, ?";
@@ -163,23 +188,66 @@ if ($stmt) {
         $stmt->bind_param($param_types, ...$params);
     }
 
-    $stmt->execute();
-    $result = $stmt->get_result();
+    if ($stmt->execute()) {
+        $result = $stmt->get_result();
 
-    if ($result->num_rows > 0) {
-        while ($row = $result->fetch_assoc()) {
-            // Ensure status is always 'Published' as per your database schema context implies
-            $row['status'] = 'Published';
-            $announcements[] = $row;
+        if ($result && $result->num_rows > 0) {
+            while ($row = $result->fetch_assoc()) {
+                // Ensure status is always 'Published' as per your database schema context implies
+                $row['status'] = 'Published';
+                $announcements[] = $row;
+            }
         }
+        $stmt->close();
+    } else {
+        // Log execution error
+        error_log("Error executing announcements query: " . $stmt->error);
+        if (!isset($_SESSION['message'])) {
+            $_SESSION['message'] = "Database error: Unable to fetch announcements. Error: " . htmlspecialchars($stmt->error);
+            $_SESSION['message_type'] = "danger";
+        }
+        $stmt->close();
     }
-    $stmt->close();
 } else {
     error_log("Error fetching announcements: " . $conn->error);
-    // Optionally, display a user-friendly message
+    // Set error message for user notification
+    if (!isset($_SESSION['message'])) {
+        $_SESSION['message'] = "Database error: Unable to fetch announcements. Please contact the administrator.";
+        $_SESSION['message_type'] = "danger";
+    }
 }
 
 $conn->close(); // Close the connection ONLY AFTER all queries are done
+
+// Helper function to fix image path for display
+function getImagePath($image_path) {
+    if (empty($image_path) || $image_path === 'null' || $image_path === '') {
+        return null;
+    }
+    
+    // If path already starts with http:// or https://, return as is
+    if (preg_match('/^https?:\/\//', $image_path)) {
+        return $image_path;
+    }
+    
+    // If path already starts with ../, return as is
+    if (strpos($image_path, '../') === 0) {
+        return $image_path;
+    }
+    
+    // If path starts with uploads/, add ../ prefix
+    if (strpos($image_path, 'uploads/') === 0) {
+        return '../' . $image_path;
+    }
+    
+    // If path starts with /, it's absolute, return as is
+    if (strpos($image_path, '/') === 0) {
+        return $image_path;
+    }
+    
+    // Default: assume it's relative to uploads folder
+    return '../uploads/announcements/' . $image_path;
+}
 ?>
 
 <!DOCTYPE html>
@@ -440,7 +508,7 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
             font-family: "Be Vietnam Pro", sans-serif; /* Consistent font */
             margin-left: 5px; /* Added spacing */
         }
-
+        
         /* Action Buttons - Consistency */
         .btn-info, .btn-primary, .btn-danger, .btn-warning {
             font-family: "Be Vietnam Pro", sans-serif;
@@ -641,8 +709,11 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
                             <?php foreach ($announcements as $announcement): ?>
                                 <div class="announcement-item">
                                     <div class="announcement-image-container">
-                                        <?php if (!empty($announcement['image_url']) && $announcement['image_url'] !== 'null'): ?>
-                                            <img src="<?php echo htmlspecialchars($announcement['image_url']); ?>" alt="Announcement Image">
+                                        <?php 
+                                        // *** MODIFICATION 2: Use helper function to fix image path ***
+                                        $image_path = getImagePath($announcement['image_path'] ?? '');
+                                        if ($image_path): ?>
+                                            <img src="<?php echo htmlspecialchars($image_path); ?>" alt="Announcement Image" onerror="this.parentElement.innerHTML='<span class=\'no-image-placeholder\'>Image Not Found</span>'">
                                         <?php else: ?>
                                             <span class="no-image-placeholder">No Image</span>
                                         <?php endif; ?>
@@ -678,7 +749,7 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
                                                 data-title="<?php echo htmlspecialchars($announcement['title']); ?>"
                                                 data-date="<?php echo date('M d, Y', strtotime($announcement['publish_date'])); ?>"
                                                 data-category="<?php echo htmlspecialchars($announcement['category']); ?>"
-                                                data-image="<?php echo htmlspecialchars($announcement['image_url']); ?>"
+                                                data-image="<?php echo htmlspecialchars($image_path ?? ''); ?>"
                                                 data-content="<?php echo htmlspecialchars($announcement['content']); ?>"
                                                 title="View Details">
                                                 <i class="fas fa-eye"></i> View
@@ -840,7 +911,7 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
                 const title = button.getAttribute('data-title');
                 const date = button.getAttribute('data-date');
                 const category = button.getAttribute('data-category');
-                const image = button.getAttribute('data-image');
+                const image = button.getAttribute('data-image'); // This now correctly uses 'image'
                 const content = button.getAttribute('data-content');
 
                 const modalTitle = announcementDetailModal.querySelector('#modalAnnouncementTitle');
@@ -871,11 +942,18 @@ $conn->close(); // Close the connection ONLY AFTER all queries are done
                 
                 modalContent.textContent = content;
 
-                if (image && image !== 'null' && image !== '') {
+                // Handle image display with error handling
+                if (image && image !== 'null' && image !== '' && image.trim() !== '') {
                     modalImage.src = image;
                     modalImage.classList.remove('d-none');
+                    // Add error handler for broken images
+                    modalImage.onerror = function() {
+                        this.classList.add('d-none');
+                        console.warn('Failed to load image: ' + image);
+                    };
                 } else {
                     modalImage.classList.add('d-none');
+                    modalImage.src = ''; // Clear src to prevent loading attempts
                 }
             });
 

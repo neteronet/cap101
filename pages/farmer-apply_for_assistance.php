@@ -236,6 +236,9 @@ if ($conn && $conn->ping()) {
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
     
+    <!-- Notification Bell Component (FROM DASHBOARD CODE) -->
+    <?php include '../includes/notification_bell.php'; ?>
+    
     <style>
         /* --- START OF CONSISTENT DESIGN STYLES (COPIED FROM DASHBOARD) --- */
         body {
@@ -248,7 +251,7 @@ if ($conn && $conn->ping()) {
             margin: 0;
         }
 
-        /* --- Sidebar Styles --- */
+        /* --- Sidebar Styles (FROM DASHBOARD) --- */
         .sidebar {
             position: fixed;
             top: 0;
@@ -265,7 +268,7 @@ if ($conn && $conn->ping()) {
             flex-direction: column;
             transition: left 0.3s ease;
             /* MODIFIED: Explicitly set sidebar font to Be Vietnam Pro for UI/Nav consistency */
-            font-family: "Be Vietnam Pro", sans-serif; 
+            font-family: "Be Vietnam Pro", sans-serif;
         }
 
         .sidebar-menu-label {
@@ -320,7 +323,7 @@ if ($conn && $conn->ping()) {
             color: #fff;
         }
         
-        /* MODIFIED: Header Brand (Logo and Text) */
+        /* MODIFIED: Header Brand (Logo and Text) - FROM DASHBOARD */
         .sidebar .header-brand {
             display: flex;
             flex-direction: row;
@@ -356,7 +359,7 @@ if ($conn && $conn->ping()) {
             border-top: 1px solid rgba(255, 255, 255, 0.2);
         }
 
-        /* --- Fixed Top Header --- */
+        /* --- Fixed Top Header (FROM DASHBOARD) --- */
         .card-header-custom {
             position: fixed;
             top: 0;
@@ -390,7 +393,7 @@ if ($conn && $conn->ping()) {
             color: #146c0b;
         }
 
-        /* --- Main Content Area --- */
+        /* --- Main Content Area (FROM DASHBOARD) --- */
         main {
             margin-left: 250px;
             padding: 72px 2rem 2rem 2rem;
@@ -408,7 +411,16 @@ if ($conn && $conn->ping()) {
             display: none; 
         }
 
-        /* --- Theme Buttons/Colors (from Dashboard) --- */
+        /* 1. Color Palette Standardization: Links */
+        a {
+            color: #19860f;
+        }
+
+        a:hover {
+            color: #146c0b;
+        }
+        
+        /* --- Theme Buttons/Colors (FROM DASHBOARD) --- */
         .btn-theme {
             background-color: #19860f;
             color: #fff;
@@ -428,7 +440,25 @@ if ($conn && $conn->ping()) {
             border: 1px solid #146c0b;
         }
 
-        /* --- Typography Consistency: Headings and Titles (from Dashboard) --- */
+        /* 2. Button and Alert Unification: Outline Button Theme */
+        .btn-outline-theme {
+            color: #19860f;
+            border-color: #19860f;
+            font-family: "Be Vietnam Pro", sans-serif;
+        }
+
+        .btn-outline-theme:hover,
+        .btn-outline-theme:active {
+            background-color: #146c0b;
+            color: #fff;
+            border-color: #146c0b;
+        }
+
+        .btn-outline-theme:focus {
+            box-shadow: 0 0 0 0.25rem rgba(25, 134, 15, 0.5);
+        }
+
+        /* --- Typography Consistency: Headings and Titles (FROM DASHBOARD) --- */
         h1,
         h2,
         h3,
@@ -443,9 +473,9 @@ if ($conn && $conn->ping()) {
         
         /* MODIFIED: Page Title size/color to match Dashboard */
         .page-title {
-            font-size: 1.5rem; /* Changed from 1.8rem to 1.5rem */
+            font-size: 1.5rem; 
             font-weight: 600;
-            color: #0f5132; /* Changed from #19860f to #0f5132 */
+            color: #0f5132; 
             margin-bottom: 1rem;
             display: flex;
             align-items: center;
@@ -486,14 +516,41 @@ if ($conn && $conn->ping()) {
             font-size: 0.9375rem;
         }
         
-        /* --- Utility & Component Styles --- */
+        /* --- Utility & Component Styles (FROM DASHBOARD) --- */
         .card {
             border-radius: 0.5rem;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
             margin-bottom: 1.5rem;
-            border: 1px solid #ddd; /* Added border for consistency */
+            border: 1px solid #ddd;
         }
 
+        /* Custom status badge classes */
+        .status-badge {
+            padding: 0.3em 0.6em;
+            border-radius: 0.4rem;
+            font-size: 13px;
+            font-weight: 500;
+            display: inline-block;
+            font-family: "Be Vietnam Pro", sans-serif;
+        }
+
+        /* Re-mapping status badges to Bootstrap colors for theme consistency */
+        .status-pending {
+            background-color: #ffc107 !important; /* Warning */
+            color: #664d03 !important;
+        }
+
+        .status-approved {
+            background-color: #198754 !important; /* Success */
+            color: #fff !important;
+        }
+
+        .status-rejected {
+            background-color: #dc3545 !important; /* Danger */
+            color: #fff !important;
+        }
+
+        /* --- Custom Styles unique to this page (RETAINED) --- */
         .qr-code {
             text-align: center;
             margin-top: 1rem;
@@ -519,7 +576,8 @@ if ($conn && $conn->ping()) {
             margin-bottom: 1.5rem;
             display: flex;
             align-items: center;
-            font-size: 0.9375rem; /* Changed from 0.95rem to 0.9375rem for 15px consistency */
+            font-size: 0.9375rem;
+            font-family: "Poppins", sans-serif; /* Use content font for alert message */
         }
 
         .alert-info-custom i {
@@ -534,21 +592,154 @@ if ($conn && $conn->ping()) {
             margin-bottom: 0.5rem;
             display: flex;
             align-items: center;
-            /* Inherits Poppins from body and font-size from new addition */
+            /* Inherits Poppins/font-size from new addition */
         }
 
         .form-label i {
             margin-right: 8px;
             color: #19860f;
         }
-        /* --- END OF CONSISTENT DESIGN STYLES --- */
+        /* --- END Custom Styles unique to this page --- */
+
+        /* ----------------------------------------------------------- */
+        /* --- Notification Bell Styling for Consistency (FROM DASHBOARD) --- */
+        /* ----------------------------------------------------------- */
+        .notification-bell-container {
+            position: relative;
+            display: inline-block;
+        }
+
+        .notification-bell {
+            color: #0f5132;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.25rem; 
+            padding: 0;
+            line-height: 1;
+            transition: color 0.2s ease;
+        }
+
+        .notification-bell:hover {
+            color: #146c0b; 
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -5px;
+            right: -10px;
+            padding: 0.15em 0.45em;
+            border-radius: 50%;
+            background-color: #dc3545; 
+            color: white;
+            font-size: 0.6rem;
+            line-height: 1;
+            min-width: 18px;
+            text-align: center;
+            font-family: "Be Vietnam Pro", sans-serif;
+        }
+
+        .notification-badge.hidden {
+            display: none;
+        }
+
+        .notification-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            width: 320px;
+            background-color: #fff;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            border-radius: 0.5rem;
+            margin-top: 8px;
+            z-index: 1070;
+            display: none;
+            font-family: "Be Vietnam Pro", sans-serif;
+            font-size: 0.875rem; 
+        }
+
+        .notification-dropdown.show {
+            display: block;
+        }
+
+        .notification-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #eee;
+            /* Changed background-color from Dashboard to inherit for a cleaner look */
+        }
+
+        .notification-header h6 {
+            margin: 0;
+            font-size: 1rem;
+            color: #fff; 
+            font-weight: 600;
+        }
+
+        .mark-all-read {
+            color: #19860f; 
+            background: none;
+            border: none;
+            font-size: 0.75rem;
+            cursor: pointer;
+            padding: 0;
+            text-decoration: underline;
+        }
+
+        .mark-all-read:hover {
+            color: #146c0b; 
+        }
+
+        .notification-list {
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 0; 
+        }
+
+        .notification-item {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #f8f9fa; 
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .notification-item:hover {
+            background-color: #f1f1f1;
+        }
+
+        .notification-item.unread {
+            background-color: #f7fff6; 
+            border-left: 3px solid #19860f; 
+            padding-left: calc(1rem - 3px); 
+            font-weight: 500;
+        }
+
+        .notification-item.unread p {
+            color: #0f5132; 
+        }
+
+        .notification-item p {
+            margin: 0;
+            line-height: 1.4;
+        }
+
+        .notification-item strong {
+            font-weight: 600;
+        }
+
+        .notification-item:last-child {
+            border-bottom: none;
+        }
+        /* --- END Notification Bell Styling --- */
     </style>
 
 
 </head>
 
 <body>
-    <!-- Sidebar (UPDATED STRUCTURE) -->
+    <!-- Sidebar (FROM DASHBOARD) -->
     <nav class="sidebar">
         <!-- New Header Brand (Logo and Text) -->
         <a href="ProvincialAgriHome.html" class="header-brand">
@@ -576,15 +767,34 @@ if ($conn && $conn->ping()) {
         </div>
     </nav>
 
-    <!-- Header (UPDATED STRUCTURE) -->
+    <!-- Header (FROM DASHBOARD) -->
     <div class="card-header card-header-custom d-flex justify-content-between align-items-center">
         <!-- New Toggle Button -->
         <button id="sidebarToggleBtn" class="btn btn-link p-0 text-dark" title="Toggle Sidebar" style="font-size: 1.5rem;">
             <i class="fas fa-bars"></i>
         </button>
-        <!-- User Info -->
-        <span class="me-3">Hi, <strong><?php echo $display_name; ?></strong></span>
-        <!-- Old logout button removed, moved to sidebar -->
+        <!-- Right side alignment wrapper -->
+        <div class="d-flex align-items-center">
+            <!-- Greeting (Consistent) -->
+            <span class="me-3">Hi, <strong><?php echo htmlspecialchars($display_name); ?></strong></span>
+
+            <!-- Notification Bell (FROM DASHBOARD CODE) -->
+            <div class="notification-bell-container me-3">
+                <button class="notification-bell" id="notificationBell" onclick="toggleNotificationDropdown()">
+                    <i class="fas fa-bell"></i>
+                    <span class="notification-badge hidden" id="notificationBadge">0</span>
+                </button>
+                <div class="notification-dropdown" id="notificationDropdown">
+                    <div class="notification-header">
+                        <h6><i class="fas fa-bell me-2"></i>Notifications</h6>
+                        <button class="mark-all-read" onclick="markAllAsRead()">Mark all as read</button>
+                    </div>
+                    <div class="notification-list" id="notificationList">
+                        <div class="notification-loading">Loading notifications...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Main Content Area -->
@@ -773,7 +983,7 @@ if ($conn && $conn->ping()) {
     <!-- Bootstrap JS and Custom Script -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Function for QR Code Download (used in Template 1)
+        // Function for QR Code Download (used in Template 1) - RETAINED
         function downloadQRCode(qrData, farmerId) {
             const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${qrData}&size=400x400`;
             const link = document.createElement('a');
@@ -783,9 +993,77 @@ if ($conn && $conn->ping()) {
             link.click();
             document.body.removeChild(link);
         }
+        
+        // --- START NOTIFICATION BELL FUNCTIONS (FROM DASHBOARD) ---
+        function toggleNotificationDropdown() {
+            document.getElementById('notificationDropdown').classList.toggle('show');
+            // Basic logic to hide the badge on open (in a real app, this would be an API call)
+            document.getElementById('notificationBadge').classList.add('hidden');
+        }
 
-        // Function for Dynamic Form Fields (used in Template 3)
+        // Close the dropdown if the user clicks outside of it
+        window.onclick = function(event) {
+            if (!event.target.matches('.notification-bell-container') && !event.target.closest('.notification-bell-container')) {
+                var dropdowns = document.getElementsByClassName("notification-dropdown");
+                for (var i = 0; i < dropdowns.length; i++) {
+                    var openDropdown = dropdowns[i];
+                    if (openDropdown.classList.contains('show')) {
+                        openDropdown.classList.remove('show');
+                    }
+                }
+            }
+        }
+        
+        function markAllAsRead() {
+            // Placeholder for real logic (e.g., AJAX call)
+            console.log("Marked all notifications as read.");
+            document.getElementById('notificationList').innerHTML = '<div class="notification-item text-center text-muted small py-2">No new notifications.</div>';
+        }
+        // --- END NOTIFICATION BELL FUNCTIONS ---
+        
+        // JavaScript to toggle sidebar collapse and preserve state using localStorage (FROM DASHBOARD)
+        const sidebar = document.querySelector('.sidebar');
+        const mainContent = document.querySelector('main');
+        const header = document.querySelector('.card-header-custom');
+        const toggleBtn = document.getElementById('sidebarToggleBtn');
+
+        function collapseSidebar() {
+            sidebar.classList.add('collapsed');
+            mainContent.classList.add('collapsed');
+            header.classList.add('collapsed');
+            localStorage.setItem('sidebarCollapsed', 'true'); // Save state
+        }
+
+        function openSidebar() {
+            sidebar.classList.remove('collapsed');
+            mainContent.classList.remove('collapsed');
+            header.classList.remove('collapsed');
+            localStorage.setItem('sidebarCollapsed', 'false'); // Save state
+        }
+
+        // Apply saved state on page load
+        const isCollapsed = localStorage.getItem('sidebarCollapsed');
+        if (isCollapsed === 'true') {
+            sidebar.classList.add('collapsed');
+            mainContent.classList.add('collapsed');
+            header.classList.add('collapsed');
+        }
+
+        // Toggle button functionality
+        if(toggleBtn) {
+            toggleBtn.addEventListener('click', function() {
+                if (sidebar.classList.contains('collapsed')) {
+                    openSidebar();
+                } else {
+                    collapseSidebar();
+                }
+            });
+        }
+
+
+        // Function for Dynamic Form Fields (used in Template 3) and DOMContentLoaded for Notifications
         document.addEventListener('DOMContentLoaded', function() {
+            // --- Form-specific Dynamic Fields Logic (RETAINED) ---
             const assistanceTypeSelect = document.getElementById('assistanceType');
             const seedDetailsDiv = document.getElementById('seedDetails');
             const engineDetailsDiv = document.getElementById('engineDetails');
@@ -810,46 +1088,32 @@ if ($conn && $conn->ping()) {
                 // Event listener for changes in the assistance type dropdown
                 assistanceTypeSelect.addEventListener('change', toggleDynamicFields);
             }
+            // --- End Form-specific Dynamic Fields Logic ---
             
-            // --- START: Sidebar Toggle Logic (UPDATED TO USE localStorage) ---
-            const sidebar = document.querySelector('.sidebar');
-            const mainContent = document.querySelector('main');
-            const header = document.querySelector('.card-header-custom');
-            const toggleBtn = document.getElementById('sidebarToggleBtn');
-            
-            function collapseSidebar() {
-                sidebar.classList.add('collapsed');
-                mainContent.classList.add('collapsed');
-                header.classList.add('collapsed');
-                localStorage.setItem('sidebarCollapsed', 'true'); // Save state to localStorage
-            }
-
-            function openSidebar() {
-                sidebar.classList.remove('collapsed');
-                mainContent.classList.remove('collapsed');
-                header.classList.remove('collapsed');
-                localStorage.setItem('sidebarCollapsed', 'false'); // Save state to localStorage
-            }
-
-            // Apply saved state on page load
-            const isCollapsed = localStorage.getItem('sidebarCollapsed');
-            if (isCollapsed === 'true') {
-                sidebar.classList.add('collapsed');
-                mainContent.classList.add('collapsed');
-                header.classList.add('collapsed');
-            }
-
-
-            if(toggleBtn) {
-                toggleBtn.addEventListener('click', function() {
-                    if (sidebar.classList.contains('collapsed')) {
-                        openSidebar();
-                    } else {
-                        collapseSidebar();
-                    }
-                });
-            }
-            // --- END: Sidebar Toggle Logic ---
+            // --- START NOTIFICATION BELL DOMContentLoaded LOGIC (FROM DASHBOARD) ---
+            // Simulate initial notification load (in a real app, this would be an API call)
+             const list = document.getElementById('notificationList');
+             const badge = document.getElementById('notificationBadge');
+             
+             if(list && badge) { // Check if elements exist
+                list.innerHTML = `
+                   <div class="notification-item unread">
+                       <p class="mb-1">Your loan application has been <strong>Approved</strong>!</p>
+                       <span class="text-muted small">5 minutes ago</span>
+                   </div>
+                   <div class="notification-item unread">
+                       <p class="mb-1">New advisory on pest control for Rice crops.</p>
+                       <span class="text-muted small">2 hours ago</span>
+                   </div>
+                   <div class="notification-item">
+                       <p class="mb-1">Claim for Seed Subsidy is <strong>Ready</strong>.</p>
+                       <span class="text-muted small">Yesterday</span>
+                   </div>
+                `;
+                badge.textContent = 2; // Set count
+                badge.classList.remove('hidden'); // Show badge
+             }
+            // --- END NOTIFICATION BELL DOMContentLoaded LOGIC ---
         });
     </script>
 </body>

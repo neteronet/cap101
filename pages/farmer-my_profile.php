@@ -20,7 +20,7 @@ if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
 $user_id = $_SESSION['user_id'];
 $display_name = 'Farmer'; // Default fallback
 // PHP CHANGE: Farmer ID is now displayed prominently
-$farmer_id_display = "FRM-" . str_pad($user_id, 9, '0', STR_PAD_LEFT); 
+$farmer_id_display = "FRM-" . str_pad($user_id, 9, '0', STR_PAD_LEFT);
 $is_farmer = false; // Flag for explicit farmer check
 
 // --- IMPROVEMENT 2 & 3: Fetch Name AND User Type for Security Check ---
@@ -141,7 +141,8 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
             background: #f8f9fa;
             font-size: 16px;
             line-height: 1.6;
-            color: #212529; /* Adjusted for better reading contrast */
+            color: #212529;
+            /* Adjusted for better reading contrast */
             margin: 0;
         }
 
@@ -161,9 +162,10 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
             display: flex;
             flex-direction: column;
             transition: left 0.3s ease;
-            font-family: "Be Vietnam Pro", sans-serif; /* Consistent Font */
+            font-family: "Be Vietnam Pro", sans-serif;
+            /* Consistent Font */
         }
-        
+
         .sidebar.collapsed {
             left: -250px;
         }
@@ -261,11 +263,13 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
             font-size: 1rem;
             display: flex;
             align-items: center;
-            justify-content: space-between; /* Changed to space-between for toggle button */
+            justify-content: space-between;
+            /* Changed to space-between for toggle button */
             z-index: 1060;
             border-bottom: 1px solid #ddd;
             transition: left 0.3s ease;
-            font-family: "Be Vietnam Pro", sans-serif; /* Consistent Font */
+            font-family: "Be Vietnam Pro", sans-serif;
+            /* Consistent Font */
         }
 
         .card-header-custom.collapsed {
@@ -284,7 +288,7 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
         main.collapsed {
             margin-left: 0;
         }
-        
+
         /* 1. Color Palette Standardization: Links */
         a {
             color: #19860f;
@@ -304,39 +308,44 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
         .card-title,
         .modal-title,
         .page-title {
-            font-family: "Be Vietnam Pro", sans-serif; /* Consistent Font */
+            font-family: "Be Vietnam Pro", sans-serif;
+            /* Consistent Font */
             color: #0f5132;
             /* Dark Green */
         }
-        
+
         /* NEW: Style for the Page Title (Dashboard & Profile) */
         .page-title {
-            font-size: 1.5rem; 
-            font-weight: 600; 
+            font-size: 1.5rem;
+            font-weight: 600;
             margin-bottom: 0.5rem;
         }
-        
+
         /* NEW: Style for the Dashboard/Profile Description Paragraph */
         .dashboard-description {
-            font-size: 0.875rem; /* 14px */
+            font-size: 0.875rem;
+            /* 14px */
         }
-        
+
         /* NEW: Explicit Card Title Size for Consistency */
         .card-title {
-            font-size: 1.25rem; 
+            font-size: 1.25rem;
             font-weight: 600;
         }
-        
+
         /* NEW: Explicit Standard Card Text Size for Consistency (0.9375rem = 15px) */
-        .card-text, 
-        .card-body p:not(.card-title):not(.summary-stat p), 
+        .card-text,
+        .card-body p:not(.card-title):not(.summary-stat p),
         .list-unstyled li {
-            font-size: 0.9375rem; /* ~15px for better readability in main content */
+            font-size: 0.9375rem;
+            /* ~15px for better readability in main content */
         }
-        .card-text.small, 
-        .list-unstyled.small li, 
+
+        .card-text.small,
+        .list-unstyled.small li,
         .card-text.text-muted.small {
-            font-size: 0.875rem !important; /* Keep 14px for elements explicitly marked as small */
+            font-size: 0.875rem !important;
+            /* Keep 14px for elements explicitly marked as small */
         }
 
 
@@ -345,7 +354,8 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
             background-color: #19860f;
             color: #fff;
             border-color: #19860f;
-            font-family: "Be Vietnam Pro", sans-serif; /* Consistent Font */
+            font-family: "Be Vietnam Pro", sans-serif;
+            /* Consistent Font */
         }
 
         .btn-theme:hover {
@@ -353,12 +363,13 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
             border-color: #146c0b;
             color: #fff;
         }
-        
+
         /* 2. Button and Alert Unification: Outline Button Theme */
         .btn-outline-theme {
             color: #19860f;
             border-color: #19860f;
-            font-family: "Be Vietnam Pro", sans-serif; /* Consistent Font */
+            font-family: "Be Vietnam Pro", sans-serif;
+            /* Consistent Font */
         }
 
         .btn-outline-theme:hover,
@@ -400,7 +411,7 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
             gap: .75rem;
             align-items: flex-start;
             font-family: "Be Vietnam Pro", sans-serif;
-            font-size: 0.9375rem; 
+            font-size: 0.9375rem;
         }
 
         .alert-custom-info {
@@ -421,7 +432,7 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
         .alert-custom-danger i {
             margin-top: .2rem;
         }
-        
+
         #sidebarToggleBtn {
             color: #0f5132;
         }
@@ -433,14 +444,16 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
         /* General card styling for consistency */
         .card {
             border-radius: 0.5rem;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05); /* Default shadow */
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+            /* Default shadow */
             margin-bottom: 1.5rem;
             border: 1px solid #ddd;
         }
+
         /* --- END CONSISTENT DESIGN STYLES (FROM DASHBOARD) --- */
 
         /* --- PROFILE-SPECIFIC STYLES (Adjusted for Harmony) --- */
-        
+
         .profile-header {
             display: flex;
             align-items: center;
@@ -455,12 +468,14 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
             height: 100px;
             border-radius: 50%;
             object-fit: cover;
-            border: 3px solid #19860f; /* Add a subtle theme border */
+            border: 3px solid #19860f;
+            /* Add a subtle theme border */
         }
 
         .profile-header h4 {
             font-size: 1.5rem;
-            color: #0f5132; /* Consistent with h1-h6 color */
+            color: #0f5132;
+            /* Consistent with h1-h6 color */
             margin-bottom: 0.3rem;
         }
 
@@ -470,21 +485,25 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
             color: #555;
             min-width: 150px;
             display: inline-block;
-            font-size: 0.9375rem; /* ~15px, consistent with body text */
+            font-size: 0.9375rem;
+            /* ~15px, consistent with body text */
         }
 
         .section-title {
             font-size: 1.25rem;
             font-weight: 600;
-            color: #0f5132; /* Consistent with h1-h6 color */
+            color: #0f5132;
+            /* Consistent with h1-h6 color */
             margin-top: 1.5rem;
             margin-bottom: 1rem;
-            font-family: "Be Vietnam Pro", sans-serif; /* Consistent Font */
+            font-family: "Be Vietnam Pro", sans-serif;
+            /* Consistent Font */
         }
 
         .card-body p {
             margin-bottom: 0.5rem;
-            font-size: 0.9375rem; /* ~15px, consistent with body text */
+            font-size: 0.9375rem;
+            /* ~15px, consistent with body text */
         }
 
         /* Update contact button styling (Kept unique for its compact size) */
@@ -500,7 +519,8 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
             font-weight: 500;
             margin-left: 8px;
             vertical-align: middle;
-            text-decoration: none; /* Ensure it looks like a button */
+            text-decoration: none;
+            /* Ensure it looks like a button */
             display: inline-flex;
             align-items: center;
             gap: 4px;
@@ -511,7 +531,8 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
             background: #146c0b;
             transform: translateY(-1px);
             box-shadow: 0 2px 6px rgba(25, 134, 15, 0.3);
-            color: #fff; /* Ensure hover text remains white */
+            color: #fff;
+            /* Ensure hover text remains white */
         }
 
         .contact-number-wrapper {
@@ -520,26 +541,156 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
             flex-wrap: wrap;
             gap: 8px;
         }
-        
+
         /* Styles for the Summary/Badges section */
         .summary-stat {
             padding: 0.5rem 0;
         }
+
         .summary-stat .fw-bold {
             font-size: 1.2rem;
-            color: #19860f; /* Theme color for values */
+            color: #19860f;
+            /* Theme color for values */
             font-family: "Be Vietnam Pro", sans-serif;
         }
-        
+
         .summary-stat .text-secondary {
             color: #6c757d !important;
         }
-        
-        /* Land details card for empty state - uses alert-custom-info for consistency */
-        /* The alert-custom-info is now defined in the consistent styles, keeping the specific structure here */
-        .no-land-details-info {
-            /* These styles are no longer needed as the HTML uses .alert-custom-info */
+
+        /* ----------------------------------------------------------- */
+        /* --- Notification Bell Styling for Consistency (IMPROVED) --- */
+        /* ----------------------------------------------------------- */
+        .notification-bell-container {
+            position: relative;
+            display: inline-block;
         }
+
+        .notification-bell {
+            /* Base color matching the sidebar toggle button for consistency */
+            color: #0f5132;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.25rem; /* Slightly larger for prominence */
+            padding: 0;
+            line-height: 1;
+            transition: color 0.2s ease;
+        }
+
+        .notification-bell:hover {
+            color: #146c0b; /* Darker theme hover color */
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -5px;
+            right: -10px;
+            padding: 0.15em 0.45em;
+            border-radius: 50%;
+            background-color: #dc3545; /* Danger Red for unread count (consistent with status-rejected) */
+            color: white;
+            font-size: 0.6rem;
+            line-height: 1;
+            min-width: 18px;
+            text-align: center;
+            font-family: "Be Vietnam Pro", sans-serif;
+        }
+
+        .notification-badge.hidden {
+            display: none;
+        }
+
+        .notification-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            width: 320px;
+            background-color: #fff;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            border-radius: 0.5rem;
+            margin-top: 8px;
+            z-index: 1070;
+            display: none;
+            /* Consistent font for UI elements */
+            font-family: "Be Vietnam Pro", sans-serif;
+            font-size: 0.875rem; /* Small font size */
+        }
+
+        .notification-dropdown.show {
+            display: block;
+        }
+
+        .notification-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .notification-header h6 {
+            margin: 0;
+            font-size: 1rem;
+            color: #0f5132; /* Dark Green for heading consistency */
+            font-weight: 600;
+        }
+
+        .mark-all-read {
+            color: #19860f; /* Theme Green for action link */
+            background: none;
+            border: none;
+            font-size: 0.75rem;
+            cursor: pointer;
+            padding: 0;
+            text-decoration: underline;
+        }
+
+        .mark-all-read:hover {
+            color: #146c0b; /* Darker Theme Green on hover */
+        }
+
+        .notification-list {
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 0; /* Remove internal padding, items will have it */
+        }
+
+        .notification-item {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #f8f9fa; /* Very light separator */
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .notification-item:hover {
+            background-color: #f1f1f1;
+        }
+
+        .notification-item.unread {
+            background-color: #f7fff6; /* Very light theme-related background for unread */
+            border-left: 3px solid #19860f; /* Theme green indicator */
+            padding-left: calc(1rem - 3px); /* Adjust padding due to border */
+            font-weight: 500;
+        }
+
+        .notification-item.unread p {
+            color: #0f5132; /* Darker text for unread content */
+        }
+
+        .notification-item p {
+            margin: 0;
+            line-height: 1.4;
+        }
+
+        .notification-item strong {
+            font-weight: 600;
+        }
+
+        .notification-item:last-child {
+            border-bottom: none;
+        }
+        /* --- END Notification Bell Styling --- */
     </style>
 </head>
 
@@ -573,20 +724,41 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
         </div>
     </nav>
 
-    <!-- Header (CONSISTENT DESIGN) -->
+    <!-- Header (CONSISTENT DESIGN - MODIFIED TO INCLUDE NOTIFICATION BELL) -->
     <div class="card-header card-header-custom d-flex justify-content-between align-items-center">
         <!-- New Toggle Button (CONSISTENT) -->
         <button id="sidebarToggleBtn" class="btn btn-link p-0 text-dark" title="Toggle Sidebar" style="font-size: 1.5rem;">
             <i class="fas fa-bars"></i>
         </button>
-        <!-- Greeting -->
-        <span class="me-3">Hi, <strong><?php echo htmlspecialchars($display_name); ?></strong></span>
+        <!-- Right side alignment wrapper (ADDED) -->
+        <div class="d-flex align-items-center">
+            <!-- Greeting -->
+            <span class="me-3">Hi, <strong><?php echo htmlspecialchars($display_name); ?></strong></span>
+
+            <!-- Notification Bell (ADDED FROM DASHBOARD) -->
+            <div class="notification-bell-container me-3">
+                <button class="notification-bell" id="notificationBell" onclick="toggleNotificationDropdown()">
+                    <i class="fas fa-bell"></i>
+                    <span class="notification-badge hidden" id="notificationBadge">0</span>
+                </button>
+                <div class="notification-dropdown" id="notificationDropdown">
+                    <div class="notification-header">
+                        <h6><i class="fas fa-bell me-2"></i>Notifications</h6>
+                        <button class="mark-all-read" onclick="markAllAsRead()">Mark all as read</button>
+                    </div>
+                    <div class="notification-list" id="notificationList">
+                        <div class="notification-loading">Loading notifications...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
+    <!-- END MODIFIED HEADER -->
 
     <!-- Main Content -->
     <main>
         <div class="container-fluid">
-        
+
             <!-- PAGE TITLE (CONSISTENT) -->
             <h1 class="page-title">My Profile</h1>
             <p class="text-muted mb-4 dashboard-description">
@@ -597,7 +769,7 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
             <!-- MAIN PROFILE CARD: COMBINED HEADER AND SUMMARY -->
             <div class="card mb-4 shadow-sm">
                 <div class="card-body">
-                    
+
                     <!-- 1. Profile Header (Enhanced with Farmer ID and Address Icon) -->
                     <div class="profile-header">
                         <img src="../photos/Avatar.png" alt="Farmer Photo">
@@ -637,7 +809,7 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
                             <h5 class="fw-bold"><?php echo $civil_status; ?></h5>
                         </div>
                     </div>
-                    
+
                     <!-- 3. Contact Information (Refactored) -->
                     <h5 class="section-title mb-3"><i class="fas fa-address-book me-2"></i>Contact Information</h5>
                     <div class="row">
@@ -660,20 +832,20 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
             <!-- LAND DETAILS CARD -->
             <h5 class="section-title"><i class="fas fa-map-marked-alt me-2"></i>Land Details</h5>
 
-            <?php if (!empty($farmer_data['land_details_decoded'])): ?>
+            <?php if (!empty($farmer_data['land_details_decoded'])) : ?>
                 <!-- ADDED: shadow-sm for consistency -->
                 <div class="card shadow-sm">
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <p class="mb-0">
-                                    <span class="info-label"><i class="fas fa-location-arrow me-2 text-success"></i>Location:</span> 
+                                    <span class="info-label"><i class="fas fa-location-arrow me-2 text-success"></i>Location:</span>
                                     <?php echo htmlspecialchars($farmer_data['land_details_decoded']['location'] ?? 'N/A'); ?>
                                 </p>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <p class="mb-0">
-                                    <span class="info-label"><i class="fas fa-ruler-combined me-2 text-success"></i>Area:</span> 
+                                    <span class="info-label"><i class="fas fa-ruler-combined me-2 text-success"></i>Area:</span>
                                     <?php echo htmlspecialchars($farmer_data['land_details_decoded']['size'] ?? 'N/A'); ?>
                                 </p>
                             </div>
@@ -681,7 +853,7 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
                         </div>
                     </div>
                 </div>
-            <?php else: ?>
+            <?php else : ?>
                 <!-- Changed to use a consistent custom alert style -->
                 <div class="alert-custom-info d-flex align-items-center justify-content-center py-4 shadow-sm" role="alert">
                     <i class="fas fa-info-circle me-2 fs-5"></i>
@@ -694,7 +866,7 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
-    
+
     <!-- JavaScript for Sidebar Toggle (CONSISTENT DESIGN - WITH localStorage) -->
     <script>
         // JavaScript to toggle sidebar collapse and preserve state using localStorage
@@ -724,7 +896,7 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
             sidebar.classList.add('collapsed');
             mainContent.classList.add('collapsed');
             header.classList.add('collapsed');
-        } 
+        }
 
         // Toggle button functionality (now uses state saving)
         toggleBtn.addEventListener('click', function() {
@@ -734,6 +906,63 @@ $crop = htmlspecialchars($farmer_data['crop'] ?? 'N/A');
                 collapseSidebar();
             }
         });
+
+
+        // --- Notification Bell JavaScript (COPIED FROM DASHBOARD) ---
+
+        // Retain notification bell JavaScript from Code B (assuming it was available from '../includes/notification_bell.php' or was standard setup)
+        // If the bell logic is missing, it should be added here or in the included file.
+        // Assuming minimal setup for notification bell based on Code B's HTML:
+        function toggleNotificationDropdown() {
+            document.getElementById('notificationDropdown').classList.toggle('show');
+            // Basic logic to hide the badge on open (in a real app, this would be an API call)
+            document.getElementById('notificationBadge').classList.add('hidden');
+        }
+
+        // Close the dropdown if the user clicks outside of it
+        window.onclick = function(event) {
+            if (!event.target.matches('.notification-bell-container') && !event.target.closest('.notification-bell-container')) {
+                var dropdowns = document.getElementsByClassName("notification-dropdown");
+                for (var i = 0; i < dropdowns.length; i++) {
+                    var openDropdown = dropdowns[i];
+                    if (openDropdown.classList.contains('show')) {
+                        openDropdown.classList.remove('show');
+                    }
+                }
+            }
+        }
+
+        function markAllAsRead() {
+            // Placeholder for real logic (e.g., AJAX call)
+            console.log("Marked all notifications as read.");
+            document.getElementById('notificationList').innerHTML = '<div class="notification-item text-center text-muted small py-2">No new notifications.</div>';
+        }
+
+        // Simulate initial notification load (in a real app, this would be an API call)
+        document.addEventListener('DOMContentLoaded', () => {
+            // Simulate loading with 2 unread announcements
+            const list = document.getElementById('notificationList');
+            const badge = document.getElementById('notificationBadge');
+
+            list.innerHTML = `
+                <div class="notification-item unread">
+                    <p class="mb-1">Your loan application has been <strong>Approved</strong>!</p>
+                    <span class="text-muted small">5 minutes ago</span>
+                </div>
+                <div class="notification-item unread">
+                    <p class="mb-1">New advisory on pest control for Rice crops.</p>
+                    <span class="text-muted small">2 hours ago</span>
+                </div>
+                <div class="notification-item">
+                    <p class="mb-1">Claim for Seed Subsidy is <strong>Ready</strong>.</p>
+                    <span class="text-muted small">Yesterday</span>
+                </div>
+             `;
+            badge.textContent = 2; // Set count
+            badge.classList.remove('hidden'); // Show badge
+        });
+
+        // --- END Notification Bell JavaScript ---
     </script>
 </body>
 

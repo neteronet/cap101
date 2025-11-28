@@ -1,1438 +1,512 @@
-<?php
-// Load latest announcements for landing page carousel (up to 5)
-require_once __DIR__ . '/home_data.php';
-?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agriconnect</title>
+    <title>Agriconnect - Your Gateway to Agricultural Services</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Font Awesome for Icons -->
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* Basic Reset & Body Styling */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
+
         body {
             font-family: 'Poppins', sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background-color: #ffffff;
-            /* Added for smooth scrolling when clicking on jump links */
-            scroll-behavior: smooth; 
-        }
-        .container {
-            max-width: 1100px;
-            margin: 0 auto;
-            padding: 0 25px;
-        }
-        /* Navbar */
-        .navbar {
-            background-color: #fff;
-            height: 60px;
-            padding: 0 1.25rem;
-            position: fixed;
-            width: 100%;
-            top: 0;
-            z-index: 1000;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-            border-bottom: 1px solid #ddd;
-        }
-        .navbar .container {
-            max-width: 1200px;
-            height: 60px;
+            background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 25%, #a5d6a7 50%, #81c784 75%, #66bb6a 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+            min-height: 100vh;
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin: 0 auto;
-            padding: 0;
-        }
-        .navbar .logo {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            text-decoration: none;
-        }
-        .navbar .logo img {
-            width: 44px;
-            height: 44px;
-            max-width: none;
-            padding: 0;
-            border-radius: 6px;
-            background: transparent;
-            object-fit: contain;
-        }
-        .navbar .logo div {
-            font-size: 0.95rem;
-            font-weight: 600;
-            color: #19860f;
-            line-height: 1.2;
-            margin-top: 0;
-        }
-        .navbar nav {
-            display: flex;
-            align-items: center;
-            gap: 24px;
-        }
-        .navbar nav ul {
-            list-style: none;
-            display: flex;
-            margin: 0;
-            padding: 0;
-            gap: 24px;
-        }
-        .navbar nav ul li {
-            margin: 0;
-        }
-        .navbar nav ul li a {
-            color: #19860f;
-            text-decoration: none;
-            font-weight: 500;
-            font-size: 0.95rem;
-            padding: 6px 0;
-            transition: color 0.3s ease;
+            flex-direction: column;
+            padding: 40px 20px 0 20px;
             position: relative;
+            overflow-x: hidden;
         }
-        /* REFINEMENT: Added hover effect with bottom line */
-        .navbar nav ul li a:hover {
-            color: #146c0b; /* Darker green on hover */
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
         }
-        .navbar nav ul li a::after {
-            content: ''; 
-            position: absolute;
-            bottom: 0px; /* Adjusted to be closer to the text */
-            left: 0;
-            width: 0;
-            height: 2px;
-            background-color: #19860f;
-            transition: width 0.3s ease;
-        }
-        .navbar nav ul li a:hover::after {
-            width: 100%;
-        }
-        /* REMOVED: Old pseudo-element styles as the new one replaces them */
-        /* .navbar nav ul li:nth-child(1) a::after, ... */
-        
-        .navbar .sign-in-btn {
-            background-color: #19860f;
-            color: #fff;
-            border: none;
-            padding: 8px 18px;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            line-height: 1;
-        }
-        .navbar .sign-in-btn:hover {
-            background-color: #146c0b;
-        }
-        /* Hero Section - UPDATED FOR LEFT ALIGNMENT */
-        .hero-section {
-            position: relative;
-            height: 100vh;
-            display: flex;
-            /* REFINEMENT: Aligned items to the center for better vertical balance */
-            align-items: center; 
-            justify-content: flex-start;
-            color: #fff;
-            text-align: left;
-            padding-top: 60px;
-        }
-        .hero-bg-img {
+
+        /* Animated background particles */
+        .particles {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            object-fit: cover;
+            overflow: hidden;
             z-index: 0;
         }
-        .hero-section .container {
-            padding-left: 150px;
-            margin-left: 0;
-            margin-right: auto;
-        }
-        .hero-overlay {
+
+        .particle {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.55);
-            z-index: 1;
-        }
-        .hero-content {
-            position: relative;
-            z-index: 2;
-            max-width: 600px;
-            padding-left: 0;
-            text-align: left;
-        }
-        .hero-content .welcome-text {
-            font-size: 1.2em;
-            letter-spacing: 2px;
-            margin-bottom: 10px;
-            color: #eee;
-            text-align: left;
-        }
-        /* REFINEMENT: Removed Pacifico font to ensure it works without custom load, reduced size */
-        .hero-content h1 {
-            font-family: 'Poppins', sans-serif; /* Consistent font */
-            font-size: 5.5em; /* Slightly smaller for a more balanced look */
-            font-weight: 700;
-            margin-bottom: 20px;
-            line-height: 0.9;
-            color: #fff;
-            display: block;
-            text-align: left; 
-        }
-        .hero-content .hero-logo {
-            width: 450px; /* Slightly larger image for impact */
-            height: auto;
-            margin-bottom: 25px; /* Reduced margin for tighter composition */
-            display: block;
-            margin-left: 0; 
-            margin-right: auto; 
-        }
-        /* REMOVED: Unused/replaced h1 span styling */
-        /* .hero-content h1 span { ... } */
-        .hero-content .description-text {
-            font-size: 1.05em; 
-            margin-bottom: 40px;
-            color: #E0E0E0; 
-            line-height: 1.8;
-            max-width: 500px; 
-            text-align: left;
-        }
-        .hero-content .sign-in-hero-btn {
-            background-color: #F7A31C;
-            color: #fff;
-            border: none;
-            padding: 14px 30px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: 500;
-            transition: background-color 0.3s ease;
-            text-decoration: none;
-            display: inline-block;
-        }
-        .hero-content .sign-in-hero-btn:hover {
-            background-color: #E8951A;
-        }
-
-        /* Main Content & Features */
-        .main-content-section {
-            padding-top: 150px;
-            padding-bottom: 90px;
-            background-color: #ffffff;
-        }
-
-        .feature-cards-row {
-            display: flex;
-            justify-content: center;
-            gap: 30px;
-            margin-top: -100px;
-            margin-bottom: 120px;
-            padding: 0 24px;
-        }
-        .feature-pill {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            padding: 24px 30px;
-            border-radius: 15px;
-            border: 1px solid rgba(25, 134, 15, 0.12);
-            background: #ffffff;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        .feature-pill:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.12);
-        }
-
-        /* Icon Styling */
-        .feature-pill-icon {
-            width: 60px;
-            height: 60px;
-            min-width: 60px;
+            background: rgba(255, 255, 255, 0.1);
             border-radius: 50%;
-            background-color: #e6f5e4;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            box-shadow: 0 4px 12px rgba(25, 134, 15, 0.1);
+            animation: float 20s infinite ease-in-out;
         }
 
-        .feature-pill-icon i {
-            font-size: 1.8rem;
-            color: #19860f;
+        @keyframes float {
+            0%, 100% { transform: translateY(0) translateX(0); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-100vh) translateX(100px); opacity: 0; }
         }
 
-        .feature-pill-info h4 {
-            margin: 0 0 8px;
-            font-size: 1.2rem;
-            font-weight: 600;
-            color: #1d2a1b;
+        .header-section {
+            text-align: center;
+            color: white;
+            margin-bottom: 80px;
+            position: relative;
+            z-index: 1;
+            animation: fadeInDown 1s ease-out;
         }
-        .feature-pill-info p {
-            margin: 0 0 10px;
-            font-size: 0.95rem;
-            color: #4b584c;
-            line-height: 1.45;
-        }
-        .feature-pill-info a {
-            margin-top: 8px;
-            display: inline-flex;
-            align-items: center;
-            font-weight: 600;
+
+        .back-to-home-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
             color: #19860f;
+            border: 2px solid #19860f;
+            padding: 10px 20px;
+            border-radius: 25px;
             text-decoration: none;
-            font-size: 0.92rem;
-            /* REFINEMENT: Link styling for better CTA */
-            padding-bottom: 2px;
-            border-bottom: 1px solid transparent;
-            transition: border-bottom 0.3s ease, color 0.3s ease;
+            font-weight: 600;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 10;
         }
-        .feature-pill-info a:hover {
-            border-bottom: 1px solid #19860f;
-            color: #146c0b;
+
+        .back-to-home-btn:hover {
+            background: #19860f;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(25, 134, 15, 0.3);
         }
-        .feature-pill-info a i {
-            margin-left: 6px;
-            font-size: 0.85rem;
+
+        .back-to-home-btn i {
+            font-size: 1rem;
         }
-        @media (max-width: 992px) {
-            .feature-cards-row {
-                flex-direction: column;
+
+        @media (max-width: 768px) {
+            .back-to-home-btn {
+                top: 10px;
+                left: 10px;
+                padding: 8px 16px;
+                font-size: 0.85rem;
             }
         }
-        /* Introduction Section */
-        .introduction-section {
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header-section h1 {
+            font-size: 4rem;
+            font-weight: 800;
+            margin-bottom: 20px;
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.3);
+            letter-spacing: -1px;
+            color: #ffffff;
+        }
+
+        .header-section p {
+            font-size: 1.4rem;
+            font-weight: 400;
+            opacity: 0.95;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+            max-width: 700px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        .login-cards-container {
+            max-width: 1300px;
+            margin: 0 auto;
             display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 60px;
-        }
-
-        .intro-left {
-            flex: 1;
-            position: relative;
-            max-width: 50%;
-        }
-        
-        .main-circle-img-wrapper {
-            position: relative;
-            width: 100%;
-            padding-bottom: 100%; 
-            max-width: 450px;
-            margin-right: auto;
-        }
-
-        .main-circle-img {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            background-color: #ccc; 
-            background-image: url('https://via.placeholder.com/550/dddddd?text=Harvester+Field');
-            background-size: cover;
-            background-position: center;
-            /* REFINEMENT: Thicker white border */
-            box-shadow: 0 0 0 10px #f0f0f0, 0 0 0 22px #fff; 
-        }
-
-        .small-circle-img {
-            position: absolute;
-            /* REFINEMENT: Adjusted position slightly */
-            bottom: -30px; 
-            left: 100px;
-            width: 140px;
-            height: 140px;
-            border-radius: 50%;
-            background-color: #999;
-            background-image: url('https://via.placeholder.com/150/999999?text=Farmer+Fruit');
-            background-size: cover;
-            background-position: center;
-            z-index: 5;
-            border: 8px solid #fff; /* REFINEMENT: Thicker border */
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
-        }
-
-        .intro-right {
-            flex: 1;
-            max-width: 50%;
-        }
-
-        .intro-label {
-            color: #F7A31C;
-            font-size: 0.9em;
-            font-weight: 700;
-            margin-bottom: 10px;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-        }
-
-        .intro-right h2 {
-            font-size: 2.3em;
-            font-weight: 700;
-            line-height: 1.15;
-            margin-bottom: 25px;
-            color: #333;
-        }
-
-        .intro-text {
-            font-size: 1.05em;
-            color: #777;
-            line-height: 1.7;
-            margin-bottom: 30px;
-        }
-
-        .intro-features {
-            display: flex;
+            justify-content: center;
             gap: 40px;
-            margin-bottom: 30px;
-        }
-
-        .intro-feature-item {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-            font-weight: 500;
-            color: #333;
-            /* REFINEMENT: Increased max-width */
-            max-width: 170px;
-        }
-        .intro-feature-item p {
-            margin-top: 10px;
-            line-height: 1.4;
-            /* REFINEMENT: Slightly bolder text for feature description */
-            font-weight: 600; 
-        }
-
-
-        .intro-feature-item .icon-placeholder {
-            width: 55px;
-            height: 55px;
-            border-radius: 50%;
-            background-color: #4C9945;
-            position: relative;
-        }
-        /* Using Unicode/Emoji as placeholder icons */
-        .intro-feature-item:nth-child(1) .icon-placeholder::after {
-            content: '🧺'; 
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 2em;
-        }
-        .intro-feature-item:nth-child(2) .icon-placeholder {
-             background-color: #4C9945;
-        }
-        .intro-feature-item:nth-child(2) .icon-placeholder::after {
-            content: '🌿';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 2em;
-        }
-
-        .intro-list {
-            list-style: none;
-            margin-bottom: 40px;
-            padding-left: 0;
-        }
-
-        .intro-list li {
-            display: flex;
-            align-items: flex-start;
-            /* REFINEMENT: Reduced margin */
-            margin-bottom: 15px;
-            font-size: 0.98em;
-            color: #555;
-        }
-
-        .intro-list li .list-dot {
-            display: block;
-            width: 9px;
-            height: 9px;
-            min-width: 9px;
-            border-radius: 50%;
-            background-color: #F7A31C;
-            margin-right: 12px;
-            margin-top: 6px;
-        }
-
-        .discover-more-btn {
-            background-color: #4C9945;
-            color: #fff;
-            border: none;
-            padding: 15px 30px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: 500;
-            transition: background-color 0.3s ease, transform 0.2s ease;
-        }
-
-        .discover-more-btn:hover {
-            background-color: #3D7A36;
-            transform: translateY(-2px);
-        }
-
-        /* Why Choose Our Website Section */
-
-        .why-choose-header {
-            background-color: #5FA941;
-            height: 90px;
+            flex-wrap: wrap;
+            padding: 20px;
             position: relative;
             z-index: 1;
         }
 
-        .why-choose-section {
-            background-color: #F7FFF6;
-            padding-bottom: 100px;
-        }
-
-        /* RESTORED 2-COLUMN FLEX LAYOUT */
-        .why-choose-content-wrapper {
-            display: flex; /* Restored to flex */
-            max-width: 1100px;
-            margin: 0 auto;
-            padding: 0 30px;
-            /* REFINEMENT: Increased overlap for a more integrated look */
-            margin-top: -30px; /* Was -20px */
-            gap: 60px;
-            position: relative;
-            z-index: 2;
-        }
-
-        .why-choose-image {
+        .login-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 25px;
+            padding: 50px 35px;
+            text-align: center;
             flex: 1;
-            min-width: 45%;
-            max-width: 45%;
-            position: relative;
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
-            background-image: url('photos/photo4.png');
-            background-size: cover;
-            background-position: center;
-            border-radius: 0 0 0 0;
-            height: 480px;
-            margin-left: 0;
-        }
-
-        .leader-box {
-            position: absolute;
-            top: 35%; 
-            left: 35%;
-            right: auto;
-            background-color: #F7A31C;
-            padding: 20px 30px;
-            font-size: 1.0em;
-            font-weight: 600;
-            line-height: 1.3;
-            color: #333;
-            text-align: center;
-            width: 180px;
-            height: 120px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
-            clip-path: polygon(0% 0%, 100% 0%, 100% 75%, 60% 75%, 50% 100%, 40% 75%, 0% 75%);
-            transform: none;
-        }
-
-        .why-choose-text-content {
-            flex: 1;
-            /* REFINEMENT: Reduced top padding */
-            padding-top: 40px; /* Was 60px */
-            padding-left: 20px;
-        }
-
-        /* REDUCED H2 FONT SIZE FOR CONSISTENCY */
-        .why-choose-text-content h2 {
-            font-size: 2.3em; /* Reduced from 2.7em to match intro section */
-            font-weight: 700;
-            margin-bottom: 30px;
-            color: #333;
-            letter-spacing: -0.5px;
-        }
-
-        /* --- ADJUSTED FOR CONSISTENCY (MATCHING .intro-text) --- */
-        .why-choose-text-content .description-text {
-            /* Now 1.05em and line-height 1.7 to match .intro-text */
-            font-size: 1.05em; 
-            color: #666;
-            line-height: 1.7; 
-            margin-bottom: 35px;
-            max-width: 90%;
-            font-weight: 400;
-        }
-        /* -------------------------------------------------------- */
-
-        .checklist {
-            list-style: none;
-            /* REFINEMENT: Reduced margin */
-            margin-bottom: 40px; /* Was 50px */
-            padding-left: 0;
-        }
-
-        /* --- ADJUSTED FOR CONSISTENCY (MATCHING .intro-list li) --- */
-        .checklist li {
-            display: flex;
-            align-items: flex-start;
-            /* Now 0.98em to match .intro-list li */
-            margin-bottom: 18px; 
-            font-size: 0.98em; 
-            font-weight: 500;
-            color: #555;
-            line-height: 1.6;
-            transition: transform 0.2s ease;
-        }
-        /* -------------------------------------------------------- */
-
-        .checklist li:hover {
-            transform: translateX(5px);
-        }
-        .checklist li br {
-            display: none;
-        }
-        .checklist li .check-icon {
-            display: inline-block;
-            /* REFINEMENT: Slightly larger icon for better visual weight */
-            width: 30px; /* Was 28px */
-            height: 30px; /* Was 28px */
-            border-radius: 50%;
-            /* REFINEMENT: Slightly increased margin for more space */
-            margin-right: 20px; /* Was 18px */
-            font-size: 1.3em; /* Was 1.2em */
-            line-height: 30px; /* Adjusted line-height */
-            text-align: center;
-            color: #fff;
-            font-weight: 700;
-            flex-shrink: 0;
-            margin-top: 0;
-            background-color: #4C9945;
-            /* REFINEMENT: Subtle button shadow */
-            box-shadow: 0 2px 8px rgba(76, 153, 69, 0.3);
-        }
-
-        /* MODIFIED TO EXACTLY MATCH .discover-more-btn */
-        .why-choose-btn {
-            background-color: #4C9945; /* Changed from linear-gradient */
-            color: #fff;
-            border: none;
-            padding: 15px 30px; /* Matched .discover-more-btn */
-            border-radius: 8px; /* Matched .discover-more-btn */
+            min-width: 320px;
+            max-width: 380px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2),
+                        0 5px 15px rgba(0, 0, 0, 0.1);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             cursor: pointer;
-            font-size: 16px;
-            font-weight: 500; /* Matched .discover-more-btn */
-            transition: background-color 0.3s ease, transform 0.2s ease; /* Matched .discover-more-btn */
-            box-shadow: none; /* Removed box-shadow */
-        }
-
-        .why-choose-btn:hover {
-            background-color: #3D7A36; /* Matched .discover-more-btn */
-            transform: translateY(-2px); /* Matched .discover-more-btn */
-            box-shadow: none; /* Removed hover box-shadow */
-        }
-
-
-        /* News & Articles Section */
-
-        .news-section {
-            background-color: #ffffff;
-            padding: 50px 0 100px 0;
-            /* Added padding-top to compensate for fixed header when jumping */
-            padding-top: 100px; 
-            margin-top: -60px; /* Offset the padding-top by header height */
-        }
-        
-        /* New rule for the scroll-target section to adjust for the fixed navbar */
-        #announcements {
-            scroll-margin-top: 60px; /* Ensure content starts below fixed navbar */
-        }
-
-        .news-title-section {
-            text-align: center;
-            margin-bottom: 60px;
-        }
-
-        .news-title-section .update-label {
-            color: #4C9945;
-            font-size: 0.85em;
-            font-weight: 500;
-            margin-bottom: 5px;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-        }
-
-        .news-title-section h2 {
-            font-size: 2.8em;
-            font-weight: 700;
-            color: #333;
-        }
-
-        /* Custom sliding carousel - shows 3 cards, slides 1 at a time */
-        .custom-sliding-carousel {
-            position: relative;
-            overflow: hidden;
-            padding: 0 50px; /* Space for controls */
-        }
-        
-        .carousel-wrapper {
-            overflow: hidden;
-            position: relative;
-        }
-        
-        .carousel-track {
-            display: flex;
-            gap: 30px; /* Increased spacing for better visual breathing room */
-            transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-            will-change: transform;
-        }
-        
-        .carousel-card {
-            flex: 0 0 calc(33.333% - 20px); /* 3 cards per view, accounting for increased gap */
-            min-width: 0;
-            max-width: none; /* Ensure consistent width */
-        }
-        
-        .blog-cards-row {
-            display: flex;
-            justify-content: space-between;
-            gap: 30px; /* Increased spacing */
-        }
-        
-        .blog-card {
-            transition: none; /* No transition on individual cards */
-            width: 100%; /* Ensure full width of container */
-            height: 100%; /* Ensure consistent height */
-            display: flex;
-            flex-direction: column;
-        }
-        
-        /* Carousel controls styling */
-        .custom-sliding-carousel .carousel-control-prev,
-        .custom-sliding-carousel .carousel-control-next {
-            position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 40px;
-            height: 40px;
-            background-color: rgba(0, 0, 0, 0.5);
-            border-radius: 50%;
-            z-index: 10;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        
-        .custom-sliding-carousel .carousel-control-prev:hover,
-        .custom-sliding-carousel .carousel-control-next:hover {
-            background-color: rgba(0, 0, 0, 0.7);
-        }
-        
-        .custom-sliding-carousel .carousel-control-prev {
-            left: 0;
-        }
-        
-        .custom-sliding-carousel .carousel-control-next {
-            right: 0;
-        }
-        
-        .custom-sliding-carousel .carousel-control-prev-icon,
-        .custom-sliding-carousel .carousel-control-next-icon {
-            width: 20px;
-            height: 20px;
-            background-size: 100% 100%;
-        }
-
-        .blog-card {
-            background-color: #fff;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
-            border: none;
             text-decoration: none;
             color: inherit;
             display: flex;
             flex-direction: column;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid transparent;
+            animation: fadeInUp 0.8s ease-out backwards;
+        }
+
+        .login-card:nth-child(1) { animation-delay: 0.1s; }
+        .login-card:nth-child(2) { animation-delay: 0.2s; }
+        .login-card:nth-child(3) { animation-delay: 0.3s; }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
             width: 100%;
             height: 100%;
-            min-height: 450px; /* Fixed minimum height for consistency */
-            max-height: 500px; /* Maximum height to prevent cards from being too tall */
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: left 0.5s;
         }
 
-        .blog-img-container {
-            position: relative;
-            width: 100%;
-            height: 220px; /* Fixed height for all images - ensures consistency */
-            min-height: 220px;
-            max-height: 220px;
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            border-radius: 10px 10px 0 0;
-            flex-shrink: 0; /* Prevent image from shrinking */
+        .login-card:hover::before {
+            left: 100%;
         }
 
-        /* Specific images for blog cards */
-        .blog-card:nth-child(1) .blog-img-container {
-            background-image: url('photos/photo5.jpg');
-        }
-        .blog-card:nth-child(2) .blog-img-container {
-            background-image: url('photos/photo6.jfif');
-        }
-        .blog-card:nth-child(3) .blog-img-container {
-            background-image: url('photos/photo7.jpg');
+        .login-card:hover {
+            transform: translateY(-15px) scale(1.02);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3),
+                        0 10px 25px rgba(0, 0, 0, 0.15);
+            border-color: rgba(76, 153, 69, 0.3);
         }
 
-
-        .blog-date-overlay {
-            position: absolute;
-            /* REFINEMENT: Moved down for better separation */
-            bottom: -20px; 
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: #F7A31C;
-            color: #fff;
-            /* REFINEMENT: Increased padding */
-            padding: 12px 20px; 
-            border-radius: 6px; /* Slightly sharper corners */
-            font-size: 0.9em;
-            font-weight: 500;
-            z-index: 10;
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
-        }
-
-        .blog-content {
-            padding: 25px 20px 20px 20px; /* Consistent padding for all cards */
-            text-align: center;
-            flex-grow: 1;
+        .login-card-icon {
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(135deg, #4C9945 0%, #19860f 100%);
+            border-radius: 50%;
             display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            min-height: 200px; /* Ensure content area has consistent minimum height */
-        }
-
-        .blog-meta {
-            display: flex;
+            align-items: center;
             justify-content: center;
-            align-items: center;
-            font-size: 0.85em;
-            color: #888;
-            margin-bottom: 15px;
+            margin-bottom: 30px;
+            font-size: 2.8rem;
+            color: white;
+            box-shadow: 0 10px 25px rgba(76, 153, 69, 0.3);
+            transition: all 0.4s ease;
+            position: relative;
         }
 
-        .blog-meta span {
-            margin: 0 10px;
+        .login-card:hover .login-card-icon {
+            transform: scale(1.1) rotate(5deg);
+            box-shadow: 0 15px 35px rgba(76, 153, 69, 0.4);
+        }
+
+        .login-card-icon::after {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: -5px;
+            right: -5px;
+            bottom: -5px;
+            border-radius: 50%;
+            border: 3px solid rgba(76, 153, 69, 0.2);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.1);
+                opacity: 0.7;
+            }
+        }
+
+        .login-card h2 {
+            color: #4C9945;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 18px;
+            transition: color 0.3s ease;
+            letter-spacing: 0.5px;
+        }
+
+        .login-card:hover h2 {
+            color: #19860f;
+        }
+
+        .login-card p {
+            color: #555;
+            font-size: 1rem;
+            line-height: 1.7;
+            margin-bottom: 30px;
+            flex-grow: 1;
+            transition: color 0.3s ease;
+        }
+
+        .login-card:hover p {
+            color: #333;
+        }
+
+        .login-card-illustration {
+            width: 100%;
+            height: 160px;
+            margin-top: auto;
             display: flex;
             align-items: center;
-        }
-        /* Simulating meta icons: Author icon and Comment icon */
-        .blog-meta span:nth-child(1)::before {
-            content: '👤'; 
-            font-size: 1.2em;
-            margin-right: 5px;
-            color: #4C9945;
-            line-height: 1;
-        }
-        .blog-meta span:nth-child(2)::before {
-            content: '💬';
-            font-size: 1.2em;
-            margin-right: 5px;
-            color: #4C9945;
-            line-height: 1;
+            justify-content: center;
+            background: linear-gradient(135deg, rgba(76, 153, 69, 0.05) 0%, rgba(25, 134, 15, 0.05) 100%);
+            border-radius: 15px;
+            transition: all 0.4s ease;
+            position: relative;
+            overflow: hidden;
         }
 
-        .blog-content h3 {
-            font-size: 1.05em; /* Consistent title size */
-            font-weight: 700;
-            line-height: 1.4;
-            color: #333;
-            transition: color 0.3s ease;
-            margin: 0 0 12px 0; /* Consistent margin */
-            min-height: 2.8em; /* Ensure consistent height for 2-line titles */
-            display: -webkit-box;
-            -webkit-line-clamp: 2; /* Limit to 2 lines */
-            line-clamp: 2; /* Standard property for compatibility */
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-            text-overflow: ellipsis;
+        .login-card:hover .login-card-illustration {
+            background: linear-gradient(135deg, rgba(76, 153, 69, 0.1) 0%, rgba(25, 134, 15, 0.1) 100%);
+            transform: scale(1.05);
         }
-        /* REFINEMENT: Title color change on hover */
-        .blog-card:hover .blog-content h3 {
-            color: #19860f; 
+
+        .login-card-illustration i {
+            font-size: 4.5rem;
+            color: #4C9945;
+            transition: all 0.4s ease;
+            z-index: 1;
         }
-        
-        /* Ensure excerpt text is consistent */
-        .blog-content p {
+
+        .login-card:hover .login-card-illustration i {
+            transform: scale(1.2) rotate(-5deg);
+            color: #19860f;
+        }
+
+        .footer {
+            background-color: #ffffff;
+            color: #000000;
+            text-align: center;
+            padding: 20px;
+            margin-top: auto;
+            width: calc(100% + 40px);
+            margin-left: -20px;
+            margin-right: -20px;
+            position: relative;
+            z-index: 1;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .footer p {
             margin: 0;
-            line-height: 1.5;
-            min-height: 3em; /* Consistent height for excerpt */
-            display: -webkit-box;
-            -webkit-line-clamp: 2; /* Limit to 2 lines */
-            line-clamp: 2; /* Standard property for compatibility */
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #000000;
         }
 
-        /* Responsive Adjustments for new sections (Updated for better mobile layout) */
+        /* Responsive Design */
         @media (max-width: 992px) {
-            .why-choose-content-wrapper {
-                flex-direction: column;
-                margin-top: -50px;
+            .header-section h1 {
+                font-size: 3rem;
+            }
+
+            .header-section p {
+                font-size: 1.2rem;
+            }
+
+            .login-cards-container {
                 gap: 30px;
             }
-            .why-choose-image {
-                max-width: 100%;
-                min-width: 100%;
-                height: 400px;
-                margin-left: 0;
-                display: block; /* Ensure it is visible */
-            }
-            .leader-box {
-                top: 20px;
-                right: 20px;
-                left: auto; /* Reset left position */
-                transform: none;
-            }
-            .why-choose-text-content {
-                padding-top: 0;
-                padding-left: 0; /* Adjusted for better mobile padding */
-            }
-            .blog-cards-row {
-                flex-direction: column;
-            }
         }
-        /* Existing Responsive Adjustments (Modified for left alignment) */
+
         @media (max-width: 768px) {
-            .navbar .container {
-                flex-direction: column;
-                text-align: center;
+            body {
+                padding: 30px 15px 0;
             }
-            .navbar nav {
-                flex-direction: column;
-                width: 100%;
-                margin-top: 15px;
+            
+            .footer {
+                width: calc(100% + 30px);
+                margin-left: -15px;
+                margin-right: -15px;
             }
-            .navbar nav ul {
-                margin-top: 15px;
-                flex-wrap: wrap;
-                justify-content: center;
-                margin-right: 0;
-            }
-            .navbar nav ul li {
-                margin: 0 10px 10px 10px;
-            }
-            .navbar .sign-in-btn {
-                margin-top: 10px;
-            }
-            .hero-content {
-                padding: 0 25px;
-                text-align: left;
-                max-width: 100%;
-            }
-            .hero-content h1 {
-                font-size: 4em;
-                justify-content: flex-start;
-            }
-            /* REMOVED: Unused h1 span styling */
-            /* .hero-content h1 span {
-                transform: translateY(-10px);
-            } */
-            .hero-content .hero-logo {
-                margin-left: 0;
-            }
-            .feature-cards-row {
-                flex-direction: column;
-                margin-top: 0;
+
+            .header-section {
                 margin-bottom: 50px;
             }
-            .introduction-section {
+
+            .header-section h1 {
+                font-size: 2.5rem;
+            }
+
+            .header-section p {
+                font-size: 1.1rem;
+            }
+
+            .login-cards-container {
                 flex-direction: column;
-                gap: 50px;
-            }
-            .intro-left, .intro-right {
-                max-width: 100%;
-            }
-            .main-circle-img-wrapper {
-                max-width: 100%;
-            }
-            .small-circle-img {
-                left: 50%;
-                transform: translateX(-50%);
-                bottom: -50px;
-            }
-            .intro-features {
-                flex-wrap: wrap;
-                justify-content: center;
-                gap: 20px;
-            }
-            .intro-feature-item {
                 align-items: center;
-                text-align: center;
+                gap: 25px;
+            }
+
+            .login-card {
+                max-width: 100%;
+                padding: 40px 30px;
             }
         }
 
-        /* --- APPENDED STYLES FOR IMAGE MATCH (kept original for checklist colors) --- */
+        @media (max-width: 480px) {
+            .header-section h1 {
+                font-size: 2rem;
+            }
 
-        /* 5. Checklist Icon Colors - Matching the three different colors in the image */
-        .checklist li:nth-child(1) .check-icon {
-            background-color: #61A847; /* Green for first item */
-        }
-        
-        .checklist li:nth-child(2) .check-icon {
-            background-color: #BFE140; /* Yellow-Green for second item */
-        }
-        
-        .checklist li:nth-child(3) .check-icon {
-            background-color: #F7A31C; /* Orange/Yellow for third item */
+            .header-section p {
+                font-size: 1rem;
+            }
+
+            .login-card {
+                padding: 35px 25px;
+                min-width: 100%;
+            }
+
+            .login-card-icon {
+                width: 85px;
+                height: 85px;
+                font-size: 2.3rem;
+            }
+
+            .login-card h2 {
+                font-size: 1.3rem;
+            }
         }
     </style>
 </head>
 <body>
-    <header class="navbar">
-        <div class="container">
-            <div class="logo">
-                <img src="photos/logo.png" alt="Province of Antique Logo">
+    <!-- Animated Background Particles -->
+    <div class="particles" id="particles"></div>
+
+    <!-- Header Section -->
+    <div class="header-section">
+        <a href="index.php" class="back-to-home-btn">
+            <i class="fas fa-arrow-left"></i>
+            <span>Back to Landing Page</span>
+        </a>
+        <h1>Welcome to Agriconnect</h1>
+        <p>Your Gateway to Agricultural Services and Management</p>
+    </div>
+
+    <!-- Login Cards Section -->
+    <div class="login-cards-container">
+        <!-- Farmers Login Card -->
+        <a href="pages/farmers-login.php" class="login-card">
+            <div class="login-card-icon">
+                <i class="fas fa-user-friends"></i>
             </div>
-            <nav>
-                <ul>
-                    <li><a href="#">Home</a></li>
-                    <li><a href="#">About</a></li>
-                    <!-- UPDATED: Added href="#announcements" for jump link -->
-                    <li><a href="#announcements">Announcements</a></li> 
-                    <li><a href="#">Contact</a></li>
-                </ul>
-                <a href="index.php" class="sign-in-btn">Sign In</a>
-            </nav>
-        </div>
-    </header>
-
-    <main class="hero-section">
-        <div class="hero-overlay">
-            <img src="photos/photo1.png" alt="Hero Background" class="hero-bg-img">
-        </div>
-        <div class="container hero-content">
-            <img src="photos/elements.png" alt="Agriconnect" class="hero-logo">
-            <p class="description-text">
-                A unified platform for managing farmer profiles, subsidy distribution, and municipal agricultural analytics—all in one secure and efficient system.
-                It provides a seamless experience for farmers, government agencies, and stakeholders, ensuring transparent and efficient agricultural management.
-            </p>
-            <a href="index.php" class="sign-in-hero-btn">Sign In</a>
-        </div>
-    </main>
-
-    <!-- START: Existing Features and Introduction Section -->
-    <section class="main-content-section">
-        <div class="container">
-            <!-- Feature Cards Row (UPDATED WITH ICONS AND STYLING) -->
-            <div class="feature-cards-row">
-                <div class="feature-pill">
-                    <!-- NEW ICON -->
-                    <div class="feature-pill-icon">
-                        <i class="fas fa-qrcode"></i>
-                    </div>
-                    <div class="feature-pill-info">
-                        <h4>QR Access</h4>
-                        <p>Generate secure QR codes for farmer verification and quick check-ins.</p>
-                        <a href="municipal-qrcode_management.php">Explore QR tools <i class="fas fa-arrow-right"></i></a>
-                    </div>
-                </div>
-                <div class="feature-pill">
-                    <!-- NEW ICON -->
-                    <div class="feature-pill-icon">
-                        <i class="fas fa-seedling"></i>
-                    </div>
-                    <div class="feature-pill-info">
-                        <h4>Crop Monitoring</h4>
-                        <p>Track planting status, growth stages, and field updates in real time.</p>
-                        <a href="municipal-crop_monitoring.php">View crop status <i class="fas fa-arrow-right"></i></a>
-                    </div>
-                </div>
-                <div class="feature-pill">
-                    <!-- NEW ICON -->
-                    <div class="feature-pill-icon">
-                        <i class="fas fa-coins"></i>
-                    </div>
-                    <div class="feature-pill-info">
-                        <h4>Subsidy Support</h4>
-                        <p>Manage requests, approvals, and claims with full transparency.</p>
-                        <a href="municipal-subsidy_management.php">Manage subsidies <i class="fas fa-arrow-right"></i></a>
-                    </div>
-                </div>
+            <h2>FARMERS LOGIN</h2>
+            <p>Access your farming dashboard, apply for subsidies, and manage your agricultural profile.</p>
+            <div class="login-card-illustration">
+                <i class="fas fa-seedling"></i>
             </div>
+        </a>
 
-            <!-- Introduction Section -->
-            <div class="introduction-section">
-                <div class="intro-left">
-                    <div class="main-circle-img-wrapper">
-                        <!-- Replace background-image URL with your actual Harvester image -->
-                        <div class="main-circle-img" style="background-image: url('photos/photo2.png');"></div>
-                        <!-- Replace background-image URL with your actual Farmer holding fruit image -->
-                        <div class="small-circle-img" style="background-image: url('photos/photo3.png');"></div>
-                    </div>
-                </div>
-                <div class="intro-right">
-                    <p class="intro-label">Our Introductions</p>
-                    <h2>Agriculture & Organic Product Farm</h2>
-                    <p class="intro-text">
-                        There are many variations of passages of lorem ipsum available but the majority have suffered alteration in some form by injected humor or random word which don't look even.
-                    </p>
-                    <div class="intro-features">
-                        <div class="intro-feature-item">
-                            <div class="icon-placeholder"></div>
-                            <p>Growing fruits vegetables</p>
-                        </div>
-                        <div class="intro-feature-item">
-                            <div class="icon-placeholder"></div>
-                            <p>Tips for ripening your fruits</p>
-                        </div>
-                    </div>
-                    <ul class="intro-list">
-                        <li><i class="list-dot"></i> Lorem Ipsum is not simply random text.</li>
-                        <li><i class="list-dot"></i> Making this the first true generator on the internet.</li>
-                    </ul>
-                    <button class="discover-more-btn">Discover More</button>
-                </div>
+        <!-- Municipal Agriculturist's Login Card -->
+        <a href="pages/municipal-login.php" class="login-card">
+            <div class="login-card-icon">
+                <i class="fas fa-building"></i>
             </div>
-        </div>
-    </section>
-    <!-- END: Existing Features and Introduction Section -->
-
-    <!-- START: Why Choose Our Website Section (NEWLY MODIFIED) -->
-    <div class="why-choose-header"></div>
-    <section class="why-choose-section">
-        <div class="why-choose-content-wrapper">
-            <div class="why-choose-image">
+            <h2>MUNICIPAL AGRICULTURIST'S LOGIN</h2>
+            <p>Review applications, manage subsidies, and oversee agricultural programs in your municipality.</p>
+            <div class="login-card-illustration">
+                <i class="fas fa-clipboard-check"></i>
             </div>
+        </a>
 
-            <div class="why-choose-text-content">
-                <h2>Why Choose Our Website</h2>
-                <p class="description-text">
-                    Our platform provides a secure and efficient way to manage farmer profiles, subsidies, and agricultural analytics, ensuring transparency and ease for all stakeholders.
-                </p>
-                <ul class="checklist">
-                    <li><i class="check-icon">✓</i> Secure QR Code Access for quick verification</li>
-                    <li><i class="check-icon">✓</i> Real-time Crop Monitoring for better yields</li>
-                    <li><i class="check-icon">✓</i> Transparent Subsidy Management for fair distribution</li>
-                </ul>
-                <button class="why-choose-btn">Discover More</button>
+        <!-- System Admin Login Card -->
+        <a href="pages/admin-login.php" class="login-card">
+            <div class="login-card-icon">
+                <i class="fas fa-shield-alt"></i>
             </div>
-        </div>
-    </section>
-    <!-- END: Why Choose Our Website Section -->
-
-    <!-- START: News & Articles Section (NEWLY MODIFIED WITH ID) -->
-    <section class="news-section" id="announcements">
-        <div class="container">
-            <div class="news-title-section">
-                <p class="update-label">update</p>
-                <h2>Announcements</h2>
+            <h2>SYSTEM ADMIN LOGIN</h2>
+            <p>Manage system settings, users, and oversee all administrative functions of the platform.</p>
+            <div class="login-card-illustration">
+                <i class="fas fa-laptop-code"></i>
             </div>
+        </a>
+    </div>
 
-            <?php if (!empty($landing_announcements)) : ?>
-                <?php
-                    // Prepare all announcements for custom sliding carousel
-                    // We'll show 3 at a time, but slide one card at a time
-                    // Duplicate first 3 cards at the end for seamless infinite loop
-                    $total = count($landing_announcements);
-                ?>
-                <div id="landingAnnouncementCarousel" class="custom-sliding-carousel">
-                    <div class="carousel-wrapper">
-                        <div class="carousel-track" data-total="<?php echo $total; ?>">
-                            <?php foreach ($landing_announcements as $idx => $announcement) : ?>
-                                <?php
-                                    // Choose image for announcement card:
-                                    // 1) If this is specifically the "Modern Farming Techniques" announcement,
-                                    //    always use the modernfarming.jpg hero image (override any image_url).
-                                    // 2) Otherwise, use image_url from DB if present.
-                                    // 3) Fallback to default photo5.jpg.
-                                    $rawTitle = $announcement['title'] ?? '';
-                                    $normalizedTitle = strtolower(trim($rawTitle));
-                                    if ($normalizedTitle === 'modern farming techniques') {
-                                        $img = 'photos/modernfarming.jpg';
-                                    } elseif (!empty($announcement['image_url'])) {
-                                        $img = htmlspecialchars($announcement['image_url']);
-                                    } else {
-                                        $img = 'photos/photo5.jpg';
-                                    }
-                                    $dateLabel = !empty($announcement['publish_date'])
-                                        ? date('d M Y', strtotime($announcement['publish_date']))
-                                        : '';
-                                    $title = htmlspecialchars($announcement['title']);
-                                    $excerpt = htmlspecialchars(substr($announcement['content'], 0, 120));
-                                ?>
-                                <div class="carousel-card" data-index="<?php echo $idx; ?>">
-                                    <a href="index.php" class="blog-card">
-                                        <div class="blog-img-container" style="background-image: url('<?php echo $img; ?>');">
-                                            <?php if ($dateLabel) : ?>
-                                                <div class="blog-date-overlay"><?php echo $dateLabel; ?></div>
-                                            <?php endif; ?>
-                                        </div>
-                                        <div class="blog-content">
-                                            <div class="blog-meta">
-                                                <span>Province of Antique</span>
-                                                <span>Announcement</span>
-                                            </div>
-                                            <h3><?php echo $title; ?></h3>
-                                            <?php if (!empty($excerpt)) : ?>
-                                                <p class="mt-2 text-muted small"><?php echo $excerpt; ?>...</p>
-                                            <?php endif; ?>
-                                        </div>
-                                    </a>
-                                </div>
-                            <?php endforeach; ?>
-                            
-                            <?php 
-                                // Duplicate first 3 cards at the end for seamless infinite loop
-                                $duplicateCount = min(3, $total);
-                                for ($i = 0; $i < $duplicateCount; $i++) {
-                                    $announcement = $landing_announcements[$i];
-                                    $rawTitle = $announcement['title'] ?? '';
-                                    $normalizedTitle = strtolower(trim($rawTitle));
-                                    if ($normalizedTitle === 'modern farming techniques') {
-                                        $img = 'photos/modernfarming.jpg';
-                                    } elseif (!empty($announcement['image_url'])) {
-                                        $img = htmlspecialchars($announcement['image_url']);
-                                    } else {
-                                        $img = 'photos/photo5.jpg';
-                                    }
-                                    $dateLabel = !empty($announcement['publish_date'])
-                                        ? date('d M Y', strtotime($announcement['publish_date']))
-                                        : '';
-                                    $title = htmlspecialchars($announcement['title']);
-                                    $excerpt = htmlspecialchars(substr($announcement['content'], 0, 120));
-                            ?>
-                                <div class="carousel-card carousel-card-duplicate" data-index="<?php echo $i; ?>" data-duplicate="true">
-                                    <a href="index.php" class="blog-card">
-                                        <div class="blog-img-container" style="background-image: url('<?php echo $img; ?>');">
-                                            <?php if ($dateLabel) : ?>
-                                                <div class="blog-date-overlay"><?php echo $dateLabel; ?></div>
-                                            <?php endif; ?>
-                                        </div>
-                                        <div class="blog-content">
-                                            <div class="blog-meta">
-                                                <span>Province of Antique</span>
-                                                <span>Announcement</span>
-                                            </div>
-                                            <h3><?php echo $title; ?></h3>
-                                            <?php if (!empty($excerpt)) : ?>
-                                                <p class="mt-2 text-muted small"><?php echo $excerpt; ?>...</p>
-                                            <?php endif; ?>
-                                        </div>
-                                    </a>
-                                </div>
-                            <?php } ?>
-                        </div>
-                    </div>
+    <!-- Footer -->
+    <div class="footer">
+        <p>© BSIT-4. All Rights Reserved.</p>
+    </div>
 
-                    <?php if ($total > 3) : ?>
-                        <button class="carousel-control-prev" type="button" id="carouselPrev">
-                            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                            <span class="visually-hidden">Previous</span>
-                        </button>
-                        <button class="carousel-control-next" type="button" id="carouselNext">
-                            <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                            <span class="visually-hidden">Next</span>
-                        </button>
-                    <?php endif; ?>
-                </div>
-            <?php else : ?>
-                <p class="text-center text-muted">No announcements available at the moment. Please check back later.</p>
-            <?php endif; ?>
-        </div>
-    </section>
-    <!-- END: News & Articles Section -->
-
-    <!-- Bootstrap JS (for carousel functionality) -->
+    <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
     
     <script>
-        // Custom smooth sliding carousel - slides one card at a time
-        document.addEventListener('DOMContentLoaded', function() {
-            const carousel = document.getElementById('landingAnnouncementCarousel');
-            if (!carousel) return;
-            
-            const track = carousel.querySelector('.carousel-track');
-            const cards = carousel.querySelectorAll('.carousel-card');
-            const prevBtn = carousel.querySelector('#carouselPrev');
-            const nextBtn = carousel.querySelector('#carouselNext');
-            const total = parseInt(track.dataset.total) || cards.length;
-            const actualTotal = total; // Original count (without duplicates)
-            const duplicateCount = Math.min(3, actualTotal); // Number of duplicated cards at the end
-            
-            if (actualTotal <= 3) return; // No need to slide if 3 or fewer cards
-            
-            let currentIndex = 0;
-            let isTransitioning = false;
-            let autoSlideInterval;
-            
-            // Calculate card width including gap
-            function getCardWidth() {
-                if (cards.length === 0) return 0;
-                const card = cards[0];
-                const cardWidth = card.offsetWidth;
-                const gap = 30; // 30px gap (increased spacing)
-                return cardWidth + gap;
+        // Create animated background particles
+        function createParticles() {
+            const particlesContainer = document.getElementById('particles');
+            const particleCount = 20;
+
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                
+                const size = Math.random() * 10 + 5;
+                particle.style.width = size + 'px';
+                particle.style.height = size + 'px';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 20 + 's';
+                particle.style.animationDuration = (Math.random() * 10 + 15) + 's';
+                
+                particlesContainer.appendChild(particle);
             }
-            
-            // Update carousel position
-            function updateCarousel(animate = true) {
-                if (isTransitioning) return;
-                isTransitioning = true;
-                
-                const cardWidth = getCardWidth();
-                const translateX = -currentIndex * cardWidth;
-                
-                if (animate) {
-                    track.style.transition = 'transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)';
-                } else {
-                    track.style.transition = 'none';
+        }
+
+        // Initialize particles on page load
+        document.addEventListener('DOMContentLoaded', createParticles);
+
+        // Add smooth scroll behavior
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
                 }
-                
-                track.style.transform = `translateX(${translateX}px)`;
-                
-                setTimeout(() => {
-                    isTransitioning = false;
-                    
-                    // If we've reached the duplicate cards (beyond original cards), 
-                    // seamlessly jump back to the equivalent position at the start
-                    if (currentIndex >= actualTotal) {
-                        currentIndex = currentIndex - actualTotal;
-                        // Jump back without animation for seamless loop
-                        const cardWidth = getCardWidth();
-                        track.style.transition = 'none';
-                        track.style.transform = `translateX(${-currentIndex * cardWidth}px)`;
-                    }
-                }, animate ? 800 : 0);
-            }
-            
-            // Next slide (forward - left to right, infinite loop)
-            function nextSlide() {
-                if (isTransitioning) return;
-                currentIndex = currentIndex + 1;
-                
-                // If we've passed all original cards and are in duplicate territory
-                // Continue forward - the reset will happen in updateCarousel callback
-                updateCarousel();
-            }
-            
-            // Previous slide (backward - right to left, manual only)
-            function prevSlide() {
-                if (isTransitioning) return;
-                currentIndex = currentIndex - 1;
-                
-                // If we go below 0, jump to the duplicate cards at the end for seamless backward loop
-                if (currentIndex < 0) {
-                    currentIndex = actualTotal + currentIndex; // Jump to duplicate position
-                    // Jump to duplicate position without animation
-                    const cardWidth = getCardWidth();
-                    track.style.transition = 'none';
-                    track.style.transform = `translateX(${-currentIndex * cardWidth}px)`;
-                    // Then animate the previous step
-                    setTimeout(() => {
-                        currentIndex = currentIndex - 1;
-                        updateCarousel(true);
-                    }, 10);
-                } else {
-                    updateCarousel();
-                }
-            }
-            
-            // Event listeners for manual controls
-            if (nextBtn) {
-                nextBtn.addEventListener('click', function() {
-                    stopAutoSlide();
-                    nextSlide();
-                    startAutoSlide(); // Resume auto-slide after manual click
-                });
-            }
-            if (prevBtn) {
-                prevBtn.addEventListener('click', function() {
-                    stopAutoSlide();
-                    prevSlide();
-                    startAutoSlide(); // Resume auto-slide after manual click
-                });
-            }
-            
-            // Auto-slide every 2 seconds - ONLY forward (left to right)
-            function startAutoSlide() {
-                stopAutoSlide(); // Clear any existing interval
-                autoSlideInterval = setInterval(nextSlide, 2000);
-            }
-            
-            function stopAutoSlide() {
-                if (autoSlideInterval) {
-                    clearInterval(autoSlideInterval);
-                }
-            }
-            
-            // Pause on hover (but only auto-slide resumes forward)
-            carousel.addEventListener('mouseenter', stopAutoSlide);
-            carousel.addEventListener('mouseleave', startAutoSlide);
-            
-            // Touch/swipe support for mobile
-            let touchStartX = 0;
-            let touchEndX = 0;
-            
-            track.addEventListener('touchstart', function(e) {
-                touchStartX = e.changedTouches[0].screenX;
-            }, { passive: true });
-            
-            track.addEventListener('touchend', function(e) {
-                touchEndX = e.changedTouches[0].screenX;
-                handleSwipe();
-            }, { passive: true });
-            
-            function handleSwipe() {
-                const swipeThreshold = 50; // Minimum swipe distance
-                const diff = touchStartX - touchEndX;
-                
-                if (Math.abs(diff) > swipeThreshold) {
-                    stopAutoSlide();
-                    if (diff > 0) {
-                        // Swipe left - go forward (left to right)
-                        nextSlide();
-                    } else {
-                        // Swipe right - go backward (right to left, manual only)
-                        prevSlide();
-                    }
-                    startAutoSlide(); // Resume auto-slide after swipe
-                }
-            }
-            
-            // Initialize - start auto-sliding forward continuously
-            updateCarousel(false);
-            startAutoSlide();
-            
-            // Recalculate on window resize
-            let resizeTimeout;
-            window.addEventListener('resize', function() {
-                clearTimeout(resizeTimeout);
-                resizeTimeout = setTimeout(() => {
-                    updateCarousel(false);
-                }, 250);
             });
         });
     </script>
