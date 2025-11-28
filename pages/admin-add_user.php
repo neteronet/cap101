@@ -64,9 +64,17 @@ if (isset($_SESSION['message'])) {
 $post_values = [
     'username' => '', 'password' => '', 'name' => '', 'user_type' => '',
     'rsbsa_id' => '', 'first_name' => '', 'middle_name' => '', 'last_name' => '', 
-    'address' => '', 'contact_number' => '', 'age' => '', 'gender' => '', 
-    'civil_status' => '', 'land_location' => '', 'land_size' => '', 'main_crop' => ''
+    // New fields for Address (residence) - Initialized
+    'res_municipality' => '', 'res_barangay' => '',
+    // New fields for Land Location - Initialized
+    'land_municipality' => '', 'land_barangay' => '',
+    
+    'contact_number' => '', 'age' => '', 'gender' => '', 
+    'civil_status' => '', 'land_size' => '', 'main_crop' => ''
 ];
+// Retain full address strings for error reporting/DB consistency checks
+$post_values['address'] = ''; 
+$post_values['land_location'] = '';
 
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -103,30 +111,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $first_name = trim($_POST['first_name'] ?? '');
             $middle_name = trim($_POST['middle_name'] ?? '');
             $last_name = trim($_POST['last_name'] ?? '');
-            $address = trim($_POST['address'] ?? '');
+            
+            // NEW: Collect structured address data
+            $res_municipality = $_POST['res_municipality'] ?? '';
+            $res_barangay = $_POST['res_barangay'] ?? '';
+            $land_municipality = $_POST['land_municipality'] ?? '';
+            $land_barangay = $_POST['land_barangay'] ?? '';
+            
             $contact_number = trim($_POST['contact_number'] ?? '');
             $age_input = trim($_POST['age'] ?? ''); // Use temporary variable for validation
             $gender = $_POST['gender'] ?? '';
             $civil_status = $_POST['civil_status'] ?? '';
-            $land_location = trim($_POST['land_location'] ?? '');
             $land_size = trim($_POST['land_size'] ?? '');
             $main_crop = trim($_POST['main_crop'] ?? '');
 
             // Convert age to integer
             $age = filter_var($age_input, FILTER_VALIDATE_INT);
+            
+            // --- CONSTRUCT FULL ADDRESS STRINGS (FIXED LOGIC) ---
+            // Assuming Region: Western Visayas (06) and Province: Antique (0604)
+            $province_name = 'Antique';
+            $region_name = 'Western Visayas (Region VI)';
+            
+            // Constructing full Residential Address string
+            $address = !empty($res_barangay) && !empty($res_municipality) ? 
+                       "Brgy. " . $res_barangay . ", " . $res_municipality . ", " . $province_name . ", " . $region_name : 
+                       '';
+                       
+            // Constructing full Land Location string
+            $land_location = !empty($land_barangay) && !empty($land_municipality) ? 
+                             "Brgy. " . $land_barangay . ", " . $land_municipality . ", " . $province_name : 
+                             ''; // Land location often doesn't need region
 
-            // Update post values for repopulation
+            // Update post values for repopulation 
             $post_values = array_merge($post_values, compact(
-                'rsbsa_id', 'first_name', 'middle_name', 'last_name', 'address', 
-                'contact_number', 'age', 'gender', 'civil_status', 'land_location', 
+                'rsbsa_id', 'first_name', 'middle_name', 'last_name', 
+                'res_municipality', 'res_barangay', 'land_municipality', 'land_barangay',
+                'contact_number', 'age', 'gender', 'civil_status', 
                 'land_size', 'main_crop'
             ));
+            // Store the final constructed address strings
+            $post_values['address'] = $address;
+            $post_values['land_location'] = $land_location;
+
 
             // Required fields check for farmer
-            if (empty($rsbsa_id) || empty($first_name) || empty($last_name) || empty($address) || 
+            if (empty($rsbsa_id) || empty($first_name) || empty($last_name) || 
+                empty($res_municipality) || empty($res_barangay) || // New Address Validation
+                empty($land_municipality) || empty($land_barangay) || // New Land Location Validation
                 empty($contact_number) || $age === false || empty($gender) || empty($civil_status) ||
-                empty($land_location) || empty($land_size) || empty($main_crop)) {
-                $message = "All farmer details fields (marked with *) are required and Age must be a valid number.";
+                empty($land_size) || empty($main_crop)) {
+                $message = "All farmer details fields (marked with *) are required, including the full Address and Land Location, and Age must be a valid number.";
                 $message_type = 'danger';
                 $valid = false;
             }
@@ -216,7 +251,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                         // Prepare Land Details JSON (matching the secondary script's logic)
                         $land_details_array = [
-                            'location' => $land_location,
+                            'location' => $land_location, // Use the constructed land_location string
                             'size' => $land_size
                         ];
                         $land_details_json = json_encode($land_details_array);
@@ -283,7 +318,6 @@ if (isset($conn) && $conn->ping()) {
     $conn->close();
 }
 ?>
-<!-- HTML and JavaScript remains the same for the form, toggle, and styling -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -299,8 +333,9 @@ if (isset($conn) && $conn->ping()) {
 <!-- Font Awesome for Icons -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
 
-<!-- Custom Styles (Copied and adapted from farmer-dashboard.php) -->
+<!-- Custom Styles (CSS removed for brevity, assuming standard styling remains) -->
 <style>
+    /* ... (CSS styles remain the same) ... */
     body {
         /* MODIFIED: Changed font-family to Poppins for body/content text */
         font-family: "Poppins", sans-serif;
@@ -515,7 +550,6 @@ if (isset($conn) && $conn->ping()) {
 <!-- Sidebar (Consistent Design) -->
 <nav class="sidebar">
     <!-- Logo and Text -->
-    <!-- Adjusted logo path/text as per the second script's style, but keeping the link generic -->
     <a href="admin-dashboard.php" class="header-brand"> 
         <img src="../photos/logo.png" alt="Department of Agriculture Logo" />
         <div>Agriconnect</div>
@@ -595,7 +629,6 @@ if (isset($conn) && $conn->ping()) {
                     </div>
                     <div class="mb-3">
                         <label for="password" class="form-label card-text">Password <span class="required-star">*</span></label>
-                        <!-- For security, only pre-fill password on error if required to simplify the form, though often cleared. Here, we keep it standard empty -->
                         <input type="password" class="form-control card-text" id="password" name="password" required /> 
                     </div>
                     <div class="mb-4">
@@ -637,12 +670,31 @@ if (isset($conn) && $conn->ping()) {
                             </div>
                         </div>
 
+                        <!-- FIXED: Address Dropdowns for Farmer's RESIDENCE -->
                         <div class="mb-3">
-                            <label for="address" class="form-label card-text">Address <span class="required-star">*</span></label>
-                            <input type="text" class="form-control card-text" id="address" name="address" 
-                                value="<?php echo htmlspecialchars($post_values['address']); ?>" />
+                            <label class="form-label card-text">Residential Address <span class="required-star">*</span></label>
+                            <div class="row g-2">
+                                <div class="col-md-3">
+                                    <input type="text" class="form-control card-text" value="Western Visayas (Reg VI)" disabled />
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="text" class="form-control card-text" value="Antique" disabled />
+                                </div>
+                                <div class="col-md-3">
+                                    <select class="form-select card-text" id="res_municipality" name="res_municipality">
+                                        <option value="">Select Municipality</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <select class="form-select card-text" id="res_barangay" name="res_barangay">
+                                        <option value="">Select Barangay</option>
+                                    </select>
+                                </div>
+                            </div>
                         </div>
-                        
+                        <!-- Hidden field for the final constructed address string (DB consistency) -->
+                        <input type="hidden" name="address" value="<?php echo htmlspecialchars($post_values['address']); ?>" />
+
                         <div class="row">
                             <div class="col-md-4 mb-3">
                                 <label for="contact_number" class="form-label card-text">Contact Number <span class="required-star">*</span></label>
@@ -673,22 +725,44 @@ if (isset($conn) && $conn->ping()) {
                                     <option value="Married" <?php echo ($post_values['civil_status'] === 'Married' ? 'selected' : ''); ?>>Married</option>
                                 </select>
                             </div>
-                            <div class="col-md-4 mb-3">
-                                <label for="land_location" class="form-label card-text">Land Location <span class="required-star">*</span></label>
-                                <input type="text" class="form-control card-text" id="land_location" name="land_location" 
-                                    value="<?php echo htmlspecialchars($post_values['land_location']); ?>" />
+                        </div>
+
+                        <!-- FIXED: Land Location Dropdowns -->
+                        <div class="mb-3">
+                            <label class="form-label card-text">Farm Land Location <span class="required-star">*</span></label>
+                            <div class="row g-2">
+                                <div class="col-md-3">
+                                    <input type="text" class="form-control card-text" value="Western Visayas (Reg VI)" disabled />
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="text" class="form-control card-text" value="Antique" disabled />
+                                </div>
+                                <div class="col-md-3">
+                                    <select class="form-select card-text" id="land_municipality" name="land_municipality">
+                                        <option value="">Select Municipality</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <select class="form-select card-text" id="land_barangay" name="land_barangay">
+                                        <option value="">Select Barangay</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div class="col-md-4 mb-3">
+                        </div>
+                        <!-- Hidden field for the final constructed land_location string (DB consistency) -->
+                        <input type="hidden" name="land_location" value="<?php echo htmlspecialchars($post_values['land_location']); ?>" />
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
                                 <label for="land_size" class="form-label card-text">Land Size (e.g., "1.5 hectares") <span class="required-star">*</span></label>
                                 <input type="text" class="form-control card-text" id="land_size" name="land_size" 
                                     value="<?php echo htmlspecialchars($post_values['land_size']); ?>" />
                             </div>
-                        </div>
-                        
-                        <div class="mb-4">
-                            <label for="main_crop" class="form-label card-text">Main Crop <span class="required-star">*</span></label>
-                            <input type="text" class="form-control card-text" id="main_crop" name="main_crop" 
-                                value="<?php echo htmlspecialchars($post_values['main_crop']); ?>" />
+                            <div class="col-md-6 mb-4">
+                                <label for="main_crop" class="form-label card-text">Main Crop <span class="required-star">*</span></label>
+                                <input type="text" class="form-control card-text" id="main_crop" name="main_crop" 
+                                    value="<?php echo htmlspecialchars($post_values['main_crop']); ?>" />
+                            </div>
                         </div>
                     </div>
                     <!-- END SECTION -->
@@ -705,6 +779,7 @@ if (isset($conn) && $conn->ping()) {
 
 <!-- JavaScript for Sidebar Toggle (Consistent Design) -->
 <script>
+    // ... (Sidebar Toggle Logic remains the same) ...
     const sidebar = document.querySelector('.sidebar');
     const mainContent = document.querySelector('main');
     const header = document.querySelector('.card-header-custom');
@@ -741,7 +816,7 @@ if (isset($conn) && $conn->ping()) {
         }
     });
     
-    // --- NEW: JavaScript for Farmer Details Form Toggle ---
+    // --- JavaScript for Farmer Details Form Toggle ---
     const userTypeSelect = document.getElementById('user_type');
     const farmerDetailsDiv = document.getElementById('farmer-details-form');
     // Select all inputs/selects inside the farmer details div
@@ -752,8 +827,8 @@ if (isset($conn) && $conn->ping()) {
             farmerDetailsDiv.style.display = 'block';
             // Set required attribute dynamically for client-side validation
             farmerInputs.forEach(input => {
-                // Only set required if it's not the optional middle_name field
-                if (input.name !== 'middle_name') {
+                // Only set required if it's not the optional middle_name field or disabled input
+                if (input.name !== 'middle_name' && input.type !== 'hidden' && !input.disabled) {
                     input.setAttribute('required', 'required');
                 }
             });
@@ -769,11 +844,128 @@ if (isset($conn) && $conn->ping()) {
     // Attach listener
     userTypeSelect.addEventListener('change', toggleFarmerDetails);
     
-    // Initial call on load (important for repopulating form on error)
-    document.addEventListener('DOMContentLoaded', function() {
-        // Must call after DOM is fully loaded, especially for pre-filled forms on error
-        toggleFarmerDetails(); 
-    });
+
+// API Configuration for PSGC (Philippine Standard Geographic Code)
+const API_BASE = 'https://psgc.gitlab.io/api';
+const ANTIQUE_CODE = '060600000'; // Antique province code
+
+/**
+ * Fetches municipalities from PSGC API and populates the dropdown
+ * @param {string} municipalityId The ID of the Municipality select element
+ * @param {string} barangayId The ID of the Barangay select element
+ */
+async function loadMunicipalities(municipalityId, barangayId) {
+    const municipalitySelect = document.getElementById(municipalityId);
+    const barangaySelect = document.getElementById(barangayId);
+    
+    // Retrieve PHP post values for repopulation on form error
+    const res_municipality_post = "<?php echo $post_values['res_municipality']; ?>";
+    const res_barangay_post = "<?php echo $post_values['res_barangay']; ?>";
+    const land_municipality_post = "<?php echo $post_values['land_municipality']; ?>";
+    const land_barangay_post = "<?php echo $post_values['land_barangay']; ?>";
+    
+    const selectedMunicipality = municipalityId === 'res_municipality' ? res_municipality_post : land_municipality_post;
+    const selectedBarangay = barangayId === 'res_barangay' ? res_barangay_post : land_barangay_post;
+
+    try {
+        municipalitySelect.disabled = true;
+        municipalitySelect.innerHTML = '<option value="">Loading municipalities...</option>';
+        
+        const response = await fetch(`${API_BASE}/provinces/${ANTIQUE_CODE}/municipalities/`);
+        const municipalities = await response.json();
+        
+        municipalitySelect.innerHTML = '<option value="">Select Municipality</option>';
+        municipalities.forEach(mun => {
+            const option = document.createElement('option');
+            option.value = mun.code;
+            option.textContent = mun.name;
+            
+            // Repopulate selected value on error (by code or name)
+            if (mun.name === selectedMunicipality || mun.code === selectedMunicipality) {
+                option.selected = true;
+            }
+            
+            municipalitySelect.appendChild(option);
+        });
+        
+        municipalitySelect.disabled = false;
+        
+        // If a municipality was pre-selected (on form error), populate the barangay dropdown immediately
+        if (selectedMunicipality) {
+            const selectedMunCode = [...municipalitySelect.options].find(opt => opt.selected)?.value;
+            if (selectedMunCode) {
+                await loadBarangays(selectedMunCode, barangayId, selectedBarangay);
+            }
+        }
+        
+        // Attach change listener to trigger barangay update
+        municipalitySelect.addEventListener('change', async function(e) {
+            const selectedMunCode = e.target.value;
+            
+            if (!selectedMunCode) {
+                barangaySelect.innerHTML = '<option value="">Select Barangay</option>';
+                barangaySelect.disabled = true;
+            } else {
+                barangaySelect.disabled = false;
+                await loadBarangays(selectedMunCode, barangayId, '');
+            }
+        });
+        
+    } catch (error) {
+        console.error('Error loading municipalities:', error);
+        municipalitySelect.innerHTML = '<option value="">Error loading municipalities</option>';
+        municipalitySelect.disabled = false;
+    }
+}
+
+/**
+ * Fetches barangays from PSGC API and populates the dropdown
+ * @param {string} municipalityCode The code of the selected municipality
+ * @param {string} barangayId The ID of the Barangay select element
+ * @param {string} preselectedValue The name of the barangay to pre-select
+ */
+async function loadBarangays(municipalityCode, barangayId, preselectedValue) {
+    const barangaySelect = document.getElementById(barangayId);
+    
+    try {
+        barangaySelect.disabled = true;
+        barangaySelect.innerHTML = '<option value="">Loading barangays...</option>';
+        
+        const response = await fetch(`${API_BASE}/municipalities/${municipalityCode}/barangays/`);
+        const barangays = await response.json();
+        
+        barangaySelect.innerHTML = '<option value="">Select Barangay</option>';
+        barangays.forEach(brgy => {
+            const option = document.createElement('option');
+            option.value = brgy.code;
+            option.textContent = brgy.name;
+            
+            if (brgy.name === preselectedValue || brgy.code === preselectedValue) {
+                option.selected = true;
+            }
+            
+            barangaySelect.appendChild(option);
+        });
+        
+        barangaySelect.disabled = false;
+    } catch (error) {
+        console.error('Error loading barangays:', error);
+        barangaySelect.innerHTML = '<option value="">Error loading barangays</option>';
+        barangaySelect.disabled = false;
+    }
+}
+
+// Initial calls on load
+document.addEventListener('DOMContentLoaded', function() {
+    toggleFarmerDetails(); 
+    
+    // 1. Load and populate Residential Address Dropdowns
+    loadMunicipalities('res_municipality', 'res_barangay');
+    
+    // 2. Load and populate Land Location Dropdowns
+    loadMunicipalities('land_municipality', 'land_barangay');
+});
+
 </script>
 </body>
 </html>

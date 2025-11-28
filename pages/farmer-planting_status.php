@@ -163,14 +163,17 @@ function calculateAutomatedProgress($crop_identifier, $current_db_status, $start
     $clean_name = explode('(', $clean_name)[0];
     $clean_name = trim($clean_name);
 
-    $terminal_states = ['Harvested', 'Damaged (Calamity)', 'Not Planted'];
-    if (in_array($current_db_status, $terminal_states)) {
+    // *** CHANGE: Updated terminal state to 'Damaged' ***
+    $terminal_states = ['Harvested', 'Damaged', 'Not Planted'];
+    if (in_array($current_db_status, $terminal_states) || $current_db_status === 'Damaged (Calamity)') { // Added old label check for safety
+        $status_to_return = ($current_db_status === 'Damaged (Calamity)') ? 'Damaged' : $current_db_status;
         return [
-            'status' => $current_db_status,
-            'percent' => ($current_db_status == 'Not Planted') ? 0 : 100,
+            'status' => $status_to_return,
+            'percent' => ($status_to_return == 'Not Planted') ? 0 : 100,
             'is_automated' => false
         ];
     }
+    // *** END CHANGE ***
 
     if (!$start_date) {
         return ['status' => $current_db_status, 'percent' => 0, 'is_automated' => false];
@@ -280,7 +283,8 @@ function generateAlerts($user_planting_statuses)
 {
     $generated_alerts = [];
     foreach ($user_planting_statuses as $status_item) {
-        if ($status_item['status'] == 'Damaged (Calamity)') {
+        // *** CHANGE: Check for both new 'Damaged' and old 'Damaged (Calamity)' ***
+        if ($status_item['status'] == 'Damaged' || $status_item['status'] == 'Damaged (Calamity)') {
             $generated_alerts[] = [
                 'type' => 'danger',
                 'message' => 'Your crop <strong class="text-danger">' . htmlspecialchars($status_item['crop_identifier']) . '</strong> has been marked as <strong>Damaged</strong>. Please submit required documentation.'
@@ -1195,7 +1199,7 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
     <!-- Sidebar (DO NOT TOUCH) -->
     <nav class="sidebar">
         <!-- HTML structure for the logo and text remains the same, but the CSS changes the layout -->
-        <a href="ProvincialAgriHome.html" class="header-brand">
+        <a class="header-brand">
             <img src="../photos/logo.png" alt="Department of Agriculture Logo" />
             <div>Agriconnect</div>
         </a>
@@ -1344,7 +1348,12 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
                         <?php foreach ($user_planting_statuses as $crop):
                             $cycle_start_date = getCycleStartDate($conn, $user_id, $crop['crop_identifier']);
 
-                            if (!$cycle_start_date && !in_array($crop['status'], ['Harvested', 'Not Planted', 'Damaged (Calamity)'])) {
+                            // Handle old status label in DB for calculations
+                            if ($crop['status'] === 'Damaged (Calamity)') {
+                                $crop['status'] = 'Damaged';
+                            }
+
+                            if (!$cycle_start_date && !in_array($crop['status'], ['Harvested', 'Not Planted', 'Damaged'])) {
                                 $cycle_start_date = $crop['update_date'];
                             }
 
@@ -1355,7 +1364,7 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
                             $auto_percent = $auto_data['percent'];
                             $is_automated = $auto_data['is_automated']; // Preserve the automation flag
                             $days_elapsed = $auto_data['days_elapsed'] ?? 0;
-                            $db_status = $crop['status']; // The last status saved in the database
+                            $db_status = $crop['status']; // The last status saved in the database (standardized to 'Damaged' if it was 'Damaged (Calamity)')
 
                             // 2. Determine the fixed percentage for the last status saved in the DB
                             $fixed_percent_for_db_status = 0;
@@ -1373,7 +1382,7 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
                                     $fixed_percent_for_db_status = 90;
                                     break;
                                 case 'Harvested':
-                                case 'Damaged (Calamity)':
+                                case 'Damaged': // *** CHANGE: Added 'Damaged' ***
                                     $fixed_percent_for_db_status = 100;
                                     $is_automated = false; // Terminal states should stop automation
                                     break;
@@ -1404,7 +1413,8 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
                                 $progress_percent = max($fixed_percent_for_db_status, $auto_percent);
                             }
                             // Ensure terminal states are set to 100% and non-automated
-                            if (in_array($display_status, ['Harvested', 'Damaged (Calamity)'])) {
+                            // *** CHANGE: Included 'Damaged' for terminal state check ***
+                            if (in_array($display_status, ['Harvested', 'Damaged'])) {
                                 $progress_percent = 100;
                                 $is_automated = false;
                             }
@@ -1439,8 +1449,8 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
                                     $progress_stage = "Harvest Complete";
                                     $status_class = 'success';
                                     break;
-                                case 'Damaged (Calamity)':
-                                    $progress_stage = "Critically Damaged";
+                                case 'Damaged': // *** CHANGE: Updated label ***
+                                    $progress_stage = "Damaged";
                                     $status_class = 'danger';
                                     break;
                                 case 'Not Planted':
@@ -1552,7 +1562,9 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
                                                     onclick="viewPhotoModal('<?php echo htmlspecialchars($photo_item['photo_path']); ?>', '<?php echo htmlspecialchars($photo_item['crop_identifier']); ?>')">
                                                 <!-- Badge color (bg-success) is correct as requested -->
                                                 <span class="badge bg-success position-absolute top-0 end-0 m-2">
-                                                    <?php echo htmlspecialchars($photo_item['status']); ?>
+                                                    <!-- *** CHANGE: Standardize display name for old label *** -->
+                                                    <?php echo htmlspecialchars(($photo_item['status'] == 'Damaged (Calamity)') ? 'Damaged' : $photo_item['status']); ?>
+                                                    <!-- *** END CHANGE *** -->
                                                 </span>
                                             </div>
                                             <div class="card-body p-2">
@@ -1625,25 +1637,32 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
                             <tbody>
                                 <?php if (!empty($update_history)): ?>
                                     <?php foreach ($update_history as $history_item):
-                                        if ($history_item['status'] == 'Damaged (Calamity)') {
+                                        // *** CHANGE: Check for both new 'Damaged' and old 'Damaged (Calamity)' ***
+                                        if ($history_item['status'] == 'Damaged' || $history_item['status'] == 'Damaged (Calamity)') {
                                             $history_class = 'danger';
+                                            $display_status_history = 'Damaged'; // Standardize display
                                         } elseif ($history_item['status'] == 'Growing') {
                                             $history_class = 'info';
+                                            $display_status_history = $history_item['status'];
                                         } elseif ($history_item['status'] == 'Harvesting' || $history_item['status'] == 'Harvested') {
                                             $history_class = 'success';
+                                            $display_status_history = $history_item['status'];
                                         } elseif ($history_item['status'] == 'Flowering') {
                                             $history_class = 'warning';
+                                            $display_status_history = $history_item['status'];
                                         } elseif ($history_item['status'] == 'Seedling') {
                                             $history_class = 'primary';
+                                            $display_status_history = $history_item['status'];
                                         } else {
                                             $history_class = 'secondary';
+                                            $display_status_history = $history_item['status'];
                                         }
                                     ?>
                                         <tr>
                                             <td><strong><?php echo htmlspecialchars($history_item['crop_identifier']); ?></strong></td>
                                             <td>
                                                 <span class="badge bg-<?php echo $history_class; ?>">
-                                                    <?php echo htmlspecialchars($history_item['status']); ?>
+                                                    <?php echo htmlspecialchars($display_status_history); ?>
                                                 </span>
                                             </td>
                                             <td>
@@ -1772,14 +1791,16 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
                             </label>
 
                             <!-- Damaged -->
-                            <input type="radio" class="btn-check" name="plantingStatus" id="modalDamaged(Calamity)" value="Damaged (Calamity)">
-                            <label class="option-label option-label-danger" for="modalDamaged(Calamity)">
+                            <!-- *** CHANGE: Updated ID, Value, and For attributes to 'Damaged' *** -->
+                            <input type="radio" class="btn-check" name="plantingStatus" id="modalDamaged" value="Damaged">
+                            <label class="option-label option-label-danger" for="modalDamaged">
                                 <i class="fas fa-exclamation-triangle"></i>
                                 <div>
                                     <div class="fw-bold">Damaged</div>
                                     <div class="small">Report Calamity/Loss</div>
                                 </div>
                             </label>
+                            <!-- *** END CHANGE *** -->
                         </div>
 
                         <!-- Compact Photo Upload -->
@@ -1866,9 +1887,12 @@ $alerts = generateAlerts($user_planting_statuses); // $alerts is no longer used 
 
             // Set current status as checked
             let radioId = 'modal' + currentStatus.replace(/[\s()]/g, '');
-            if (currentStatus === 'Damaged (Calamity)') {
-                radioId = 'modalDamaged(Calamity)';
+
+            // *** CHANGE: Use the new ID for both old and new labels in JS ***
+            if (currentStatus === 'Damaged (Calamity)' || currentStatus === 'Damaged') {
+                radioId = 'modalDamaged';
             }
+            // *** END CHANGE ***
 
             const radio = document.getElementById(radioId);
             if (radio) {

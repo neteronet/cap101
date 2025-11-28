@@ -56,7 +56,7 @@ if ($stmt_name) {
 $announcements = []; // Initialize an empty array to store announcements
 
 // Assuming your table name for announcements is 'announcements'
-$sql = "SELECT id, title, category, content, image_url, publish_date FROM announcements ORDER BY publish_date DESC";
+$sql = "SELECT id, title, category, content, image, publish_date FROM announcements ORDER BY publish_date DESC";
 $result = $conn->query($sql);
 
 if ($result) {
@@ -549,7 +549,7 @@ $conn->close();
 <body>
     <!-- Sidebar (Consistent Design) -->
     <nav class="sidebar">
-        <a href="ProvincialAgriHome.html" class="header-brand">
+        <a class="header-brand">
             <!-- Changed logo source and text to match the reference dashboard -->
             <img src="../photos/logo.png" alt="Department of Agriculture Logo" />
             <div>Agriconnect</div>

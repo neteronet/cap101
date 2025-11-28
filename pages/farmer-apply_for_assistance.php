@@ -87,6 +87,7 @@ $stmt_latest = $conn->prepare("
 $application_exists_this_year = false;
 $allow_new_application = true; // Assume true unless blocked by PENDING or APPROVED/UNCLAIMED
 $is_approved_unclaimed = false; // Flag to trigger QR code display
+$is_approved_and_claimed = false; // NEW FLAG: For successfully claimed subsidy
 
 if ($stmt_latest) {
     $stmt_latest->bind_param("i", $user_id);
@@ -102,6 +103,10 @@ if ($stmt_latest) {
         } elseif ($latest_status === 'Approved' && $latest_claimed_status == 0) {
             $allow_new_application = false; // Blocked by Approved/Unclaimed
             $is_approved_unclaimed = true;
+        }
+        // ADDED CHECK: If latest is Approved AND Claimed
+        elseif ($latest_status === 'Approved' && $latest_claimed_status == 1) {
+            $is_approved_and_claimed = true;
         }
         // If status is Rejected or Claimed (1), $allow_new_application remains true
     }
@@ -742,7 +747,7 @@ if ($conn && $conn->ping()) {
     <!-- Sidebar (FROM DASHBOARD) -->
     <nav class="sidebar">
         <!-- New Header Brand (Logo and Text) -->
-        <a href="ProvincialAgriHome.html" class="header-brand">
+        <a class="header-brand">
             <img src="../photos/logo.png" alt="Province of Antique" />
             <div>Agriconnect</div>
         </a>
@@ -838,6 +843,7 @@ if ($conn && $conn->ping()) {
                     <p class="text-danger small mt-2">
                         **DO NOT SHARE THIS CODE PUBLICLY.** It is linked to your assistance claim.
                     </p>
+                    <!-- THE DOWNLOAD BUTTON - Functionality is already correct and present. -->
                     <button class="btn btn-theme col-lg-4 col-md-6 mx-auto mt-3" onclick="downloadQRCode('<?php echo urlencode($approved_qr_code); ?>', '<?php echo htmlspecialchars($farmer_id_display); ?>')" style="background-color: #198754; border-color: #198754;">
                         <i class="fas fa-download me-2"></i> Download QR Code
                     </button>
@@ -861,12 +867,28 @@ if ($conn && $conn->ping()) {
                 // TEMPLATE 3: ALLOWED TO APPLY (Show Form) 
                 // (Covers: No application this year, Latest is Rejected, Latest is Claimed)
             ?>
+
+                <?php if ($is_approved_and_claimed): 
+                    // NEW TEMPLATE FOR CLAIMED SUBSIDY
+                ?>
+                    <div class="card shadow p-4 text-center border-success border-3 mb-4">
+                        <h2 class="text-success mb-3"><i class="fas fa-award"></i> Assistance Successfully Claimed!</h2>
+                        <p class="text-muted mb-4">
+                            Your previous assistance application (ID: **<?php echo htmlspecialchars($latest_app_id); ?>**) for **<?php echo date('Y'); ?>** was successfully **Claimed**.
+                        </p>
+                        <i class="fas fa-seedling fa-4x text-success my-4"></i>
+                        <p class="card-text text-muted">
+                            You may now submit a new assistance request for the current year.
+                        </p>
+                    </div>
+                <?php endif; ?>
+                
                 <div class="alert alert-info-custom" role="alert">
                     <i class="fas fa-info-circle"></i>
                     Please fill in the form below to request support. You are currently eligible to apply for new assistance for this year.
                 </div>
 
-                <?php if ($application_exists_this_year && ($latest_status === 'Rejected' || $latest_claimed_status == 1)): ?>
+                <?php if ($application_exists_this_year && $latest_status === 'Rejected'): ?>
                     <div class="alert alert-info border-info" role="alert">
                         <i class="fas fa-exclamation-circle me-2"></i>
                         Note: Your last application (ID: **<?php echo htmlspecialchars($latest_app_id); ?>**) was **<?php echo htmlspecialchars($latest_status); ?>**. You may submit a new request.
@@ -983,15 +1005,41 @@ if ($conn && $conn->ping()) {
     <!-- Bootstrap JS and Custom Script -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Function for QR Code Download (used in Template 1) - RETAINED
+        // Function for QR Code Download (used in Template 1) - MODIFIED FOR ROBUST CROSS-ORIGIN DOWNLOAD
         function downloadQRCode(qrData, farmerId) {
             const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${qrData}&size=400x400`;
-            const link = document.createElement('a');
-            link.href = qrCodeUrl;
-            link.download = `Farmer_QRCode_${farmerId || 'Claim'}.png`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            const filename = `Farmer_QRCode_${farmerId || 'Claim'}.png`;
+            
+            // Use fetch to get the image data as a Blob
+            fetch(qrCodeUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.blob();
+                })
+                .then(blob => {
+                    // Create a temporary URL for the Blob object (this URL is local and can be downloaded)
+                    const url = window.URL.createObjectURL(blob);
+                    
+                    // Create a temporary <a> element to trigger download
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = filename; // Set the desired filename
+                    document.body.appendChild(link);
+                    link.click(); // Trigger the download
+                    
+                    // Clean up by revoking the object URL and removing the link
+                    // setTimeout is sometimes used to ensure the click fully registers before revoking
+                    setTimeout(() => {
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(link);
+                    }, 100); 
+                })
+                .catch(error => {
+                    console.error('Error fetching QR code for download:', error);
+                    alert('Failed to download QR Code. Please check your connection or try again.');
+                });
         }
         
         // --- START NOTIFICATION BELL FUNCTIONS (FROM DASHBOARD) ---

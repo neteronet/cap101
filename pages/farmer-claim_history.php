@@ -70,7 +70,7 @@ if ($stmt_name) {
     exit();
 }
 
-// --- Fetch Claim History for Approved and Claimed Assistance ---
+// --- Fetch Claim History for Approved and Claimed Assistance (KEPT FOR FUNCTIONAL CONSISTENCY, THOUGH NOT DISPLAYED) ---
 $claim_history = [];
 $stmt_claims = $conn->prepare("
     SELECT sc.claim_id, aa.assistance_type, aa.seed_type, aa.seed_quantity, aa.engine_type, sc.claim_date, sc.notes
@@ -623,7 +623,7 @@ $conn->close(); // Close the connection after all database operations
     <!-- Sidebar (CONSISTENT DESIGN) -->
     <nav class="sidebar">
         <!-- Logo and Text (Consistent) -->
-        <a href="ProvincialAgriHome.html" class="header-brand">
+        <a class="header-brand">
             <img src="../photos/logo.png" alt="Department of Agriculture Logo" />
             <div>Agriconnect</div>
         </a>
@@ -689,48 +689,8 @@ $conn->close(); // Close the connection after all database operations
                 View the history of your approved and claimed assistance applications.
             </p>
 
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <h5 class="card-title"><i class="fas fa-list me-2"></i>Approved Claims</h5>
-                    <?php if (!empty($claim_history)): ?>
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Claim ID</th>
-                                        <th>Assistance Type</th>
-                                        <th>Details</th>
-                                        <th>Claim Date</th>
-                                        <th>Notes</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($claim_history as $claim): ?>
-                                        <tr>
-                                            <td><?php echo htmlspecialchars($claim['claim_id']); ?></td>
-                                            <td><?php echo htmlspecialchars($claim['assistance_type']); ?></td>
-                                            <td>
-                                                <?php
-                                                $details = [];
-                                                if ($claim['seed_type']) $details[] = "Seed: " . htmlspecialchars($claim['seed_type']);
-                                                if ($claim['seed_quantity']) $details[] = "Qty: " . htmlspecialchars($claim['seed_quantity']);
-                                                if ($claim['engine_type']) $details[] = "Engine: " . htmlspecialchars($claim['engine_type']);
-                                                echo implode(", ", $details);
-                                                ?>
-                                            </td>
-                                            <td><?php echo date('F j, Y', strtotime($claim['claim_date'])); ?></td>
-                                            <td><?php echo htmlspecialchars($claim['notes'] ?? 'N/A'); ?></td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    <?php else: ?>
-                        <p class="text-muted">No approved claims found.</p>
-                    <?php endif; ?>
-                </div>
-            </div>
-
+            <!-- REMOVED: Approved Claims Section as requested by the user -->
+            
             <div class="card shadow-sm">
                 <div class="card-body">
                     <h5 class="card-title"><i class="fas fa-file-alt me-2"></i>Application History</h5>
@@ -739,7 +699,7 @@ $conn->close(); // Close the connection after all database operations
                             <table class="table table-striped">
                                 <thead>
                                     <tr>
-                                        <th>Application ID</th>
+                                        <!-- REMOVED: <th>Application ID</th> as requested by the user -->
                                         <th>Assistance Type</th>
                                         <th>Details</th>
                                         <th>Status</th>
@@ -750,7 +710,7 @@ $conn->close(); // Close the connection after all database operations
                                 <tbody>
                                     <?php foreach ($application_history as $app): ?>
                                         <tr>
-                                            <td><?php echo htmlspecialchars($app['application_id']); ?></td>
+                                            <!-- REMOVED: <td><?php echo htmlspecialchars($app['application_id']); ?></td> as requested by the user -->
                                             <td><?php echo htmlspecialchars($app['assistance_type']); ?></td>
                                             <td>
                                                 <?php
@@ -758,7 +718,14 @@ $conn->close(); // Close the connection after all database operations
                                                 if ($app['seed_type']) $details[] = "Seed: " . htmlspecialchars($app['seed_type']);
                                                 if ($app['seed_quantity']) $details[] = "Qty: " . htmlspecialchars($app['seed_quantity']);
                                                 if ($app['engine_type']) $details[] = "Engine: " . htmlspecialchars($app['engine_type']);
-                                                echo implode(", ", $details);
+                                                
+                                                // --- MODIFICATION START: Display 'N/A' if no details are present ---
+                                                if (empty($details)) {
+                                                    echo 'N/A';
+                                                } else {
+                                                    echo implode(", ", $details);
+                                                }
+                                                // --- MODIFICATION END ---
                                                 ?>
                                             </td>
                                             <td>

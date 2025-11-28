@@ -585,6 +585,12 @@ $conn->close(); // Close the connection after all database operations
         .carousel-control-next {
             width: 8%; /* Reduced width */
         }
+        
+        /* NEW: Fix for Announcement Card height fluctuation */
+        #announcementCarousel {
+            min-height: 160px; /* Ensure a minimum height for the carousel content area to prevent card shrinking when content is short */
+        }
+
 
         /* ----------------------------------------------------------- */
         /* --- Notification Bell Styling for Consistency (IMPROVED) --- */
@@ -660,7 +666,7 @@ $conn->close(); // Close the connection after all database operations
         .notification-header h6 {
             margin: 0;
             font-size: 1rem;
-            color: #fff; /* Dark Green for heading consistency */
+            color: #0f5132; /* Dark Green for heading consistency */
             font-weight: 600;
         }
 
@@ -723,13 +729,12 @@ $conn->close(); // Close the connection after all database operations
     </style>
 
 </head>
-
 <body>
 
     <!-- Sidebar (FROM CODE A) -->
     <nav class="sidebar">
         <!-- Logo and Text (Consistent with Code A) -->
-        <a href="ProvincialAgriHome.html" class="header-brand">
+        <a class="header-brand">
             <!-- Using the better logo and name from Code A structure -->
             <img src="../photos/logo.png" alt="Department of Agriculture Logo" />
             <div>Agriconnect</div>
@@ -806,7 +811,7 @@ $conn->close(); // Close the connection after all database operations
 
                             <?php if (!empty($announcements)) : ?>
                                 <?php
-                                $chunks = array_chunk($announcements, 3);
+                                $chunks = array_chunk($announcements, 1);
                                 ?>
                                 <div id="announcementCarousel" class="carousel slide flex-grow-1" data-bs-ride="carousel" data-bs-interval="8000">
                                     <div class="carousel-inner">
@@ -844,7 +849,7 @@ $conn->close(); // Close the connection after all database operations
                                     <?php endif; ?>
                                 </div>
                             <?php else : ?>
-                                <p class="text-muted small mb-3 flex-grow-1">No recent announcements.</p>
+                                <p class="text-muted small mb-3 flex-grow-1" id="announcementCarousel">No recent announcements.</p>
                             <?php endif; ?>
 
                             <a href="farmer-announcement.php" class="btn btn-theme mt-auto">View All Announcements</a>
@@ -1038,5 +1043,4 @@ $conn->close(); // Close the connection after all database operations
         });
     </script>
 </body>
-
 </html>
