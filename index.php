@@ -486,6 +486,8 @@ require_once __DIR__ . '/home_data.php';
             font-size: 16px;
             font-weight: 500;
             transition: background-color 0.3s ease, transform 0.2s ease;
+            text-decoration: none; /* Added for anchor tag */
+            display: inline-block; /* Added for anchor tag */
         }
 
         .discover-more-btn:hover {
@@ -644,6 +646,8 @@ require_once __DIR__ . '/home_data.php';
             font-weight: 500; /* Matched .discover-more-btn */
             transition: background-color 0.3s ease, transform 0.2s ease; /* Matched .discover-more-btn */
             box-shadow: none; /* Removed box-shadow */
+            text-decoration: none; /* Added for anchor tag */
+            display: inline-block; /* Added for anchor tag */
         }
 
         .why-choose-btn:hover {
@@ -1060,7 +1064,7 @@ require_once __DIR__ . '/home_data.php';
                     <div class="feature-pill-info">
                         <h4>QR Access</h4>
                         <p>Generate secure QR codes for farmer verification and quick check-ins.</p>
-                        <a href="municipal-qrcode_management.php">Explore QR tools <i class="fas fa-arrow-right"></i></a>
+                        <a href="home.php">Explore QR tools <i class="fas fa-arrow-right"></i></a>
                     </div>
                 </div>
                 <div class="feature-pill">
@@ -1071,7 +1075,7 @@ require_once __DIR__ . '/home_data.php';
                     <div class="feature-pill-info">
                         <h4>Crop Monitoring</h4>
                         <p>Track planting status, growth stages, and field updates in real time.</p>
-                        <a href="municipal-crop_monitoring.php">View crop status <i class="fas fa-arrow-right"></i></a>
+                        <a href="home.php">View crop status <i class="fas fa-arrow-right"></i></a>
                     </div>
                 </div>
                 <div class="feature-pill">
@@ -1082,7 +1086,7 @@ require_once __DIR__ . '/home_data.php';
                     <div class="feature-pill-info">
                         <h4>Subsidy Support</h4>
                         <p>Manage requests, approvals, and claims with full transparency.</p>
-                        <a href="municipal-subsidy_management.php">Manage subsidies <i class="fas fa-arrow-right"></i></a>
+                        <a href="home.php">Manage subsidies <i class="fas fa-arrow-right"></i></a>
                     </div>
                 </div>
             </div>
@@ -1117,7 +1121,8 @@ require_once __DIR__ . '/home_data.php';
                         <li><i class="list-dot"></i> Lorem Ipsum is not simply random text.</li>
                         <li><i class="list-dot"></i> Making this the first true generator on the internet.</li>
                     </ul>
-                    <button class="discover-more-btn">Discover More</button>
+                    <!-- MODIFIED: Changed from button to anchor tag with link to about.php -->
+                    <a href="about.php" class="discover-more-btn">Discover More</a>
                 </div>
             </div>
         </div>
@@ -1141,7 +1146,8 @@ require_once __DIR__ . '/home_data.php';
                     <li><i class="check-icon">✓</i> Real-time Crop Monitoring for better yields</li>
                     <li><i class="check-icon">✓</i> Transparent Subsidy Management for fair distribution</li>
                 </ul>
-                <button class="why-choose-btn">Discover More</button>
+                <!-- MODIFIED: Changed from button to anchor tag with link to about.php -->
+                <a href="about.php" class="why-choose-btn">Discover More</a>
             </div>
         </div>
     </section>

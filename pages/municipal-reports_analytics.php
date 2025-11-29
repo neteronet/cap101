@@ -75,6 +75,10 @@ $totalHectaresPlanted = 0;
 $pendingSubsidyRequests = 0;
 $farmersRegistered = 0;
 
+// NEW: Disaster Report Initialization
+$disasterTypeLabels = [];
+$disasterTypeData = [];
+
 // Re-establish connection check (Good practice)
 if (isset($conn) && $conn->connect_error) { // Check if connection is still valid/open, or re-establish
     // Assuming $servername, $db_username, $db_password, $dbname are defined in connection.php
@@ -191,7 +195,38 @@ if (isset($conn) && !$conn->connect_error) {
         error_log("Error preparing farmer age statement: " . $conn->error);
     }
 
-    // --- 4. Other Key Metrics ---
+    // --- NEW: 4. Disaster Impact by Type chart (Secured with Prepared Statements) ---
+    // Assuming a table 'disaster_reports' with 'disaster_type' and 'report_date'
+    $sql_disaster_impact = "SELECT
+                                disaster_type,
+                                COUNT(DISTINCT farmer_id) as affected_farmers_count
+                            FROM disaster_reports
+                            -- Filter out NULL or empty disaster type entries and apply date filter securely
+                            WHERE disaster_type IS NOT NULL AND disaster_type != '' AND report_date BETWEEN ? AND ?
+                            GROUP BY disaster_type
+                            ORDER BY affected_farmers_count DESC
+                            LIMIT 6";
+
+    $stmt_disaster = $conn->prepare($sql_disaster_impact);
+
+    if ($stmt_disaster) {
+        // NOTE: The end date is included in the period, so we use 'ss' for date strings
+        $stmt_disaster->bind_param("ss", $startDate, $endDate); 
+        $stmt_disaster->execute();
+        $result_disaster_impact = $stmt_disaster->get_result(); // Get the result set
+
+        if ($result_disaster_impact) {
+            while ($row = $result_disaster_impact->fetch_assoc()) {
+                $disasterTypeLabels[] = htmlspecialchars($row['disaster_type']); // Sanitize disaster name
+                $disasterTypeData[] = $row['affected_farmers_count']; 
+            }
+        }
+        $stmt_disaster->close();
+    } else {
+        error_log("Error preparing disaster impact statement: " . $conn->error);
+    }
+
+    // --- 5. Other Key Metrics ---
     
     // Total Active Farmers (No date filter needed)
     $sql_total_active_farmers = "SELECT COUNT(*) as total FROM farmers";
@@ -664,7 +699,8 @@ if (isset($conn) && $conn) {
         </form>
 
         <div class="row">
-            <!-- Crop Performance Section -->
+            <?php if ($reportType == 'crop'): ?>
+            <!-- Crop Performance Section (Displays when reportType is 'crop') -->
             <div class="col-lg-6">
                 <div class="report-section">
                     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -675,12 +711,12 @@ if (isset($conn) && $conn) {
                         <canvas id="cropYieldChart"></canvas>
                     </div>
                     <p class="text-muted mt-3 mb-0" style="font-size: 0.9rem;">
-                        The top 6 crops based on the number of registered farmers.
+                        The top 6 crops based on the number of registered farmers in the period (<?php echo htmlspecialchars($startDate); ?> to <?php echo htmlspecialchars($endDate); ?>).
                     </p>
                 </div>
             </div>
 
-            <!-- Subsidy Distribution Section -->
+            <!-- Subsidy Distribution Section (Secondary for Crop) -->
             <div class="col-lg-6">
                 <div class="report-section">
                     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -691,20 +727,77 @@ if (isset($conn) && $conn) {
                         <canvas id="subsidyStatusChart"></canvas>
                     </div>
                     <p class="text-muted mt-3 mb-0" style="font-size: 0.9rem;">
-                        Breakdown of subsidy requests by status (Pending, Approved, Claimed).
+                        Breakdown of subsidy requests by status (Pending, Approved, Claimed) in the period (<?php echo htmlspecialchars($startDate); ?> to <?php echo htmlspecialchars($endDate); ?>).
                     </p>
                 </div>
             </div>
 
+            <?php elseif ($reportType == 'disaster'): ?>
+            <!-- NEW: Disaster Impact Section (Displays when reportType is 'disaster') -->
+            <div class="col-lg-6">
+                <div class="report-section">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4>Disaster Impact by Type</h4>
+                        <button class="btn btn-sm btn-outline-success"><i class="fas fa-download me-1"></i> Download</button>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="disasterImpactChart"></canvas>
+                    </div>
+                    <p class="text-muted mt-3 mb-0" style="font-size: 0.9rem;">
+                        Number of unique farmers affected by the top disaster types in the period (<?php echo htmlspecialchars($startDate); ?> to <?php echo htmlspecialchars($endDate); ?>).
+                    </p>
+                </div>
+            </div>
+
+            <!-- Subsidy Distribution Section (Secondary for Disaster) -->
+            <div class="col-lg-6">
+                <div class="report-section">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4>Subsidy Distribution Status</h4>
+                        <button class="btn btn-sm btn-outline-success"><i class="fas fa-download me-1"></i> Download</button>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="subsidyStatusChart"></canvas>
+                    </div>
+                    <p class="text-muted mt-3 mb-0" style="font-size: 0.9rem;">
+                        Breakdown of subsidy requests by status (Pending, Approved, Claimed) in the period (<?php echo htmlspecialchars($startDate); ?> to <?php echo htmlspecialchars($endDate); ?>).
+                    </p>
+                </div>
+            </div>
+
+            <?php else: // Fallback for other report types ?>
+                <!-- Fallback/Placeholder: You can add content for 'subsidy' or 'farmer' here -->
+                <div class="col-lg-12">
+                    <div class="alert alert-info" role="alert">
+                        <strong>Report Selected: <?php echo ucfirst(htmlspecialchars($reportType)); ?>.</strong> Displaying general metrics and the Subsidy Distribution chart. Full report customization for this type is not yet implemented.
+                    </div>
+                </div>
+                <!-- Subsidy Distribution Section (Default when no specific report is chosen) -->
+                <div class="col-lg-6 offset-lg-3">
+                    <div class="report-section">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h4>Subsidy Distribution Status (Default Chart)</h4>
+                            <button class="btn btn-sm btn-outline-success"><i class="fas fa-download me-1"></i> Download</button>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="subsidyStatusChart"></canvas>
+                        </div>
+                        <p class="text-muted mt-3 mb-0" style="font-size: 0.9rem;">
+                            Breakdown of subsidy requests by status (Pending, Approved, Claimed) in the period (<?php echo htmlspecialchars($startDate); ?> to <?php echo htmlspecialchars($endDate); ?>).
+                        </p>
+                    </div>
+                </div>
+            <?php endif; ?>
+
             <!-- Other Reports and Data Tables -->
             <div class="col-lg-12">
                 <div class="report-section">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-3 mt-4">
                         <h4>Other Key Metrics</h4>
                         <button class="btn btn-sm btn-outline-success"><i class="fas fa-download me-1"></i> Download All Data</button>
                     </div>
                     <div class="row">
-                        <div class="col-md-3">
+                        <div class="col-md-4"> <!-- FIX: Changed col-md-3 to col-md-4 for better spacing (1/3 of the row) -->
                             <div class="card bg-light mb-3">
                                 <div class="card-body">
                                     <h6 class="card-title">Total Active Farmers</h6>
@@ -713,7 +806,7 @@ if (isset($conn) && $conn) {
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4"> <!-- FIX: Changed col-md-3 to col-md-4 for better spacing (1/3 of the row) -->
                             <div class="card bg-light mb-3">
                                 <div class="card-body">
                                     <h6 class="card-title">Farmers Registered (<?php echo $periodFilter == 'current' ? 'Last 6 Months' : ($periodFilter == 'last3m' ? 'Last 3 Months' : ($periodFilter == 'last6m' ? 'Last 6 Months' : ($periodFilter == 'yearly' ? 'Yearly' : 'Custom Period'))); ?>)</h6>
@@ -722,16 +815,8 @@ if (isset($conn) && $conn) {
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3">
-                            <div class="card bg-light mb-3">
-                                <div class="card-body">
-                                    <h6 class="card-title">Total Hectares Planted (Current Season)</h6>
-                                    <h2 class="card-text text-primary"><?php echo number_format($totalHectaresPlanted, 1); ?></h2>
-                                    <a href="municipal-crop_monitoring.php" class="btn-link">Monitor crops</a>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
+                        <!-- The "Total Hectares Planted" card has been correctly removed. -->
+                        <div class="col-md-4"> <!-- FIX: Changed col-md-3 to col-md-4 for better spacing (1/3 of the row) -->
                             <div class="card bg-light mb-3">
                                 <div class="card-body">
                                     <h6 class="card-title">Pending Subsidy Requests</h6>
@@ -750,7 +835,7 @@ if (isset($conn) && $conn) {
 <!-- Bootstrap Script -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
 
-<!-- Chart.js Initialization (UPDATED LABELS) -->
+<!-- Chart.js Initialization (UPDATED LABELS and NEW CHART) -->
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // PHP variables for crop data
@@ -762,6 +847,10 @@ if (isset($conn) && $conn) {
         const subsidyApprovedPendingClaim = <?php echo json_encode($subsidyApprovedPendingClaim); ?>;
         const subsidyPendingReview = <?php echo json_encode($subsidyPendingReview); ?>;
         const subsidyRejected = <?php echo json_encode($subsidyRejected); ?>;
+
+        // NEW: PHP variables for disaster data
+        const disasterTypeLabels = <?php echo json_encode($disasterTypeLabels); ?>;
+        const disasterTypeData = <?php echo json_encode($disasterTypeData); ?>;
 
         // Crop Performance Data (Bar Chart) - LABELS UPDATED
         const cropPerformanceData = {
@@ -785,6 +874,32 @@ if (isset($conn) && $conn) {
                     'rgba(153, 102, 255, 1)',
                     'rgba(255, 99, 132, 1)',
                     'rgba(54, 162, 235, 1)'
+                ],
+                borderWidth: 1
+            }]
+        };
+        
+        // NEW: Disaster Impact Data (Bar Chart)
+        const disasterImpactData = {
+            labels: disasterTypeLabels,
+            datasets: [{
+                label: 'Affected Farmers Count',
+                data: disasterTypeData,
+                backgroundColor: [
+                    'rgba(220, 53, 69, 0.7)', // Red/Danger for disaster
+                    'rgba(255, 193, 7, 0.7)', // Warning
+                    'rgba(23, 162, 184, 0.7)', // Info
+                    'rgba(108, 117, 125, 0.7)', // Secondary
+                    'rgba(25, 134, 15, 0.7)', // Success
+                    'rgba(153, 102, 255, 0.7)' // Purple
+                ],
+                borderColor: [
+                    'rgba(220, 53, 69, 1)',
+                    'rgba(255, 193, 7, 1)',
+                    'rgba(23, 162, 184, 1)',
+                    'rgba(108, 117, 125, 1)',
+                    'rgba(25, 134, 15, 1)',
+                    'rgba(153, 102, 255, 1)'
                 ],
                 borderWidth: 1
             }]
@@ -825,34 +940,62 @@ if (isset($conn) && $conn) {
                 }
             }
         };
-
-        // Crop Yield Chart
-        const cropYieldCtx = document.getElementById('cropYieldChart').getContext('2d');
-        new Chart(cropYieldCtx, {
-            type: 'bar',
-            data: cropPerformanceData, // Use the fetched data
-            options: {
-                ...chartOptions,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            // **UPDATED Y-AXIS TITLE**
-                            text: 'Number of Farmers'
+        
+        // --- CHART INITIALIZATION ---
+        
+        // Crop Yield Chart (Only initialize if the canvas exists)
+        const cropYieldCtx = document.getElementById('cropYieldChart');
+        if (cropYieldCtx) {
+            new Chart(cropYieldCtx.getContext('2d'), {
+                type: 'bar',
+                data: cropPerformanceData, // Use the fetched data
+                options: {
+                    ...chartOptions,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                // **UPDATED Y-AXIS TITLE**
+                                text: 'Number of Farmers'
+                            }
                         }
                     }
                 }
-            }
-        });
+            });
+        }
+        
+        // NEW: Disaster Impact Chart (Only initialize if the canvas exists)
+        const disasterImpactCtx = document.getElementById('disasterImpactChart');
+        if (disasterImpactCtx) {
+            new Chart(disasterImpactCtx.getContext('2d'), {
+                type: 'bar',
+                data: disasterImpactData,
+                options: {
+                    ...chartOptions,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Number of Affected Farmers'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
 
         // Subsidy Status Chart (Doughnut)
-        const subsidyStatusCtx = document.getElementById('subsidyStatusChart').getContext('2d');
-        new Chart(subsidyStatusCtx, {
-            type: 'doughnut',
-            data: subsidyStatusData,
-            options: chartOptions // Use shared options for simplicity
-        });
+        const subsidyStatusCtx = document.getElementById('subsidyStatusChart');
+        if(subsidyStatusCtx) {
+            new Chart(subsidyStatusCtx.getContext('2d'), {
+                type: 'doughnut',
+                data: subsidyStatusData,
+                options: chartOptions // Use shared options for simplicity
+            });
+        }
     });
 </script>
 

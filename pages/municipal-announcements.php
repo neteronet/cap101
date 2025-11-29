@@ -515,6 +515,15 @@ function getImagePath($image_path) {
             font-size: 0.875rem; /* 14px for small actions */
             padding: 0.375rem 0.75rem;
         }
+
+        /* Custom fix for modal position to clear fixed header (56px height) */
+        .announcement-modal-top-offset {
+            /* Remove default centering effect by top margin */
+            /* 56px (header height) + ~14px buffer = 70px */
+            margin-top: 70px; 
+            margin-bottom: 30px; /* Ensure some bottom space */
+            /* Note: modal-dialog will retain its max-width/responsive behavior */
+        }
         
         .pagination-container {
             display: flex;
@@ -817,7 +826,8 @@ function getImagePath($image_path) {
 
     <!-- Announcement Detail Modal -->
     <div class="modal fade" id="announcementDetailModal" tabindex="-1" aria-labelledby="announcementDetailModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
+        <!-- FIX: Removed 'modal-dialog-centered' and added 'announcement-modal-top-offset' -->
+        <div class="modal-dialog modal-lg announcement-modal-top-offset"> 
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="announcementDetailModalLabel">Announcement Details</h5>
@@ -841,7 +851,8 @@ function getImagePath($image_path) {
 
     <!-- Delete Confirmation Modal -->
     <div class="modal fade" id="deleteConfirmationModal" tabindex="-1" aria-labelledby="deleteConfirmationModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <!-- FIX: Removed 'modal-dialog-centered' and added 'announcement-modal-top-offset' -->
+        <div class="modal-dialog announcement-modal-top-offset">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="deleteConfirmationModalLabel">Confirm Deletion</h5>

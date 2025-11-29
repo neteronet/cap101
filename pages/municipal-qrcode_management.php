@@ -443,6 +443,7 @@ function get_status_class($status) {
                 Scan QR codes or use manual entry to verify and process subsidy claims for farmers.
             </p>
             <div class="row">
+                <!-- 1. Scan Farmer QR Code Card -->
                 <div class="col-lg-6 mb-4">
                     <div class="card h-100 shadow-sm">
                         <div class="card-body">
@@ -472,6 +473,7 @@ function get_status_class($status) {
                     </div>
                 </div>
 
+                <!-- 2. Subsidy Claim Verification Card -->
                 <div class="col-lg-6 mb-4">
                     <div class="card h-100 shadow-sm">
                         <div class="card-body">
@@ -516,26 +518,31 @@ function get_status_class($status) {
                     </div>
                 </div>
 
+                <!-- 3. Manual Claim (When Scanner Unavailable) Card - REMOVED -->
+                <!-- The manual claim card has been removed as requested. -->
+                
+                <!-- 4. NEW CARD: QR Code Verification via Photo Upload -->
                 <div class="col-lg-6 mb-4">
                     <div class="card h-100 shadow-sm">
                         <div class="card-body">
-                            <h5 class="card-title">Manual Claim (When Scanner Unavailable)</h5>
+                            <h5 class="card-title">QR Code Verification via Photo Upload</h5>
                             <p class="card-text small">
-                                Enter the Farmer ID manually to fetch and claim the subsidy.
+                                Upload a clear image of the farmer's QR code (e.g., screenshot, printed photo) to verify the claim.
                             </p>
-                            <form id="manualClaimForm">
+                            <form id="photoClaimForm">
                                 <div class="mb-3">
-                                    <label for="manualFarmerId" class="form-label small">Farmer ID (e.g., FRM-000000002):</label>
-                                    <input type="text" class="form-control" id="manualFarmerId" placeholder="FRM-XXXXXXXXX" required>
+                                    <label for="qrCodeImage" class="form-label small">Upload QR Code Image:</label>
+                                    <input class="form-control" type="file" id="qrCodeImage" accept="image/*" required>
                                 </div>
-                                <button type="submit" class="btn btn-theme">
-                                    <i class="fas fa-search me-1"></i> Fetch Details
+                                <button type="submit" class="btn btn-theme" id="scanImageButton" disabled>
+                                    <i class="fas fa-camera-retro me-1"></i> Decode and Fetch Details
                                 </button>
-                                <div id="manualMessage" class="mt-3"></div>
+                                <div id="photoMessage" class="mt-3"></div>
                             </form>
                         </div>
                     </div>
                 </div>
+                <!-- END NEW CARD -->
 
                 <div class="col-12">
                     <div class="card shadow-sm">
@@ -572,8 +579,7 @@ function get_status_class($status) {
                     </div>
                 </div>
             </div>
-        </div>
-    </main>
+        </main>
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
     
@@ -638,6 +644,13 @@ function get_status_class($status) {
         const verifyButton = document.getElementById('verifyButton');
         const verificationMessage = document.getElementById('verificationMessage');
         const verifyClaimForm = document.getElementById('verifyClaimForm');
+        
+        // New DOM Elements for Photo Upload
+        const photoClaimForm = document.getElementById('photoClaimForm');
+        const qrCodeImageInput = document.getElementById('qrCodeImage');
+        const scanImageButton = document.getElementById('scanImageButton');
+        const photoMessage = document.getElementById('photoMessage');
+        // manualMessage and manualFarmerIdInput are no longer declared here
 
         let html5QrcodeScanner = null; // html5-qrcode scanner instance
         let isScanning = false;
@@ -657,6 +670,9 @@ function get_status_class($status) {
             verifyButton.classList.remove('btn-secondary');
             verifyButton.classList.add('btn-theme');
             verificationMessage.innerHTML = message ? `<div class="alert alert-${type}">${message}</div>` : '';
+            
+            // Clear the manual message if it was still active (though the form is removed)
+            // manualMessage.innerHTML = ''; // Removed as manualMessage element no longer exists
         }
 
         // Helper function to stop scanner
@@ -687,6 +703,8 @@ function get_status_class($status) {
             resetVerificationForm();
             qrResultDisplay.style.display = 'none';
             qrScanMessage.style.display = 'none';
+            // manualMessage.innerHTML = ''; // Clear manual message - REMOVED
+            photoMessage.innerHTML = '';  // Clear photo message
 
             try {
                 // Create scanner instance with optimized settings
@@ -821,51 +839,17 @@ function get_status_class($status) {
             return null;
         }
 
-        // Helper function to automatically save claim to database
-        async function autoSaveClaim(appId, userId, farmerName, subsidyType) {
-            try {
-                verificationMessage.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin me-2"></i> Automatically saving claim to database...</div>';
-                
-                const response = await fetch('api/update_subsidy_claim.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: `application_id=${appId}&user_id=${userId}`
-                });
-                
-                const data = await response.json();
-
-                if (data.success) {
-                    verificationMessage.innerHTML = `<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i> ${data.message} Claim automatically saved to database.</div>`;
-                    claimStatusInput.value = 'Claimed';
-                    verifyButton.textContent = 'Already Claimed';
-                    verifyButton.classList.remove('btn-theme');
-                    verifyButton.classList.add('btn-secondary');
-                    verifyButton.disabled = true;
-                    
-                    // Update claim count
-                    const newClaimCount = parseInt(claimCountInput.value || 0) + 1;
-                    claimCountInput.value = newClaimCount;
-                    
-                    // Update the recent transactions table dynamically
-                    addTransactionToTable(appId, userId, farmerName, subsidyType, 'Claimed');
-                    
-                    return true;
-                } else {
-                    verificationMessage.innerHTML = `<div class="alert alert-danger"><i class="fas fa-times-circle me-2"></i> ${data.message}</div>`;
-                    return false;
-                }
-            } catch (error) {
-                console.error('Auto-save claim error:', error);
-                verificationMessage.innerHTML = '<div class="alert alert-danger">An error occurred while saving to database. Please try again.</div>';
-                return false;
-            }
-        }
-
+        /*
+        * REMOVED autoSaveClaim FUNCTION:
+        * The automatic claiming in response to a successful QR scan/upload is a security risk/poor practice
+        * and should be replaced by a manual 'Mark as Claimed' button press.
+        */
+        
         async function processQrData(qrData) {
             const parsedData = parseQrData(qrData);
             
             if (!parsedData) {
-                resetVerificationForm('Invalid QR code data format scanned.');
+                resetVerificationForm('Invalid QR code data format scanned or uploaded.');
                 return;
             }
 
@@ -895,17 +879,16 @@ function get_status_class($status) {
                     claimCountInput.value = details.claim_count;
 
                     if (details.claim_count > 0) {
+                        // Case 1: Already claimed
                         resetVerificationForm('This subsidy has already been claimed. The QR code cannot be scanned again unless the farmer applies for a new subsidy.', 'danger');
-                    } else if (details.current_status === 'Approved' || details.current_status === 'Claimed') {
-                        // Automatically save the claim to database
-                        await autoSaveClaim(
-                            parsedData.application_id,
-                            parsedData.user_id,
-                            details.farmer_name,
-                            details.subsidy_type
-                        );
+                    } else if (details.current_status === 'Approved') {
+                        // Case 2: Approved and ready to claim (Enable button for manual confirmation)
+                        verifyButton.disabled = false;
+                        verifyButton.textContent = 'Mark as Claimed';
+                        verificationMessage.innerHTML = '<div class="alert alert-success"><i class="fas fa-info-circle me-2"></i> Subsidy is **Approved** and ready to be claimed. Please verify all details and click "Mark as Claimed".</div>';
                     } else {
-                        resetVerificationForm(`Subsidy status is '${details.current_status}'. Only 'Approved' or 'Claimed' applications can be claimed.`, 'warning');
+                        // Case 3: Not Approved, not yet claimed
+                        resetVerificationForm(`Subsidy status is '${details.current_status}'. Only 'Approved' applications can be claimed.`, 'warning');
                     }
                 } else {
                     resetVerificationForm(data.message || 'Error fetching subsidy details from the server.');
@@ -926,6 +909,7 @@ function get_status_class($status) {
             const userId = hiddenFarmerIdInput.value;
             const currentStatus = claimStatusInput.value; // Check current visible status
 
+            // Only allow claiming if current visible status is 'Approved' (or 'Claimed' if they somehow got here)
             if (!appId || !userId || verifyButton.disabled || (currentStatus !== 'Approved' && currentStatus !== 'Claimed')) {
                 verificationMessage.innerHTML = '<div class="alert alert-danger">Cannot process claim. Invalid data or status not eligible for claiming.</div>';
                 return;
@@ -954,6 +938,10 @@ function get_status_class($status) {
                     verifyButton.textContent = 'Already Claimed';
                     verifyButton.classList.remove('btn-theme');
                     verifyButton.classList.add('btn-secondary');
+                    
+                    // Update claim count display
+                    const newClaimCount = parseInt(claimCountInput.value || 0) + 1;
+                    claimCountInput.value = newClaimCount;
                     
                     // Update the recent transactions table dynamically
                     addTransactionToTable(appId, userId, farmerNameInput.value, subsidyTypeInput.value, 'Claimed');
@@ -998,87 +986,58 @@ function get_status_class($status) {
             }
         }
         
-        // --- Manual Claim Form Handler ---
-        const manualClaimForm = document.getElementById('manualClaimForm');
-        const manualFarmerIdInput = document.getElementById('manualFarmerId');
-        const manualMessage = document.getElementById('manualMessage');
+        // --- Manual Claim Form Handler - REMOVED ---
+        // The manual claim form handler logic has been removed as requested.
+        
+        // --- Photo Upload Handler (NEW FUNCTIONALITY) ---
 
-        manualClaimForm.addEventListener('submit', async function(e) {
+        // Enable button when file is selected
+        qrCodeImageInput.addEventListener('change', () => {
+            scanImageButton.disabled = qrCodeImageInput.files.length === 0;
+        });
+
+        photoClaimForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            // Reset verification form UI when starting a manual check
+            // Reset verification form UI when starting a photo check
             resetVerificationForm();
+            // manualMessage.innerHTML = ''; // Clear manual message - REMOVED
             
-            const farmerIdInput = manualFarmerIdInput.value.trim();
-            
-            if (!farmerIdInput) {
-                manualMessage.innerHTML = '<div class="alert alert-danger">Please enter a Farmer ID.</div>';
+            const imageFile = qrCodeImageInput.files[0];
+
+            if (!imageFile) {
+                photoMessage.innerHTML = '<div class="alert alert-danger">Please select an image file to upload.</div>';
                 return;
             }
 
-            // Extract user_id from FRM-XXXXXXXXX format or just a number
-            let userId = null;
-            if (farmerIdInput.startsWith('FRM-')) {
-                const idPart = farmerIdInput.substring(4);
-                userId = parseInt(idPart, 10);
-                if (isNaN(userId)) {
-                    manualMessage.innerHTML = '<div class="alert alert-danger">Invalid Farmer ID format. Please use FRM-XXXXXXXXX format.</div>';
-                    return;
-                }
-            } else {
-                userId = parseInt(farmerIdInput, 10);
-                if (isNaN(userId)) {
-                    manualMessage.innerHTML = '<div class="alert alert-danger">Invalid Farmer ID format. Please use FRM-XXXXXXXXX or the numeric ID.</div>';
-                    return;
-                }
-            }
-
-            manualMessage.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin me-2"></i> Fetching details...</div>';
+            photoMessage.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin me-2"></i> Decoding QR code from image...</div>';
+            scanImageButton.disabled = true;
 
             try {
-                // Fetch the latest Approved/Pending application details for this user
-                const response = await fetch('api/get_subsidy_details.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: `user_id=${userId}`
-                });
+                // Use the static method scanFile from html5-qrcode
+                const decodedText = await Html5Qrcode.scanFile(imageFile, false); // false for no log
+                
+                // Success
+                photoMessage.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i> QR Code successfully decoded. Fetching details...</div>';
+                
+                // Update the main result display (optional, but good for feedback)
+                scannedDataSpan.textContent = decodedText;
+                qrResultDisplay.style.display = 'block';
+                
+                // Pass the result to the existing processing function
+                processQrData(decodedText);
+                
 
-                const data = await response.json();
-
-                if (data.success && data.details) {
-                    const details = data.details;
-                    
-                    // Populate the verification form
-                    hiddenApplicationIdInput.value = details.application_id;
-                    hiddenFarmerIdInput.value = details.farmer_id;
-                    applicationIdDisplayInput.value = details.application_id;
-                    farmerIdDisplayInput.value = `FRM-${String(details.farmer_id).padStart(9, '0')}`;
-                    farmerNameInput.value = details.farmer_name;
-                    subsidyTypeInput.value = details.subsidy_type;
-                    claimStatusInput.value = details.current_status;
-                    claimCountInput.value = details.claim_count;
-
-                    if (details.current_status === 'Approved' && details.claim_count == 0) {
-                        verifyButton.disabled = false;
-                        verifyButton.textContent = 'Mark as Claimed';
-                        verificationMessage.innerHTML = '<div class="alert alert-info">Details fetched successfully. You can now mark as claimed.</div>';
-                        manualMessage.innerHTML = '<div class="alert alert-success">Details fetched successfully! Ready for claiming.</div>';
-                    } else if (details.claim_count > 0) {
-                        verificationMessage.innerHTML = '<div class="alert alert-danger">This subsidy has already been claimed.</div>';
-                        manualMessage.innerHTML = '<div class="alert alert-danger">This subsidy has already been claimed.</div>';
-                    } else {
-                        verificationMessage.innerHTML = `<div class="alert alert-warning">Subsidy status is '${details.current_status}'. Only 'Approved' applications can be claimed.</div>`;
-                        manualMessage.innerHTML = `<div class="alert alert-warning">Subsidy status is '${details.current_status}'. Only 'Approved' applications can be claimed.</div>`;
-                    }
-                } else {
-                    manualMessage.innerHTML = `<div class="alert alert-danger">${data.message || 'No matching Approved subsidy found for this Farmer ID.'}</div>`;
-                }
             } catch (error) {
-                console.error('Manual fetch error:', error);
-                manualMessage.innerHTML = '<div class="alert alert-danger">An error occurred while fetching details from the server.</div>';
+                // Failure
+                console.error('Photo decode error:', error);
+                photoMessage.innerHTML = '<div class="alert alert-danger"><i class="fas fa-times-circle me-2"></i> Failed to decode QR code. Please ensure the image is clear and contains a valid QR code.</div>';
+            } finally {
+                // Re-enable button
+                scanImageButton.disabled = qrCodeImageInput.files.length === 0;
             }
         });
-        
+
         // Initial state
         document.addEventListener('DOMContentLoaded', () => {
             resetVerificationForm('Awaiting QR Scan or Manual ID Entry.');

@@ -3,29 +3,28 @@ session_start(); // Start the session at the very beginning of the script
 
 include '../includes/connection.php'; // Ensure your connection file is correctly included
 
-// --- IMPROVEMENT 1: Robust Connection Check to prevent crashing on DB failure ---
+// --- Connection Check ---
 if (!isset($conn) || $conn->connect_error) {
     error_log("Database connection failed: " . ($conn->connect_error ?? "Connection object not set"));
-    // Redirect to a specific error page and stop execution
     header("location: admin-login.php"); 
     exit();
 }
 
-// Check if the user is logged in. If not, redirect to the login page.
+// Check if the user is logged in
 if (!isset($_SESSION['user_id']) || !is_numeric($_SESSION['user_id'])) {
     header("location: admin-login.php");
     exit();
 }
 if ($_SESSION['user_type'] != 'admin') {
-        header("location: admin-login.php");
-        exit();
-    }
+    header("location: admin-login.php");
+    exit();
+}
 
 $user_id = $_SESSION['user_id'];
-$display_name = 'Admin'; // Default fallback
-$is_admin = false; // Flag to enforce admin access
+$display_name = 'Admin'; 
+$is_admin = false;
 
-// --- IMPROVEMENT 2: Fetch user name AND user type for security check ---
+// --- Fetch user name AND user type ---
 $stmt_name = $conn->prepare("SELECT name, user_type FROM users WHERE user_id = ?");
 if ($stmt_name) {
     $stmt_name->bind_param("i", $user_id);
@@ -35,19 +34,17 @@ if ($stmt_name) {
     $stmt_name->close();
 
     if ($db_name) {
-        $display_name = htmlspecialchars($db_name); // Sanitize immediately
+        $display_name = htmlspecialchars($db_name);
     }
 
-    // --- IMPROVEMENT 3: Explicit Admin Authorization Check ---
     if ($db_user_type === 'admin') {
         $is_admin = true;
     } 
-
 } else {
     error_log("Failed to prepare statement for user name/type: " . $conn->error);
 }
 
-// Security Check: If the user is not explicitly an 'admin', redirect them out.
+// Security Check
 if (!$is_admin) {
     session_unset();
     session_destroy();
@@ -55,7 +52,7 @@ if (!$is_admin) {
     exit();
 }
 
-// Example: Get count of all Farmers (which Admin can see)
+// Get count of Farmers
 $farmer_count = 0;
 $stmt_count = $conn->prepare("SELECT COUNT(*) FROM users WHERE user_type = 'farmer'");
 if($stmt_count){
@@ -65,8 +62,7 @@ if($stmt_count){
     $stmt_count->close();
 }
 
-
-// --- NEW FETCH 1: Get count of all MAO Users (user_type = 'mao') ---
+// Get count of MAO Users
 $mao_count = 0;
 $stmt_mao = $conn->prepare("SELECT COUNT(*) FROM users WHERE user_type = 'mao'");
 if($stmt_mao){
@@ -77,24 +73,11 @@ if($stmt_mao){
 }
 
 
-// --- NEW FETCH 2: Get count of Approved Applications ---
-// NOTE: This assumes an 'applications' table with a 'status' column set to 'approved'.
-// ADJUST table/column names if your schema is different.
-$approved_applications_count = 0;
-$stmt_applications = $conn->prepare("SELECT COUNT(*) FROM applications WHERE status = 'approved'");
-if($stmt_applications){
-    $stmt_applications->execute();
-    $stmt_applications->bind_result($approved_applications_count);
-    $stmt_applications->fetch();
-    $stmt_applications->close();
-}
+// --- FETCH: Get Recent Added USERS --- 
+$recent_users = [];
 
-
-// --- NEW FETCH 3: Get Recent Farmer Registrations (e.g., last 5) ---
-$recent_farmers = [];
-// Select the latest 5 farmers, ordered by user_id DESC (assuming auto-increment ID represents registration order)
-// We fetch user_id, name, and email for display.
-$stmt_recent = $conn->prepare("SELECT user_id, name, email FROM users WHERE user_type = 'farmer' ORDER BY user_id DESC LIMIT 5");
+// We fetch user_id, name, type, and date.
+$stmt_recent = $conn->prepare("SELECT user_id, name, user_type, created_at FROM users ORDER BY created_at DESC LIMIT 5");
 
 if ($stmt_recent) {
     $stmt_recent->execute();
@@ -102,20 +85,15 @@ if ($stmt_recent) {
 
     if ($result_recent->num_rows > 0) {
         while ($row = $result_recent->fetch_assoc()) {
-            // Sanitize data before storing it in the array
             $row['name'] = htmlspecialchars($row['name']);
-            $row['email'] = htmlspecialchars($row['email']);
-            $recent_farmers[] = $row;
+            $row['formatted_date'] = date("M d, Y", strtotime($row['created_at']));
+            $recent_users[] = $row;
         }
     }
     $stmt_recent->close();
 } else {
-    error_log("Failed to prepare statement for recent farmers: " . $conn->error);
+    error_log("Failed to prepare statement for recent users: " . $conn->error);
 }
-
-
-// --- Placeholder for other data fetches... ---
-
 ?>
 
 <!DOCTYPE html>
@@ -129,18 +107,15 @@ if ($stmt_recent) {
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet" />
 
-    <!-- Google Fonts (FROM FARMER DASHBOARD) -->
+    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-    <!-- Font Awesome for Icons -->
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
 
-    <!-- Notification Bell Component Removed -->
-
-    <!-- Custom Styles (CSS is synchronized with farmer-dashboard.php) -->
+    <!-- Custom Styles -->
     <style>
         body {
-            /* MODIFIED: Changed font-family to Poppins for body/content text */
             font-family: "Poppins", sans-serif;
             background: #f8f9fa;
             font-size: 16px;
@@ -149,7 +124,7 @@ if ($stmt_recent) {
             margin: 0;
         }
 
-        /* --- Sidebar Styles (Consistent with Farmer Dashboard) --- */
+        /* --- Sidebar Styles --- */
         .sidebar {
             position: fixed;
             top: 0;
@@ -248,7 +223,7 @@ if ($stmt_recent) {
             border-top: 1px solid rgba(255, 255, 255, 0.2);
         }
 
-        /* --- Fixed Top Header (Consistent with Farmer Dashboard) --- */
+        /* --- Fixed Top Header --- */
         .card-header-custom {
             position: fixed;
             top: 0;
@@ -273,7 +248,7 @@ if ($stmt_recent) {
             left: 0;
         }
 
-        /* --- Main Content Area (Consistent with Farmer Dashboard) --- */
+        /* --- Main Content Area --- */
         main {
             margin-left: 250px;
             padding: 72px 2rem 2rem 2rem;
@@ -310,22 +285,7 @@ if ($stmt_recent) {
         .card-text, .card-body p:not(.card-title), .list-unstyled li {
             font-size: 0.9375rem;
         }
-
-        /* Button Theme Consistency */
-        .btn-theme {
-            background-color: #19860f;
-            color: #fff;
-            border-color: #19860f;
-            font-family: "Be Vietnam Pro", sans-serif;
-        }
-
-        .btn-theme:hover {
-            background-color: #146c0b;
-            border-color: #146c0b;
-            color: #fff;
-        }
         
-        /* Card Styles */
         .card {
             border-radius: 0.5rem;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
@@ -333,21 +293,21 @@ if ($stmt_recent) {
             border: 1px solid #ddd;
         }
         
-        /* Status Badge Consistency (Not heavily used by Admin, but for consistency) */
+        /* Status Badge for User Type */
         .status-badge {
             padding: 0.3em 0.6em;
             border-radius: 0.4rem;
-            font-size: 13px;
-            font-weight: 500;
+            font-size: 0.8rem;
+            font-weight: 600;
             display: inline-block;
-            font-family: "Be Vietnam Pro", sans-serif;
+            text-transform: capitalize;
         }
-        
-        /* Notification Bell Styling - REMOVED */
+        .bg-role-farmer { background-color: #d1e7dd; color: #0f5132; }
+        .bg-role-mao { background-color: #cfe2ff; color: #084298; }
+        .bg-role-admin { background-color: #e2e3e5; color: #41464b; }
 
-        /* Table Styling for better look */
         .table-striped>tbody>tr:nth-of-type(odd)>* {
-            background-color: rgba(25, 134, 15, 0.05); /* Light green tint for stripes */
+            background-color: rgba(25, 134, 15, 0.05); 
         }
         
         .table thead th {
@@ -360,15 +320,13 @@ if ($stmt_recent) {
 
 <body>
 
-    <!-- Sidebar (Consistent with Farmer Dashboard Structure) -->
+    <!-- Sidebar -->
     <nav class="sidebar">
-        <!-- Logo and Text (Consistent Logo and Name for System) -->
         <a href="ProvincialAgriHome.html" class="header-brand">
             <img src="../photos/logo.png" alt="Department of Agriculture Logo" />
             <div>Agriconnect</div>
         </a>
 
-        <!-- Menu Label -->
         <div class="sidebar-menu-label">Main Menu</div>
 
         <ul class="nav flex-column">
@@ -389,7 +347,6 @@ if ($stmt_recent) {
             </li>
         </ul>
         
-        <!-- Logout Section (Consistent location) -->
         <div class="sidebar-logout">
             <a href="admin-logout.php" class="nav-link">
                 <i class="fas fa-sign-out-alt"></i> Logout
@@ -397,34 +354,27 @@ if ($stmt_recent) {
         </div>
     </nav>
 
-    <!-- Header (Consistent with Farmer Dashboard Structure) -->
+    <!-- Header -->
     <div class="card-header card-header-custom d-flex justify-content-between align-items-center">
-        <!-- Sidebar Toggle Button -->
         <button id="sidebarToggleBtn" class="btn btn-link p-0 text-dark" title="Toggle Sidebar" style="font-size: 1.5rem;">
             <i class="fas fa-bars"></i>
         </button>
-        <!-- Right side alignment wrapper -->
         <div class="d-flex align-items-center">
-            <!-- Greeting -->
             <span class="me-3">Hi, <strong><?php echo $display_name; ?></strong></span>
-
-            <!-- Notification Bell (Markup removed) -->
         </div>
     </div>
 
     <!-- Main Content -->
     <main>
         <div class="container">
-            <!-- Page Title (Consistent Style) -->
             <h1 class="page-title">Admin Dashboard</h1>
             <p class="text-muted mb-4 dashboard-description">
                 Welcome to your administration panel. Review overall system performance and manage users.
             </p>
 
-            <!-- Dashboard Content Cards -->
             <div class="row">
-                <div class="col-md-4 mb-4">
-                    <!-- Card 1: Registered Farmers (Existing) -->
+                <!-- Card 1: Registered Farmers -->
+                <div class="col-md-6 mb-4"> 
                     <div class="card text-white bg-success">
                         <div class="card-body">
                             <h5 class="card-title text-white"><i class="fas fa-users me-2"></i> Registered Farmers</h5>
@@ -436,65 +386,59 @@ if ($stmt_recent) {
                     </div>
                 </div>
                 
-                <div class="col-md-4 mb-4">
-                    <!-- Card 2: Approved Applications (Updated Fetch) -->
-                    <div class="card text-white bg-warning">
-                        <div class="card-body">
-                            <h5 class="card-title text-white"><i class="fas fa-check-circle me-2"></i> Approved Applications</h5>
-                            <p class="card-text fs-2">
-                                <?php echo number_format($approved_applications_count); // Display fetched count ?>
-                            </p>
-                            <a href="#" class="text-white small text-decoration-none">More Info <i class="fas fa-arrow-circle-right"></i></a>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="col-md-4 mb-4">
-                    <!-- Card 3: MAO Users (Updated Fetch) -->
+                <!-- Card 2: MAO Users -->
+                <div class="col-md-6 mb-4">
                     <div class="card text-white bg-info">
                         <div class="card-body">
                             <h5 class="card-title text-white"><i class="fas fa-user-tie me-2"></i> MAO Users</h5>
                             <p class="card-text fs-2">
-                                <?php echo number_format($mao_count); // Display fetched count ?>
+                                <?php echo number_format($mao_count); ?>
                             </p>
-                            <a href="#" class="text-white small text-decoration-none">Manage Users <i class="fas fa-arrow-circle-right"></i></a>
+                            <p class="small text-white mb-0" style="height: 1.5rem;">&nbsp;</p> 
                         </div>
                     </div>
                 </div>
             </div>
             
-            <!-- NEW: Recent Farmer Registrations Table -->
+            <!-- MODIFIED: Recent Added USERS Table (ID and Action Removed) -->
             <div class="card">
                 <div class="card-body">
-                    <h5 class="card-title">Recent Farmer Registrations</h5>
+                    <h5 class="card-title">Recent Added Users</h5>
                     
                     <div class="table-responsive">
-                        <?php if (count($recent_farmers) > 0): ?>
+                        <?php if (count($recent_users) > 0): ?>
                         <table class="table table-striped table-hover align-middle">
                             <thead>
                                 <tr>
-                                    <th scope="col" style="width: 10%;">ID</th>
-                                    <th scope="col" style="width: 35%;">Name</th>
-                                    <th scope="col" style="width: 40%;">Email</th>
-                                    <th scope="col" style="width: 15%;">Action</th>
+                                    <!-- Action Removed. Adjusted widths: Name 50%, Role 25%, Date 25% -->
+                                    <th scope="col" style="width: 50%;">Name</th>
+                                    <th scope="col" style="width: 25%;">Role</th>
+                                    <th scope="col" style="width: 25%;">Date Added</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($recent_farmers as $farmer): ?>
+                                <?php foreach ($recent_users as $user): ?>
+                                    <?php 
+                                        // Determine badge class based on user_type
+                                        $badgeClass = 'bg-role-admin'; // fallback
+                                        if($user['user_type'] === 'farmer') $badgeClass = 'bg-role-farmer';
+                                        if($user['user_type'] === 'mao') $badgeClass = 'bg-role-mao';
+                                    ?>
                                 <tr>
-                                    <th scope="row"><?php echo $farmer['user_id']; ?></th>
-                                    <td><?php echo $farmer['name']; ?></td>
-                                    <td><?php echo $farmer['email']; ?></td>
+                                    <td><?php echo $user['name'] ?: '<span class="text-muted">No Name</span>'; ?></td>
                                     <td>
-                                        <!-- Note: Replace 'admin-view_farmer_details.php' with your actual detail page link -->
-                                        <a href="admin-view_farmer_details.php?id=<?php echo $farmer['user_id']; ?>" class="btn btn-sm btn-outline-success">View</a>
+                                        <span class="status-badge <?php echo $badgeClass; ?>">
+                                            <?php echo strtoupper($user['user_type']); ?>
+                                        </span>
                                     </td>
+                                    <td><?php echo $user['formatted_date']; ?></td>
+                                    <!-- Action Button Logic Removed -->
                                 </tr>
                                 <?php endforeach; ?>
                             </tbody>
                         </table>
                         <?php else: ?>
-                        <p class="text-muted mb-0">No recent farmer registrations found.</p>
+                        <p class="text-muted mb-0">No recent user registrations found.</p>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -505,9 +449,8 @@ if ($stmt_recent) {
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
     
-    <!-- JavaScript for Sidebar Toggle (Consistent with Farmer Dashboard) -->
+    <!-- JavaScript for Sidebar Toggle -->
     <script>
-        // JavaScript to toggle sidebar collapse and preserve state using localStorage
         const sidebar = document.querySelector('.sidebar');
         const mainContent = document.querySelector('main');
         const header = document.querySelector('.card-header-custom');
@@ -517,17 +460,16 @@ if ($stmt_recent) {
             sidebar.classList.add('collapsed');
             mainContent.classList.add('collapsed');
             header.classList.add('collapsed');
-            localStorage.setItem('sidebarCollapsed', 'true'); // Save state
+            localStorage.setItem('sidebarCollapsed', 'true');
         }
 
         function openSidebar() {
             sidebar.classList.remove('collapsed');
             mainContent.classList.remove('collapsed');
             header.classList.remove('collapsed');
-            localStorage.setItem('sidebarCollapsed', 'false'); // Save state
+            localStorage.setItem('sidebarCollapsed', 'false');
         }
 
-        // Apply saved state on page load
         const isCollapsed = localStorage.getItem('sidebarCollapsed');
         if (isCollapsed === 'true') {
             sidebar.classList.add('collapsed');
@@ -535,7 +477,6 @@ if ($stmt_recent) {
             header.classList.add('collapsed');
         }
 
-        // Toggle button functionality 
         toggleBtn.addEventListener('click', function() {
             if (sidebar.classList.contains('collapsed')) {
                 openSidebar();
@@ -543,15 +484,11 @@ if ($stmt_recent) {
                 collapseSidebar();
             }
         });
-        
-        // Notification Bell Placeholder Functions - REMOVED
-
     </script>
 </body>
 
 </html>
 <?php
-// Close the connection as the very last step after all HTML and data have been generated
 if (isset($conn) && $conn) {
     $conn->close();
 }
